@@ -18,6 +18,7 @@
 package engine
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"time"
@@ -46,6 +47,13 @@ type Options struct {
 	Local, Remote fsys.FS
 	State         *state.DB
 	Settings      *config.Settings
+	// LocalName and RemoteName label each side in conflict file names, e.g.
+	// the machine's host name and the share's name. Empty means "local" and
+	// "remote".
+	LocalName, RemoteName string
+	// AllowDeletions lets one run through the deletion guard, after the user
+	// has confirmed that the deletions it held are wanted.
+	AllowDeletions bool
 	// OnAction, if set, is called after each action with its outcome: nil when
 	// it was carried out, an error wrapping ErrChanged when it was skipped.
 	OnAction func(a *Action, err error)
@@ -58,6 +66,9 @@ type Issue struct {
 	Path   string
 	Op     Op
 	Reason string
+	// Outcome says what was done about a conflict: "held", "newest wins: ...",
+	// "kept both: ...".
+	Outcome string
 }
 
 // Result summarises a run.
@@ -69,10 +80,39 @@ type Result struct {
 	Adopted       int // already in sync, now recorded
 	BytesToLocal  int64
 	BytesToRemote int64
-	Conflicts     []Issue // held: changed on both sides, or a file/folder clash
+	Conflicts     []Issue // changed on both sides, or a file/folder clash
+	// Held is set when an unresolved "ask" conflict held the whole shuttle:
+	// nothing but the conflicts was looked at.
+	Held bool
+	// HeldDeletions are deletions the deletion guard stopped: too large a
+	// share of one side's files at once. They run once AllowDeletions is set.
+	HeldDeletions []Issue
 	Skipped       []Issue // changed during the run
 	Errors        []Issue
 	Unsupported   []string // symlinks, devices and the like: never synced
+}
+
+func newExecutor(ctx context.Context, o *Options, res *Result) *executor {
+	e := &executor{ctx: ctx, o: o, res: res, now: o.Now}
+	if e.now == nil {
+		e.now = time.Now
+	}
+	if e.o.LocalName == "" || e.o.RemoteName == "" {
+		named := *o
+		named.LocalName, named.RemoteName = cmp.Or(o.LocalName, "local"), cmp.Or(o.RemoteName, "remote")
+		e.o = &named
+	}
+	return e
+}
+
+func onlyConflicts(actions []Action) []Action {
+	var out []Action
+	for _, a := range actions {
+		if a.Op == OpConflict {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 // Preview scans both sides and returns the plan without carrying it out.
@@ -104,10 +144,23 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	}
 	actions := Plan(o.Settings.Mode, o.Settings.Deletions, local, remote, records)
 	res.Planned = len(actions)
+	if !o.AllowDeletions {
+		actions, res.HeldDeletions = guardDeletions(actions, local, remote, o.Settings.DeletionGuard)
+	}
 
-	e := &executor{ctx: ctx, o: o, res: res, now: o.Now}
-	if e.now == nil {
-		e.now = time.Now
+	e := newExecutor(ctx, o, res)
+	if err := e.compareAll(actions); err != nil {
+		return res, err
+	}
+	if o.Settings.Conflicts == config.ConflictAsk && o.Settings.ConflictHold == config.HoldShuttle {
+		if conflicts := onlyConflicts(actions); len(conflicts) > 0 {
+			// Hold the shuttle: report the conflicts, change nothing else.
+			for i := range conflicts {
+				e.hold(&conflicts[i])
+			}
+			res.Held = true
+			return res, e.flush() // records of identical files found by compares
+		}
 	}
 	if err := e.run(actions); err != nil {
 		return res, err

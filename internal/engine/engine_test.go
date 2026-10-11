@@ -207,6 +207,7 @@ func TestSyncEndToEnd(t *testing.T) {
 
 func TestSyncHoldsConflicts(t *testing.T) {
 	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	h.settings.Conflicts = config.ConflictAsk
 	write(t, h.localDir, "a.txt", "base", t0)
 	h.run()
 
@@ -242,6 +243,7 @@ func TestSyncSameEditOnBothSidesIsNotAConflict(t *testing.T) {
 
 func TestFirstSyncOfExistingCopies(t *testing.T) {
 	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	h.settings.Conflicts = config.ConflictAsk
 	// The same tree on both sides, timestamps rounded on the share.
 	write(t, h.localDir, "same.txt", "identical", t0.Add(400*time.Millisecond))
 	write(t, h.remoteDir, "same.txt", "identical", t0)

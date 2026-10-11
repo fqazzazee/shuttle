@@ -51,6 +51,9 @@ type Action struct {
 	Reason string
 	// NoHistory is set when the path has no state record.
 	NoHistory bool
+
+	hash []byte // content hash found by a compare, for an OpAdopt
+	skip bool   // already reported; nothing to execute
 }
 
 // sideStatus is one side of a path compared with its record.
@@ -288,7 +291,7 @@ func survives(sorted []string, deleted map[string]bool, dir string) bool {
 
 // executionOrder: mkdirs parents-first, then everything that is not a
 // deletion in path order, then deletions children-first.
-func executionOrder(a, b Action) int {
+func executionOrder(a, b Action) int { //nolint:gocritic // slices.SortStableFunc passes values
 	phase := func(o Op) int {
 		switch o {
 		case OpMkdirLocal, OpMkdirRemote:
