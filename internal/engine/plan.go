@@ -53,8 +53,9 @@ type Action struct {
 	// NoHistory is set when the path has no state record.
 	NoHistory bool
 
-	hash []byte // content hash found by a compare, for an OpAdopt
-	skip bool   // already reported; nothing to execute
+	hash       []byte // content hash found by a compare, for an OpAdopt
+	skip       bool   // already reported; nothing to execute
+	alwaysHold bool   // a conflict no policy can settle (names differing only in case)
 }
 
 // sideStatus is one side of a path compared with its record.

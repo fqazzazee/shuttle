@@ -192,6 +192,10 @@ func (s *SMB) Chtimes(ctx context.Context, name string, mtime time.Time) error {
 	return smbErr(sh.Chtimes(p, mtime, mtime))
 }
 
+// FoldsCase reports true: SMB servers compare names case-insensitively by
+// default (Windows always; Samba and NAS devices unless configured otherwise).
+func (s *SMB) FoldsCase() bool { return true }
+
 func (s *SMB) Close() error {
 	return errors.Join(s.share.Umount(), s.session.Logoff())
 }
