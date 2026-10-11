@@ -5,6 +5,7 @@ package engine
 import (
 	"context"
 	"io"
+	"sync"
 
 	"golang.org/x/time/rate"
 )
@@ -35,11 +36,50 @@ type Limits struct {
 	Up, Down *Limiter
 }
 
-// limit paces r by this shuttle's limit and the shared one, for a transfer
+// Cap is a cap on the total rate of several shuttles, which can change while
+// they run: each file transfer is paced by the limits in force when it
+// starts. A nil *Cap means no cap.
+type Cap struct {
+	mu       sync.Mutex
+	up, down int64
+	limits   Limits
+}
+
+// NewCap returns a Cap of up and down bytes per second; 0 means unlimited.
+func NewCap(up, down int64) *Cap {
+	c := &Cap{}
+	c.Set(up, down)
+	return c
+}
+
+// Set changes the cap's rates. A direction whose rate is unchanged keeps
+// its limiter, and with it what transfers in progress have used.
+func (c *Cap) Set(up, down int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if up != c.up {
+		c.up, c.limits.Up = up, NewLimiter(up)
+	}
+	if down != c.down {
+		c.down, c.limits.Down = down, NewLimiter(down)
+	}
+}
+
+// Limits are the limits in force now.
+func (c *Cap) Limits() Limits {
+	if c == nil {
+		return Limits{}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.limits
+}
+
+// limit paces r by this shuttle's limit and the shared cap, for a transfer
 // towards the share when up is set.
 func (e *executor) limit(r io.Reader, up bool) io.Reader {
 	var ls []*Limiter
-	for _, l := range []Limits{e.own, e.o.Shared} {
+	for _, l := range []Limits{e.own, e.o.Cap.Limits()} {
 		x := l.Down
 		if up {
 			x = l.Up

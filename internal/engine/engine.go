@@ -57,9 +57,9 @@ type Options struct {
 	// the machine's host name and the share's name. Empty means "local" and
 	// "remote".
 	LocalName, RemoteName string
-	// Shared limits transfers across every shuttle (the global bandwidth cap),
-	// on top of the shuttle's own limits. Both directions may be nil.
-	Shared Limits
+	// Cap limits transfers across every shuttle (the global bandwidth cap),
+	// on top of the shuttle's own limits. nil means no cap.
+	Cap *Cap
 	// AllowDeletions lets one run through the deletion guard, after the user
 	// has confirmed that the deletions it held are wanted.
 	AllowDeletions bool

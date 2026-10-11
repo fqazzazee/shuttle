@@ -91,6 +91,11 @@ type Daemon struct {
 	cfg       *config.Config
 	runners   map[string]*runner
 
+	// global is the bandwidth cap across every shuttle. A reload changes
+	// its rates in place, so runs in progress pick them up at their next
+	// file.
+	global *engine.Cap
+
 	reloadMu  sync.Mutex // one reload at a time, and none during shutdown
 	configErr string     // why the config on disk was not loaded; "" when it was
 	errShown  string     // the config error last announced
@@ -129,7 +134,8 @@ func New(opts *Options) (*Daemon, error) {
 		host = "local"
 	}
 	d := &Daemon{o: o, cfg: cfg, runners: map[string]*runner{}, hostname: host, shares: map[string]string{},
-		ready: make(chan struct{}), quit: make(chan struct{}), reload: make(chan struct{}, 1)}
+		ready: make(chan struct{}), quit: make(chan struct{}), reload: make(chan struct{}, 1),
+		global: engine.NewCap(cfg.Bandwidth.Up, cfg.Bandwidth.Down)}
 	for i := range cfg.Shuttles {
 		s := &cfg.Shuttles[i]
 		d.runners[s.Name] = newRunner(d, cfg, s)

@@ -100,11 +100,59 @@ func TestBandwidthLimits(t *testing.T) {
 	})
 	t.Run("shared cap", func(t *testing.T) {
 		h := newHarness(t, config.ModePush, config.DeletionsAdditive)
-		h.opts.Shared = Limits{Up: NewLimiter(slowRate)}
+		h.opts.Cap = NewCap(slowRate, 0)
 		if took := timedRun(t, h, h.localDir); took < minLimited*9/10 {
 			t.Errorf("push under the shared cap took %v, want at least %v", took, minLimited)
 		}
 	})
+}
+
+// A cap set while a run is going applies from its next file.
+func TestCapChangesMidRun(t *testing.T) {
+	if testing.Short() {
+		t.Skip("timed")
+	}
+	h := newHarness(t, config.ModePush, config.DeletionsAdditive)
+	c := NewCap(0, 0)
+	h.opts.Cap = c
+	write(t, h.localDir, "a.bin", strings.Repeat("x", transferSize), t0)
+	write(t, h.localDir, "b.bin", strings.Repeat("x", transferSize), t0)
+	var second time.Time
+	h.opts.OnAction = func(*Action, error) {
+		if second.IsZero() {
+			c.Set(slowRate, 0)
+			second = time.Now()
+		}
+	}
+	if res := h.run(); res.Copied != 2 {
+		t.Fatalf("copied %d files", res.Copied)
+	}
+	if took := time.Since(second); took < minLimited*9/10 {
+		t.Errorf("the file after the cap was set took %v, want at least %v", took, minLimited)
+	}
+}
+
+func TestCap(t *testing.T) {
+	if l := (*Cap)(nil).Limits(); l.Up != nil || l.Down != nil {
+		t.Error("a nil cap must not limit")
+	}
+	c := NewCap(1000, 0)
+	first := c.Limits()
+	if first.Up == nil || first.Down != nil {
+		t.Fatalf("limits = %+v, want up only", first)
+	}
+	c.Set(1000, 2000)
+	if l := c.Limits(); l.Up != first.Up || l.Down == nil {
+		t.Errorf("an unchanged rate must keep its limiter (and what it has used); got %+v", l)
+	}
+	c.Set(500, 2000)
+	if l := c.Limits(); l.Up == first.Up || l.Up.burst != 500 {
+		t.Errorf("a changed rate must get a new limiter; got %+v", l)
+	}
+	c.Set(0, 0)
+	if l := c.Limits(); l.Up != nil || l.Down != nil {
+		t.Errorf("0 must lift the cap; got %+v", l)
+	}
 }
 
 func TestNewLimiter(t *testing.T) {
