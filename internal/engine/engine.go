@@ -25,6 +25,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/ignore"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
 
@@ -51,6 +52,9 @@ type Options struct {
 	// the machine's host name and the share's name. Empty means "local" and
 	// "remote".
 	LocalName, RemoteName string
+	// Shared limits transfers across every shuttle (the global bandwidth cap),
+	// on top of the shuttle's own limits. Both directions may be nil.
+	Shared Limits
 	// AllowDeletions lets one run through the deletion guard, after the user
 	// has confirmed that the deletions it held are wanted.
 	AllowDeletions bool
@@ -97,7 +101,8 @@ type Result struct {
 }
 
 func newExecutor(ctx context.Context, o *Options, res *Result) *executor {
-	e := &executor{ctx: ctx, o: o, res: res, now: o.Now}
+	e := &executor{ctx: ctx, o: o, res: res, now: o.Now,
+		own: Limits{Up: NewLimiter(o.Settings.Bandwidth.Up), Down: NewLimiter(o.Settings.Bandwidth.Down)}}
 	if e.now == nil {
 		e.now = time.Now
 	}
@@ -121,7 +126,11 @@ func onlyConflicts(actions []Action) []Action {
 
 // Preview scans both sides and returns the plan without carrying it out.
 func Preview(ctx context.Context, o *Options) ([]Action, error) {
-	local, remote, _, err := scanBoth(ctx, o.Local, o.Remote)
+	ignored, err := ignore.Compile(o.Settings.Ignore)
+	if err != nil {
+		return nil, err
+	}
+	local, remote, _, err := scanBoth(ctx, o.Local, o.Remote, ignored)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +146,11 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 // with single paths are reported in the Result and the run carries on.
 func Run(ctx context.Context, o *Options) (*Result, error) {
 	res := &Result{}
-	local, remote, unsupported, err := scanBoth(ctx, o.Local, o.Remote)
+	ignored, err := ignore.Compile(o.Settings.Ignore)
+	if err != nil {
+		return res, err
+	}
+	local, remote, unsupported, err := scanBoth(ctx, o.Local, o.Remote, ignored)
 	if err != nil {
 		return res, err
 	}

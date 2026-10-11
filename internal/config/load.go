@@ -17,6 +17,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/ignore"
 )
 
 // The raw* types mirror the file. Every setting is a pointer so "not set" can
@@ -470,6 +471,9 @@ func (p *parser) checkSettings(at string, s *Settings) {
 	}
 	if s.Has(TriggerSchedule) && s.Interval != 0 && s.Interval < time.Minute {
 		p.errorf("%s.interval: must be at least 1m", at)
+	}
+	if _, err := ignore.Compile(s.Ignore); err != nil {
+		p.errorf("%s.ignore: %v", at, err)
 	}
 	if s.DeletionGuard < 0 || s.DeletionGuard > 100 {
 		p.errorf("%s.deletion_guard: %d must be a percentage from 0 (off) to 100", at, s.DeletionGuard)
