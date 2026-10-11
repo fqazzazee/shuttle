@@ -110,28 +110,30 @@ func Serve(ctx context.Context, conn *dbus.Conn, d *daemon.Daemon) error {
 	return err
 }
 
-// changed is the daemon's listener: it emits ShuttleChanged, ConflictRaised
-// for conflicts newly held, and updates the properties.
+// changed is the daemon's listener: it updates the properties, then emits
+// ShuttleChanged and ConflictRaised for conflicts newly held. Properties
+// first: a client that reads them when a signal arrives must not get the
+// state from before it.
 func (s *server) changed(st *daemon.Status) {
+	s.setProp("State", string(s.d.State()))
+	s.setProp("Paused", s.d.Paused())
 	_ = s.conn.Emit(Path, Interface+".ShuttleChanged", st.Name, encode(st))
 	for _, c := range s.newlyHeld(st) {
 		_ = s.conn.Emit(Path, Interface+".ConflictRaised", st.Name, c.Path, c.Reason)
 	}
-	s.setProp("State", string(s.d.State()))
-	s.setProp("Paused", s.d.Paused())
 }
 
-// reloaded is the daemon's reload listener: it emits ShuttleRemoved and
-// updates the properties.
+// reloaded is the daemon's reload listener: it updates the properties,
+// then emits ShuttleRemoved (see changed).
 func (s *server) reloaded(r *daemon.Reloaded) {
+	s.setProp("ConfigError", r.ConfigError)
+	s.setProp("State", string(s.d.State()))
 	for _, name := range r.Removed {
 		s.mu.Lock()
 		delete(s.held, name)
 		s.mu.Unlock()
 		_ = s.conn.Emit(Path, Interface+".ShuttleRemoved", name)
 	}
-	s.setProp("ConfigError", r.ConfigError)
-	s.setProp("State", string(s.d.State()))
 }
 
 // setProp updates a read-only property and emits PropertiesChanged. prop's
