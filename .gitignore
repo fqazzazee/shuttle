@@ -1,0 +1,43 @@
+# Planning docs and agent notes stay on the maintainer's machine
+/localonly/
+/CLAUDE.md
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never relax these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credentials.json
+secrets.yaml
+
+# Build output (dist/ is also goreleaser's)
+/bin/
+/shuttle
+dist/
+coverage/
+coverage.out
+coverage.html
+*.test
+*.out
+*.log
+
+# go.work is ignored for a single module
+go.work
+go.work.sum
+
+# Local scratch
+tmp/
+.tmp/

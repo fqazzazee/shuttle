@@ -1,0 +1,50 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard   # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose
+    - errorlint      # %w vs %v, and errors.Is/As misuse
+    - gocritic
+    - gosec
+    - misspell
+    - nilerr
+    - revive
+    - unconvert
+    - unparam
+    - wastedassign
+
+  settings:
+    gocritic:
+      enabled-tags: [diagnostic, performance]
+    gosec:
+      excludes:
+        - G104   # duplicates errcheck
+    revive:
+      rules:
+        - name: exported
+          disabled: true   # internal packages behind a binary, not a public library
+
+  exclusions:
+    # Unchecked fmt.Fprint* to stdout/stderr, Close on read paths, and similar
+    # cases where there is nothing useful to do with the error.
+    presets: [std-error-handling]
+    rules:
+      # Tests get to be blunter about error handling and magic numbers.
+      - path: _test\.go
+        linters: [errcheck, gosec, unparam]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [github.com/fqazzazee/shuttle]
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

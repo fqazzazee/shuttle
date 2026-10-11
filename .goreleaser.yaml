@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: shuttle
+
+builds:
+  - id: shuttle
+    main: ./cmd/shuttle
+    binary: shuttle
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+
+nfpms:
+  - package_name: shuttle
+    homepage: https://github.com/fqazzazee/shuttle
+    maintainer: Fadi Q <fadi.qazzazee@gmail.com>
+    description: Push, pull and sync folders between SMB/NFS shares and local storage.
+    license: GPL-2.0-or-later
+    formats: [rpm, deb]
+    bindir: /usr/bin
+
+# Release notes come from conventional commit subjects (squash merges keep them
+# one per PR).
+changelog:
+  use: git
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Other changes
+      order: 999
+  filters:
+    exclude: ['^docs', '^test', '^ci', '^chore']

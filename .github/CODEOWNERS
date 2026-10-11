@@ -1,0 +1,5 @@
+# Code owners for shuttle. A no-op with one maintainer (you cannot be asked to
+# review your own PR); starts working the day someone else contributes.
+# Last matching pattern wins.
+
+* @fqazzazee

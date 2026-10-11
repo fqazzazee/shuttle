@@ -1,0 +1,24 @@
+name: Dependency review
+
+# Blocks PRs that add dependencies with known vulnerabilities or licenses that
+# cannot ship inside a GPL-2.0-or-later binary.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: review
+    # Needs the dependency graph, which is public-repo-only on the free plan.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          deny-licenses: AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1

@@ -1,0 +1,55 @@
+name: Smoke test (distros)
+
+# Builds and installs from source on distros other than the one shuttle is
+# developed on, then runs the installed binary from outside the checkout.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: arch
+            image: archlinux:latest
+            bootstrap: pacman -Syu --noconfirm --needed git go make
+          - name: debian
+            image: debian:stable-slim
+            bootstrap: apt-get update && apt-get install -y --no-install-recommends git ca-certificates golang-go make
+          - name: fedora
+            image: fedora:latest
+            bootstrap: dnf -y install git golang make
+    steps:
+      - name: bootstrap
+        run: ${{ matrix.bootstrap }}
+
+      # checkout needs git present, which is why bootstrap runs first.
+      - uses: actions/checkout@v7
+
+      # The checkout is owned by a different uid than the container's root, and
+      # go build's VCS stamping refuses to read a repo git calls "dubious".
+      - name: trust checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # Distro Go may be older than go.mod's 1.26; GOTOOLCHAIN=auto fetches it.
+      - name: install
+        run: make install PREFIX=/usr/local
+
+      - name: smoke
+        run: make smoke PREFIX=/usr/local

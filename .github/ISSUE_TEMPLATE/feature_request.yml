@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest something shuttle should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the **Status** and **Not planned** sections of the
+        [README](../blob/main/README.md) first — it may already be planned, or
+        deliberately out of scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that you cannot do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: Roughly how it would work. A sketch of the TUI screen or config helps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: Workarounds you are using now (rsync scripts, Syncthing, ...), and why they are not enough.
