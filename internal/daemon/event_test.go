@@ -293,7 +293,8 @@ func TestARunEndsAfterItsEvents(t *testing.T) {
 	stop := make(chan struct{})
 	broken := make(chan string, 1)
 	go func() {
-		var seen time.Time
+		var last time.Time
+		seen := 0 // runs seen over; the poller may miss some, never count extra
 		for {
 			select {
 			case <-stop:
@@ -301,18 +302,15 @@ func TestARunEndsAfterItsEvents(t *testing.T) {
 			default:
 			}
 			st := f.d.Statuses()[0]
-			if st.State == StateRunning || !st.LastRun.After(seen) {
+			if st.State == StateRunning || !st.LastRun.After(last) {
 				continue
 			}
-			seen = st.LastRun
+			last = st.LastRun
+			seen++
 			// Every run here is asked for, so each sends "completed".
-			ended := len(f.eventsOf(EventCompleted))
-			f.mu.Lock()
-			runs := f.runs
-			f.mu.Unlock()
-			if ended < runs {
+			if sent := len(f.eventsOf(EventCompleted)); sent < seen {
 				select {
-				case broken <- fmt.Sprintf("run %d seen over with %d completed events", runs, ended):
+				case broken <- fmt.Sprintf("%d runs seen over with %d completed events", seen, sent):
 				default:
 				}
 			}
