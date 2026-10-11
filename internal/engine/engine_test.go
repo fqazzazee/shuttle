@@ -88,13 +88,17 @@ func read(t *testing.T, dir, p string) (string, bool) {
 	return string(b), true
 }
 
-// listing renders every file under dir as "path=content", sorted.
+// listing renders every synced file under dir as "path=content", in walk
+// order. The versions folder is left out; see versionsListing.
 func listing(t *testing.T, dir string) string {
 	t.Helper()
 	var out []string
 	err := filepath.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil || p == dir {
 			return err
+		}
+		if e.IsDir() && e.Name() == VersionsDir && filepath.Dir(p) == dir {
+			return fs.SkipDir
 		}
 		rel, _ := filepath.Rel(dir, p)
 		rel = filepath.ToSlash(rel)

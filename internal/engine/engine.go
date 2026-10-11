@@ -73,14 +73,18 @@ type Issue struct {
 
 // Result summarises a run.
 type Result struct {
-	Planned       int
-	Copied        int
-	Created       int // directories
-	Deleted       int
-	Adopted       int // already in sync, now recorded
-	BytesToLocal  int64
-	BytesToRemote int64
-	Conflicts     []Issue // changed on both sides, or a file/folder clash
+	Planned int
+	Copied  int
+	Created int // directories
+	Deleted int
+	Adopted int // already in sync, now recorded
+	// Versioned counts files moved to the versions folder instead of being
+	// overwritten or deleted; VersionsPruned, old versions retention removed.
+	Versioned      int
+	VersionsPruned int
+	BytesToLocal   int64
+	BytesToRemote  int64
+	Conflicts      []Issue // changed on both sides, or a file/folder clash
 	// Held is set when an unresolved "ask" conflict held the whole shuttle:
 	// nothing but the conflicts was looked at.
 	Held bool
@@ -165,6 +169,8 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	if err := e.run(actions); err != nil {
 		return res, err
 	}
+	e.prune(o.Local, "local")
+	e.prune(o.Remote, "remote")
 	if len(res.Errors) == 0 {
 		if err := o.State.SetLastComplete(e.now()); err != nil {
 			return res, err
