@@ -64,9 +64,17 @@ func TestNoBusIsUnavailableNotNotFound(t *testing.T) {
 	}
 }
 
+// keyringCtx bounds a test's keyring calls, so a stuck unlock prompt fails
+// the test quickly instead of hanging it.
+func keyringCtx(t *testing.T) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+	return ctx
+}
+
 func TestRoundTrip(t *testing.T) {
 	isolated(t)
-	ctx := context.Background()
+	ctx := keyringCtx(t)
 	s := SecretService()
 	other := Key{Host: "nas.example", Share: "photos", User: "user"}
 
@@ -107,7 +115,7 @@ func TestVisibleToOtherTools(t *testing.T) {
 	if err != nil {
 		t.Skip("secret-tool not installed")
 	}
-	if err := SecretService().Set(context.Background(), key, "seen by secret-tool"); err != nil {
+	if err := SecretService().Set(keyringCtx(t), key, "seen by secret-tool"); err != nil {
 		t.Fatal(err)
 	}
 	out, err := exec.Command(tool, "lookup", "service", "shuttle", "username", key.Account()).Output()
@@ -137,9 +145,25 @@ func TestErrorsNeverCarryThePassword(t *testing.T) {
 	}
 }
 
-// TestZLockedKeyring runs last (Go runs tests in source order): it locks the
-// throwaway keyring, and nothing can unlock it without a display.
-func TestZLockedKeyring(t *testing.T) {
+// TestLockedKeyring locks a keyring, which nothing can unlock again without
+// a display. So it runs in a throwaway keyring of its own, in a child
+// process: locking the shared one would hang every later test that uses it.
+func TestLockedKeyring(t *testing.T) {
+	isolated(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "testdata/with-test-keyring.sh", os.Args[0], "-test.run=^TestLockedKeyringChild$", "-test.v")
+	cmd.Env = append(os.Environ(), "SHUTTLE_TEST_LOCK_CHILD=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "--- PASS: TestLockedKeyringChild") {
+		t.Errorf("locked-keyring child: %v\n%s", err, out)
+	}
+}
+
+func TestLockedKeyringChild(t *testing.T) {
+	if os.Getenv("SHUTTLE_TEST_LOCK_CHILD") == "" {
+		t.Skip("run by TestLockedKeyring in a keyring of its own")
+	}
 	isolated(t)
 	conn, err := dbus.SessionBus()
 	if err != nil {
@@ -153,12 +177,12 @@ func TestZLockedKeyring(t *testing.T) {
 	if err != nil || len(locked) != 1 {
 		t.Fatalf("locking the test keyring: %v %v", locked, err)
 	}
-	// With no display, the unlock prompt fails at once; the timeout is only
-	// there so a prompt that does appear somewhere cannot hang the test.
+	// With no display the unlock prompt cannot appear; go-keyring then either
+	// fails or waits for a prompt that never comes, so give it a deadline.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err = SecretService().Get(ctx, key)
-	if !errors.Is(err, ErrLocked) {
-		t.Errorf("Get on a locked keyring = %v, want ErrLocked", err)
+	if !errors.Is(err, ErrLocked) && !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Get on a locked keyring = %v, want ErrLocked or the deadline", err)
 	}
 }

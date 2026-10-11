@@ -27,7 +27,7 @@ func TestLocalContract(t *testing.T) {
 func smbOptions(t *testing.T) *fsys.SMBOptions {
 	return &fsys.SMBOptions{
 		Addr: fsystest.Env(t, "SHUTTLE_TEST_SMB_ADDR"), Share: "test",
-		User: "shuttle", Password: "shuttle",
+		User: fsystest.SambaUser, Password: fsystest.SambaPassword,
 	}
 }
 
