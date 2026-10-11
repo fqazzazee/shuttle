@@ -1,0 +1,303 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package engine
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"path"
+	"time"
+
+	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/state"
+)
+
+// Records are committed in batches (see package state for why that is safe):
+// whichever comes first of this many changes or this much time.
+const (
+	flushEvery    = 1000
+	flushInterval = time.Second
+)
+
+type executor struct {
+	ctx       context.Context
+	o         *Options
+	res       *Result
+	now       func() time.Time
+	pending   []func(*state.Tx) error
+	lastFlush time.Time
+}
+
+func (e *executor) run(actions []Action) error {
+	e.lastFlush = e.now()
+	for i := range actions {
+		if err := e.ctx.Err(); err != nil {
+			// Keep the records of everything already done.
+			return errors.Join(err, e.flush())
+		}
+		a := &actions[i]
+		err := e.do(a)
+		e.report(a, err)
+		if len(e.pending) >= flushEvery || e.now().Sub(e.lastFlush) >= flushInterval {
+			if err := e.flush(); err != nil {
+				return err
+			}
+		}
+	}
+	return e.flush()
+}
+
+func (e *executor) report(a *Action, err error) {
+	switch {
+	case err == nil:
+	case errors.Is(err, ErrChanged):
+		e.res.Skipped = append(e.res.Skipped, Issue{Path: a.Path, Op: a.Op, Reason: err.Error()})
+	default:
+		e.res.Errors = append(e.res.Errors, Issue{Path: a.Path, Op: a.Op, Reason: err.Error()})
+	}
+	if e.o.OnAction != nil {
+		e.o.OnAction(a, err)
+	}
+}
+
+func (e *executor) do(a *Action) error {
+	switch a.Op {
+	case OpMkdirLocal, OpMkdirRemote:
+		return e.mkdir(a, a.Op == OpMkdirRemote)
+	case OpCopyToLocal, OpCopyToRemote:
+		return e.copy(a, a.Op == OpCopyToRemote)
+	case OpDeleteLocal, OpDeleteRemote:
+		return e.delete(a, a.Op == OpDeleteRemote)
+	case OpAdopt:
+		e.record(a.Path, a.Local, a.Remote, nil)
+		e.res.Adopted++
+		return nil
+	case OpCompare:
+		return e.compare(a)
+	case OpForget:
+		e.pending = append(e.pending, func(tx *state.Tx) error { return tx.Delete(a.Path) })
+		return nil
+	case OpConflict:
+		e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: a.Op, Reason: a.Reason})
+		return nil
+	}
+	return fmt.Errorf("unknown op %v", a.Op)
+}
+
+// sides returns the FS and scanned entry of the source and destination, for
+// an action that writes to the remote side when toRemote is set.
+func (e *executor) sides(a *Action, toRemote bool) (src, dst fsys.FS, srcInfo, dstInfo *fsys.FileInfo) {
+	if toRemote {
+		return e.o.Local, e.o.Remote, a.Local, a.Remote
+	}
+	return e.o.Remote, e.o.Local, a.Remote, a.Local
+}
+
+func (e *executor) mkdir(a *Action, toRemote bool) error {
+	_, dst, srcInfo, dstInfo := e.sides(a, toRemote)
+	if _, err := e.unchanged(dst, a.Path, dstInfo); err != nil {
+		return err
+	}
+	if err := dst.MkdirAll(e.ctx, a.Path); err != nil {
+		return err
+	}
+	made, err := dst.Stat(e.ctx, a.Path)
+	if err != nil {
+		return err
+	}
+	if toRemote {
+		e.record(a.Path, srcInfo, &made, nil)
+	} else {
+		e.record(a.Path, &made, srcInfo, nil)
+	}
+	e.res.Created++
+	return nil
+}
+
+func (e *executor) copy(a *Action, toRemote bool) error {
+	src, dst, srcInfo, dstInfo := e.sides(a, toRemote)
+	if _, err := e.unchanged(src, a.Path, srcInfo); err != nil {
+		return err
+	}
+	if _, err := e.unchanged(dst, a.Path, dstInfo); err != nil {
+		return err
+	}
+	if dir := path.Dir(a.Path); dir != "." {
+		if err := dst.MkdirAll(e.ctx, dir); err != nil {
+			return err
+		}
+	}
+
+	r, err := src.Open(e.ctx, a.Path)
+	if err != nil {
+		return err
+	}
+	h := sha256.New()
+	n, err := fsys.WriteFile(e.ctx, dst, a.Path, io.TeeReader(r, h), srcInfo.ModTime)
+	r.Close()
+	if err != nil {
+		return err
+	}
+	if toRemote {
+		e.res.BytesToRemote += n
+	} else {
+		e.res.BytesToLocal += n
+	}
+	e.res.Copied++
+
+	// If the source changed while it was being read, the copy may mix old and
+	// new content. Leave it unrecorded: the next run sees both sides changed
+	// and compares them, rather than trusting this copy.
+	after, err := e.unchanged(src, a.Path, srcInfo)
+	if err != nil {
+		return fmt.Errorf("source %w", err)
+	}
+	written, err := dst.Stat(e.ctx, a.Path)
+	if err != nil {
+		return err
+	}
+	if toRemote {
+		e.record(a.Path, &after, &written, h.Sum(nil))
+	} else {
+		e.record(a.Path, &written, &after, h.Sum(nil))
+	}
+	return nil
+}
+
+func (e *executor) delete(a *Action, onRemote bool) error {
+	target, info := e.o.Local, a.Local
+	if onRemote {
+		target, info = e.o.Remote, a.Remote
+	}
+	if _, err := e.unchanged(target, a.Path, info); err != nil {
+		return err
+	}
+	if err := target.Remove(e.ctx, a.Path); err != nil {
+		return err
+	}
+	e.pending = append(e.pending, func(tx *state.Tx) error { return tx.DeleteTree(a.Path) })
+	e.res.Deleted++
+	return nil
+}
+
+// compare settles a file present on both sides that changed on both, or has
+// no history: identical contents are recorded as synced; otherwise the
+// action's OnDiffer applies.
+func (e *executor) compare(a *Action) error {
+	if _, err := e.unchanged(e.o.Local, a.Path, a.Local); err != nil {
+		return err
+	}
+	if _, err := e.unchanged(e.o.Remote, a.Path, a.Remote); err != nil {
+		return err
+	}
+	same, sum, err := e.sameContent(a)
+	if err != nil {
+		return err
+	}
+	if same {
+		e.record(a.Path, a.Local, a.Remote, sum)
+		e.res.Adopted++
+		return nil
+	}
+	if a.OnDiffer == OpConflict {
+		e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: OpConflict, Reason: a.Reason})
+		return nil
+	}
+	return e.copy(a, a.OnDiffer == OpCopyToRemote)
+}
+
+// sameContent decides whether both copies of a.Path hold the same bytes. A
+// file with no history whose size matches and whose times are within
+// ModTimeWindow is taken as the same without reading it, so a first sync of
+// an existing copy does not read every file on both sides.
+func (e *executor) sameContent(a *Action) (bool, []byte, error) {
+	l, r := a.Local, a.Remote
+	if l.Size != r.Size {
+		return false, nil, nil
+	}
+	if a.NoHistory {
+		d := l.ModTime.Sub(r.ModTime)
+		if d.Abs() <= ModTimeWindow {
+			return true, nil, nil
+		}
+	}
+	lsum, err := e.hash(e.o.Local, a.Path)
+	if err != nil {
+		return false, nil, err
+	}
+	rsum, err := e.hash(e.o.Remote, a.Path)
+	if err != nil {
+		return false, nil, err
+	}
+	return bytes.Equal(lsum, rsum), lsum, nil
+}
+
+func (e *executor) hash(f fsys.FS, p string) ([]byte, error) {
+	r, err := f.Open(e.ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, r); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
+}
+
+// unchanged re-stats p and checks it still looks as scanned (want nil means
+// it was absent). It returns the fresh entry, or an error wrapping
+// ErrChanged when it differs.
+func (e *executor) unchanged(f fsys.FS, p string, want *fsys.FileInfo) (fsys.FileInfo, error) {
+	got, err := f.Stat(e.ctx, p)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		if want == nil {
+			return fsys.FileInfo{}, nil
+		}
+		return fsys.FileInfo{}, fmt.Errorf("%s was deleted: %w", p, ErrChanged)
+	case err != nil:
+		return fsys.FileInfo{}, err
+	case want == nil:
+		return got, fmt.Errorf("%s appeared: %w", p, ErrChanged)
+	case got.Kind != want.Kind,
+		got.Kind == fsys.KindFile && (got.Size != want.Size || !got.ModTime.Equal(want.ModTime)):
+		return got, fmt.Errorf("%s was modified: %w", p, ErrChanged)
+	}
+	return got, nil
+}
+
+// record queues the state record for a path both sides now agree on.
+func (e *executor) record(p string, l, r *fsys.FileInfo, sum []byte) {
+	rec := &state.Record{
+		Path:   p,
+		Kind:   l.Kind,
+		Local:  state.Side{Size: l.Size, ModTime: l.ModTime},
+		Remote: state.Side{Size: r.Size, ModTime: r.ModTime},
+		Hash:   sum,
+		Synced: e.now(),
+	}
+	e.pending = append(e.pending, func(tx *state.Tx) error { return tx.Put(rec) })
+}
+
+func (e *executor) flush() error {
+	e.lastFlush = e.now()
+	if len(e.pending) == 0 {
+		return nil
+	}
+	pending := e.pending
+	e.pending = nil
+	return e.o.State.Update(func(tx *state.Tx) error {
+		for _, f := range pending {
+			if err := f(tx); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

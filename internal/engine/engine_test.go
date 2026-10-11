@@ -1,0 +1,404 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package engine
+
+import (
+	"context"
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/state"
+)
+
+// harness is a shuttle between two temp folders with its own state DB.
+type harness struct {
+	t         *testing.T
+	localDir  string
+	remoteDir string
+	opts      Options
+	settings  config.Settings
+}
+
+func newHarness(t *testing.T, mode config.Mode, deletions config.DeletionMode) *harness {
+	t.Helper()
+	h := &harness{t: t, localDir: t.TempDir(), remoteDir: t.TempDir()}
+	local, err := fsys.OpenLocal(h.localDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remote, err := fsys.OpenLocal(h.remoteDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := state.Open(filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { local.Close(); remote.Close(); db.Close() })
+	h.settings = config.Defaults()
+	h.settings.Mode, h.settings.Deletions = mode, deletions
+	h.opts = Options{Local: local, Remote: remote, State: db, Settings: &h.settings}
+	return h
+}
+
+func (h *harness) run() *Result {
+	h.t.Helper()
+	res, err := Run(context.Background(), &h.opts)
+	if err != nil {
+		h.t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) > 0 {
+		h.t.Fatalf("Run reported errors: %+v", res.Errors)
+	}
+	return res
+}
+
+// write creates a file with content and a fixed mtime under dir.
+func write(t *testing.T, dir, p, content string, mtime time.Time) {
+	t.Helper()
+	full := filepath.Join(dir, filepath.FromSlash(p))
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(full, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func read(t *testing.T, dir, p string) (string, bool) {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(p)))
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", false
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b), true
+}
+
+// listing renders every file under dir as "path=content", sorted.
+func listing(t *testing.T, dir string) string {
+	t.Helper()
+	var out []string
+	err := filepath.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
+		if err != nil || p == dir {
+			return err
+		}
+		rel, _ := filepath.Rel(dir, p)
+		rel = filepath.ToSlash(rel)
+		if e.IsDir() {
+			out = append(out, rel+"/")
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		out = append(out, rel+"="+string(b))
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Join(out, " ")
+}
+
+func mtimeOf(t *testing.T, dir, p string) time.Time {
+	t.Helper()
+	fi, err := os.Stat(filepath.Join(dir, filepath.FromSlash(p)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fi.ModTime()
+}
+
+func TestPushEndToEnd(t *testing.T) {
+	h := newHarness(t, config.ModePush, config.DeletionsMirror)
+	write(t, h.localDir, "a.txt", "alpha", t0)
+	write(t, h.localDir, "docs/b.txt", "bravo", t0)
+	write(t, h.remoteDir, "stale.txt", "only on the share", t0)
+
+	res := h.run()
+	if got, want := listing(t, h.remoteDir), "a.txt=alpha docs/ docs/b.txt=bravo"; got != want {
+		t.Errorf("remote = %s\nwant     %s", got, want)
+	}
+	if res.Copied != 2 || res.Created != 1 || res.Deleted != 1 || res.BytesToRemote != 10 {
+		t.Errorf("result = %+v", res)
+	}
+	if !mtimeOf(t, h.remoteDir, "docs/b.txt").Equal(t0) {
+		t.Error("modification time not carried over")
+	}
+
+	// Nothing changed, so nothing to do.
+	if res := h.run(); res.Planned != 0 {
+		t.Errorf("second run planned %d actions, want 0", res.Planned)
+	}
+
+	// An edit on the share is overwritten by the source of truth.
+	write(t, h.remoteDir, "a.txt", "edited on the share", t1)
+	h.run()
+	if got, _ := read(t, h.remoteDir, "a.txt"); got != "alpha" {
+		t.Errorf("remote a.txt = %q, want the local version", got)
+	}
+}
+
+func TestPullAdditiveKeepsLocalExtras(t *testing.T) {
+	h := newHarness(t, config.ModePull, config.DeletionsAdditive)
+	write(t, h.remoteDir, "from-share.txt", "share", t0)
+	write(t, h.localDir, "mine.txt", "local only", t0)
+
+	h.run()
+	if got, want := listing(t, h.localDir), "from-share.txt=share mine.txt=local only"; got != want {
+		t.Errorf("local = %s\nwant    %s", got, want)
+	}
+	if _, ok := read(t, h.remoteDir, "mine.txt"); ok {
+		t.Error("pull wrote to the share")
+	}
+
+	// Deleted on the share: additive keeps the local copy.
+	os.Remove(filepath.Join(h.remoteDir, "from-share.txt"))
+	h.run()
+	if _, ok := read(t, h.localDir, "from-share.txt"); !ok {
+		t.Error("additive pull deleted a local file")
+	}
+}
+
+func TestSyncEndToEnd(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	write(t, h.localDir, "local.txt", "L", t0)
+	write(t, h.localDir, "dir/doomed.txt", "D", t0)
+	write(t, h.remoteDir, "remote.txt", "R", t0)
+	h.run()
+	want := "dir/ dir/doomed.txt=D local.txt=L remote.txt=R"
+	if got := listing(t, h.localDir); got != want {
+		t.Fatalf("local after first sync = %s", got)
+	}
+	if got := listing(t, h.remoteDir); got != want {
+		t.Fatalf("remote after first sync = %s", got)
+	}
+
+	// Edit on each side, delete a folder on one.
+	write(t, h.localDir, "local.txt", "L2", t1)
+	write(t, h.remoteDir, "remote.txt", "R2", t1)
+	if err := os.RemoveAll(filepath.Join(h.localDir, "dir")); err != nil {
+		t.Fatal(err)
+	}
+	h.run()
+	want = "local.txt=L2 remote.txt=R2"
+	if got := listing(t, h.localDir); got != want {
+		t.Errorf("local = %s\nwant    %s", got, want)
+	}
+	if got := listing(t, h.remoteDir); got != want {
+		t.Errorf("remote = %s\nwant     %s", got, want)
+	}
+	if res := h.run(); res.Planned != 0 {
+		t.Errorf("third run planned %d actions, want 0", res.Planned)
+	}
+}
+
+func TestSyncHoldsConflicts(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	write(t, h.localDir, "a.txt", "base", t0)
+	h.run()
+
+	write(t, h.localDir, "a.txt", "local edit", t1)
+	write(t, h.remoteDir, "a.txt", "remote edit!", t1)
+	for range 2 { // and it stays held, rather than flipping on a later run
+		res := h.run()
+		if len(res.Conflicts) != 1 || res.Conflicts[0].Path != "a.txt" {
+			t.Fatalf("conflicts = %+v", res.Conflicts)
+		}
+		if got, _ := read(t, h.localDir, "a.txt"); got != "local edit" {
+			t.Errorf("local a.txt = %q", got)
+		}
+		if got, _ := read(t, h.remoteDir, "a.txt"); got != "remote edit!" {
+			t.Errorf("remote a.txt = %q", got)
+		}
+	}
+}
+
+func TestSyncSameEditOnBothSidesIsNotAConflict(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	write(t, h.localDir, "a.txt", "base", t0)
+	h.run()
+
+	// Same new content, written at different times: compared by content.
+	write(t, h.localDir, "a.txt", "agreed", t1)
+	write(t, h.remoteDir, "a.txt", "agreed", t1.Add(time.Hour))
+	res := h.run()
+	if len(res.Conflicts) != 0 || res.Adopted != 1 || res.Copied != 0 {
+		t.Errorf("result = %+v, want the file adopted without copying", res)
+	}
+}
+
+func TestFirstSyncOfExistingCopies(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	// The same tree on both sides, timestamps rounded on the share.
+	write(t, h.localDir, "same.txt", "identical", t0.Add(400*time.Millisecond))
+	write(t, h.remoteDir, "same.txt", "identical", t0)
+	// Same size, far-apart times, different bytes.
+	write(t, h.localDir, "clash.txt", "aaaa", t0)
+	write(t, h.remoteDir, "clash.txt", "bbbb", t1)
+
+	res := h.run()
+	if res.Copied != 0 || res.Adopted != 1 {
+		t.Errorf("result = %+v, want same.txt adopted without copying", res)
+	}
+	if len(res.Conflicts) != 1 || res.Conflicts[0].Path != "clash.txt" {
+		t.Errorf("conflicts = %+v, want clash.txt (first sync never overwrites)", res.Conflicts)
+	}
+}
+
+// A file edited between the scan and its copy must not be overwritten or
+// recorded; it is picked up by the next run.
+func TestFileChangedDuringRunIsSkipped(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	write(t, h.localDir, "c.txt", "c", t0)
+	write(t, h.localDir, "d.txt", "d", t0)
+	h.opts.OnAction = func(a *Action, _ error) {
+		if a.Path == "c.txt" {
+			write(t, h.localDir, "d.txt", "d, edited mid-run", t1)
+		}
+	}
+	res := h.run()
+	if len(res.Skipped) != 1 || res.Skipped[0].Path != "d.txt" {
+		t.Fatalf("skipped = %+v, want d.txt", res.Skipped)
+	}
+	if _, ok := read(t, h.remoteDir, "d.txt"); ok {
+		t.Error("d.txt was copied although it changed after the scan")
+	}
+
+	h.opts.OnAction = nil
+	h.run()
+	if got, _ := read(t, h.remoteDir, "d.txt"); got != "d, edited mid-run" {
+		t.Errorf("next run copied %q, want the edited version", got)
+	}
+}
+
+// The other direction: an edit on the destination after the scan must not be
+// overwritten by the copy that was planned before it.
+func TestDestinationEditedDuringRunIsNotOverwritten(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	write(t, h.localDir, "a.txt", "a", t0)
+	write(t, h.localDir, "b.txt", "b", t0)
+	h.run()
+
+	write(t, h.localDir, "b.txt", "b, local edit", t1)
+	// Plan copies b.txt to the remote; edit the remote b.txt just before.
+	write(t, h.localDir, "a.txt", "a2", t1)
+	h.opts.OnAction = func(a *Action, _ error) {
+		if a.Path == "a.txt" {
+			write(t, h.remoteDir, "b.txt", "b, remote edit", t1.Add(time.Minute))
+		}
+	}
+	res := h.run()
+	if len(res.Skipped) != 1 || res.Skipped[0].Path != "b.txt" {
+		t.Fatalf("skipped = %+v, want b.txt", res.Skipped)
+	}
+	if got, _ := read(t, h.remoteDir, "b.txt"); got != "b, remote edit" {
+		t.Errorf("remote b.txt = %q: a concurrent edit was overwritten", got)
+	}
+
+	// Next run: both sides changed since the last sync, so it is a conflict.
+	h.opts.OnAction = nil
+	if res := h.run(); len(res.Conflicts) != 1 {
+		t.Errorf("conflicts = %+v, want b.txt", res.Conflicts)
+	}
+}
+
+// With history, two same-size edits made close together are still compared
+// by content: the timestamp shortcut is only for files with no history.
+func TestCloseTimestampsDoNotHideAConflict(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	write(t, h.localDir, "a.txt", "base", t0)
+	h.run()
+
+	write(t, h.localDir, "a.txt", "mine", t1)
+	write(t, h.remoteDir, "a.txt", "your", t1.Add(time.Second))
+	if res := h.run(); len(res.Conflicts) != 1 || res.Adopted != 0 {
+		t.Errorf("result = %+v, want a conflict", res)
+	}
+}
+
+// If part of the local tree cannot be read, the run must stop: carrying on
+// would read the unreadable files as deleted and delete them remotely.
+func TestUnreadableFolderStopsTheRun(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read any directory")
+	}
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	write(t, h.localDir, "private/notes.txt", "n", t0)
+	h.run()
+
+	locked := filepath.Join(h.localDir, "private")
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+
+	res, err := Run(context.Background(), &h.opts)
+	if err == nil {
+		t.Fatal("Run succeeded with an unreadable folder")
+	}
+	if res.Planned != 0 {
+		t.Errorf("planned %d actions after a failed scan", res.Planned)
+	}
+	if _, ok := read(t, h.remoteDir, "private/notes.txt"); !ok {
+		t.Error("the remote copy was deleted")
+	}
+}
+
+func TestSkipsSymlinksTempFilesAndVersions(t *testing.T) {
+	h := newHarness(t, config.ModePush, config.DeletionsAdditive)
+	write(t, h.localDir, "real.txt", "r", t0)
+	write(t, h.localDir, fsys.TempPrefix+"abc", "half-written", t0)
+	write(t, h.localDir, VersionsDir+"/old.txt", "kept version", t0)
+	if err := os.Symlink("/etc/passwd", filepath.Join(h.localDir, "link")); err != nil {
+		t.Fatal(err)
+	}
+
+	res := h.run()
+	if got := listing(t, h.remoteDir); got != "real.txt=r" {
+		t.Errorf("remote = %s, want only real.txt", got)
+	}
+	if !slices.Equal(res.Unsupported, []string{"local: link"}) {
+		t.Errorf("unsupported = %v", res.Unsupported)
+	}
+}
+
+func TestCancelledRun(t *testing.T) {
+	h := newHarness(t, config.ModePush, config.DeletionsAdditive)
+	write(t, h.localDir, "a.txt", "a", t0)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := Run(ctx, &h.opts); !errors.Is(err, context.Canceled) {
+		t.Errorf("Run error = %v, want context.Canceled", err)
+	}
+	if got := listing(t, h.remoteDir); got != "" {
+		t.Errorf("remote = %s, want nothing", got)
+	}
+}
+
+func TestPreviewChangesNothing(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+	write(t, h.localDir, "a.txt", "a", t0)
+	actions, err := Preview(context.Background(), &h.opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary(actions) != "copy-to-remote a.txt\n" {
+		t.Errorf("preview = %q", summary(actions))
+	}
+	if got := listing(t, h.remoteDir); got != "" {
+		t.Errorf("remote = %s after a preview", got)
+	}
+}
