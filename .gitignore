@@ -38,6 +38,7 @@ coverage.html
 go.work
 go.work.sum
 
-# Local scratch
+# Local scratch (.cache/ holds the Samba test share)
 tmp/
 .tmp/
+.cache/

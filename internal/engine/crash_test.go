@@ -141,7 +141,7 @@ func runSync(localDir, remoteDir, statePath string, wrapLocal, wrapRemote func(f
 		return nil, err
 	}
 	defer local.Close()
-	remote, err := fsys.OpenLocal(remoteDir)
+	remote, err := openRemote(remoteDir)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func runSync(localDir, remoteDir, statePath string, wrapLocal, wrapRemote func(f
 // deleted folder, and a file big enough to take several writes.
 func crashScenario(t *testing.T) (localDir, remoteDir, statePath string) {
 	t.Helper()
-	localDir, remoteDir = t.TempDir(), t.TempDir()
+	localDir, remoteDir = t.TempDir(), newRemoteDir(t)
 	statePath = filepath.Join(t.TempDir(), "state.db")
 	for _, p := range []string{"a", "b", "c", "d", "e", "dir/f", "dir/g"} {
 		write(t, localDir, p, p, t0)

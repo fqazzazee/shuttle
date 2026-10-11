@@ -29,12 +29,12 @@ type harness struct {
 
 func newHarness(t *testing.T, mode config.Mode, deletions config.DeletionMode) *harness {
 	t.Helper()
-	h := &harness{t: t, localDir: t.TempDir(), remoteDir: t.TempDir()}
+	h := &harness{t: t, localDir: t.TempDir(), remoteDir: newRemoteDir(t)}
 	local, err := fsys.OpenLocal(h.localDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	remote, err := fsys.OpenLocal(h.remoteDir)
+	remote, err := openRemote(h.remoteDir)
 	if err != nil {
 		t.Fatal(err)
 	}

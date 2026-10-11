@@ -1,9 +1,11 @@
 # A throwaway Samba server for the SMB integration tests: one writable share,
 # "test", for the user "shuttle" with password "shuttle". Never use outside
-# tests.
+# tests. /share is bind-mounted from the host, and UID is the host user's, so
+# the tests can set up and inspect the share's files directly.
 FROM docker.io/library/alpine:3.24
+ARG UID=1000
 RUN apk add --no-cache samba-server samba-common-tools \
- && adduser -D -H shuttle \
+ && adduser -D -H -u "$UID" shuttle \
  && printf 'shuttle\nshuttle\n' | smbpasswd -a -s shuttle \
  && mkdir -p /share \
  && chown shuttle /share
