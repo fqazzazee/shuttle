@@ -23,6 +23,10 @@ import (
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
+// exitConfig is EX_CONFIG from sysexits.h: the systemd unit does not
+// restart on it, since a broken config stays broken until fixed.
+const exitConfig = 78
+
 // version is set at build time with -ldflags "-X main.version=...".
 var version = "dev"
 
@@ -49,6 +53,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	case "daemon":
 		if err := runDaemon(ctx, stderr); err != nil {
 			fmt.Fprintf(stderr, "shuttle daemon: %v\n", err)
+			if errors.Is(err, daemon.ErrConfig) {
+				return exitConfig
+			}
 			return 1
 		}
 		return 0

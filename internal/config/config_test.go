@@ -3,6 +3,7 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"slices"
 	"strings"
@@ -444,5 +445,26 @@ func TestLoad(t *testing.T) {
 	}
 	if _, err := Load("testdata/missing.toml"); err == nil {
 		t.Error("Load of a missing file succeeded")
+	}
+}
+
+// The README's example config must load: documentation that cannot be
+// copied and used is worse than none.
+func TestReadmeExampleParses(t *testing.T) {
+	readme, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, body, found := bytes.Cut(readme, []byte("```toml\n"))
+	if !found {
+		t.Fatal("no ```toml block in README.md")
+	}
+	body, _, found = bytes.Cut(body, []byte("```"))
+	if !found {
+		t.Fatal("the ```toml block in README.md is not closed")
+	}
+	cfg := parse(t, string(body))
+	if s, ok := cfg.Shuttle("documents"); !ok || s.Local != home+"/Documents" || s.Settings.Mode != ModeSync {
+		t.Errorf("README example resolves to %+v", s)
 	}
 }
