@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package main
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/engine"
+)
+
+func TestAgo(t *testing.T) {
+	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	for d, want := range map[time.Duration]string{
+		10 * time.Second: "just now", 5 * time.Minute: "5m ago",
+		3 * time.Hour: "3h ago", 50 * time.Hour: "2d ago",
+	} {
+		if got := ago(now.Add(-d), now); got != want {
+			t.Errorf("ago(-%v) = %q, want %q", d, got, want)
+		}
+	}
+	if got := ago(time.Time{}, now); got != "never" {
+		t.Errorf("ago(zero) = %q", got)
+	}
+}
+
+func TestDetails(t *testing.T) {
+	st := &daemon.Status{
+		Error:         "share nas: connection refused",
+		Conflicts:     []engine.Issue{{Outcome: "held"}, {Outcome: "held"}, {Outcome: "kept both: ..."}},
+		HeldDeletions: 1,
+		Pending:       true,
+		Note:          "polling instead",
+	}
+	want := "share nas: connection refused; 2 conflicts waiting for you; 1 deletion held by the guard; a run is waiting; polling instead"
+	if got := details(st); got != want {
+		t.Errorf("details =\n%q\nwant\n%q", got, want)
+	}
+	if got := details(&daemon.Status{}); got != "" {
+		t.Errorf("details of a quiet shuttle = %q", got)
+	}
+}
+
+// cli runs the shuttle command and returns its exit code and output.
+func cli(t *testing.T, args ...string) (int, string, string) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), args, &stdout, &stderr)
+	return code, stdout.String(), stderr.String()
+}
+
+// startDaemon writes a config with two push shuttles, a and b, runs
+// `shuttle daemon` on a private session bus, and waits until it answers.
+// It returns the folder a pushes to.
+func startDaemon(t *testing.T) (localA, mountA string) {
+	t.Helper()
+	privateSessionBus(t)
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", dir)
+	localA, mountA = t.TempDir(), t.TempDir()
+	cfg := "[shares.m]\ntype = \"path\"\npath = \"" + mountA + "\"\n" +
+		"[shares.n]\ntype = \"path\"\npath = \"" + t.TempDir() + "\"\n" +
+		"[shuttles.a]\nmode = \"push\"\nlocal = \"" + localA + "\"\nremote = \"m:\"\n" +
+		"[shuttles.b]\nmode = \"push\"\nlocal = \"" + t.TempDir() + "\"\nremote = \"n:\"\n"
+	if err := os.MkdirAll(filepath.Join(dir, "shuttle"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "shuttle", "config.toml"), []byte(cfg), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan int, 1)
+	var stderr bytes.Buffer
+	go func() { done <- run(ctx, []string{"daemon"}, &bytes.Buffer{}, &stderr) }()
+	t.Cleanup(func() {
+		cancel()
+		if code := <-done; code != 0 {
+			t.Errorf("daemon exit code %d:\n%s", code, stderr.String())
+		}
+	})
+	for range 300 {
+		if code, _, _ := cli(t, "status"); code == 0 {
+			return localA, mountA
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("the daemon never answered:\n%s", stderr.String())
+	return "", ""
+}
+
+func TestStatusSyncPauseResume(t *testing.T) {
+	local, mount := startDaemon(t)
+	if err := os.WriteFile(filepath.Join(local, "x.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, _ := cli(t, "status")
+	if code != 0 || !strings.HasPrefix(out, "NAME") || !strings.Contains(out, "a     idle") || !strings.Contains(out, "never") {
+		t.Errorf("status (%d):\n%s", code, out)
+	}
+
+	if code, out, _ := cli(t, "sync", "a"); code != 0 || out != "syncing a\n" {
+		t.Errorf("sync a = %d %q", code, out)
+	}
+	for range 300 {
+		if _, err := os.Stat(filepath.Join(mount, "x.txt")); err == nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if _, err := os.Stat(filepath.Join(mount, "x.txt")); err != nil {
+		t.Fatal("sync a did not push")
+	}
+	time.Sleep(50 * time.Millisecond)
+	if _, out, _ := cli(t, "status"); !strings.Contains(out, "just now") {
+		t.Errorf("status after a sync:\n%s", out)
+	}
+
+	if code, out, _ := cli(t, "pause"); code != 0 || out != "paused all shuttles\n" {
+		t.Errorf("pause = %d %q", code, out)
+	}
+	if _, out, _ := cli(t, "status"); !strings.HasPrefix(out, "All shuttles are paused") || !strings.Contains(out, "paused") {
+		t.Errorf("status while paused:\n%s", out)
+	}
+	if code, out, _ := cli(t, "resume"); code != 0 || out != "resumed all shuttles\n" {
+		t.Errorf("resume = %d %q", code, out)
+	}
+	if code, out, _ := cli(t, "pause", "b"); code != 0 || out != "paused b\n" {
+		t.Errorf("pause b = %d %q", code, out)
+	}
+	if _, out, _ := cli(t, "status"); !strings.Contains(out, "b     paused") || strings.Contains(out, "All shuttles") {
+		t.Errorf("status with b paused:\n%s", out)
+	}
+}
+
+func TestCLIErrors(t *testing.T) {
+	startDaemon(t)
+	for _, tt := range []struct {
+		args []string
+		code int
+		msg  string
+	}{
+		{[]string{"sync", "nope"}, 1, "no shuttle by that name"},
+		{[]string{"sync"}, 2, "wrong arguments"},
+		{[]string{"status", "extra"}, 2, "wrong arguments"},
+		{[]string{"pause", "a", "b"}, 2, "wrong arguments"},
+	} {
+		code, _, stderr := cli(t, tt.args...)
+		if code != tt.code || !strings.Contains(stderr, tt.msg) {
+			t.Errorf("shuttle %v = %d, %q; want %d and %q", tt.args, code, stderr, tt.code, tt.msg)
+		}
+	}
+}
+
+func TestCLIWithoutADaemon(t *testing.T) {
+	privateSessionBus(t)
+	code, _, stderr := cli(t, "status")
+	if code != 1 || !strings.Contains(stderr, "not running") || !strings.Contains(stderr, "systemctl --user start shuttle") {
+		t.Errorf("status without a daemon = %d, %q", code, stderr)
+	}
+}
