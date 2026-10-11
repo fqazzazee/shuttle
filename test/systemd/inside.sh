@@ -199,7 +199,10 @@ sleep 15 # longer than RestartSec
 [ "$(prop ExecMainStatus)" = 78 ] || fail "exit status $(prop ExecMainStatus), want 78"
 [ "$(prop NRestarts)" = "$restarts" ] || fail "systemd kept restarting a broken config"
 [ "$(prop ActiveState)" = failed ] || fail "state $(prop ActiveState), want failed"
-journalctl --user -u shuttle --no-pager | grep -q 'mode: "both" must be one of' || fail "the journal lacks the config error"
+# Not "journalctl | grep -q": grep stops at the first match, journalctl dies
+# writing to the closed pipe, and pipefail fails the line.
+journalctl --user -u shuttle --no-pager >~/journal
+grep -q 'mode: "both" must be one of' ~/journal || fail "the journal lacks the config error"
 echo "failed once with 78; the journal says why"
 
 echo
