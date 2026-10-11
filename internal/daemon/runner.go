@@ -3,10 +3,12 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -278,4 +280,23 @@ func isOffline(err error) bool {
 	var netErr *net.OpError
 	var dnsErr *net.DNSError
 	return errors.As(err, &netErr) || errors.As(err, &dnsErr)
+}
+
+// pairOf names the two folders a shuttle syncs, for state.Bind: the local
+// folder, and the folder on the server the share reaches, whatever the
+// share is called. A user name, a password or a setting changing is not a
+// new pair; the server, the share on it or either folder is.
+func pairOf(cfg *config.Config, s *config.Shuttle) string {
+	sh := cfg.Shares[s.Share]
+	var server string
+	switch sh.Type {
+	case config.ShareSMB:
+		// Host names and SMB share names are case-insensitive.
+		server = fmt.Sprintf("smb://%s:%d/%s", strings.ToLower(sh.Host), cmp.Or(sh.Port, 445), strings.ToLower(sh.Share))
+	case config.ShareNFS3:
+		server = fmt.Sprintf("nfs://%s:%d%s", strings.ToLower(sh.Host), cmp.Or(sh.Port, 2049), sh.Export)
+	default:
+		server = "path:" + sh.Path
+	}
+	return s.Local + "\n" + server + "\n" + s.Remote
 }

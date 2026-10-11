@@ -39,6 +39,7 @@ var (
 
 	keySchema       = []byte("schema")
 	keyLastComplete = []byte("last_complete")
+	keyPair         = []byte("pair")
 )
 
 var (
@@ -209,6 +210,33 @@ func (d *DB) SetLastComplete(t time.Time) error {
 	return d.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucketMeta).Put(keyLastComplete, []byte(strconv.FormatInt(t.UnixNano(), 10)))
 	})
+}
+
+// Bind ties the database to the folder pair whose history it records, an
+// opaque string naming both sides. Bound to another pair before, it forgets
+// that history and reports reset: the next run is a first sync, which
+// deletes nothing. A history read against other folders would take
+// whatever the new folders lack as deleted there, and delete it from the
+// other side. A database from before pairs were recorded is bound as is.
+func (d *DB) Bind(pair string) (reset bool, err error) {
+	err = d.db.Update(func(tx *bolt.Tx) error {
+		meta := tx.Bucket(bucketMeta)
+		was := meta.Get(keyPair)
+		if was != nil && string(was) != pair {
+			reset = true
+			if err := tx.DeleteBucket(bucketFiles); err != nil {
+				return err
+			}
+			if _, err := tx.CreateBucket(bucketFiles); err != nil {
+				return err
+			}
+			if err := meta.Delete(keyLastComplete); err != nil {
+				return err
+			}
+		}
+		return meta.Put(keyPair, []byte(pair))
+	})
+	return reset, err
 }
 
 // Tx is a read-write transaction from DB.Update.
