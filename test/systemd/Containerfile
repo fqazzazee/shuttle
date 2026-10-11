@@ -1,0 +1,9 @@
+# A machine with systemd as PID 1 and a lingering user, "tester", whose user
+# manager and session bus start at boot: where shuttle's systemd unit is
+# tested for real (test/systemd/run.sh). The shuttle binary is mounted in.
+FROM registry.fedoraproject.org/fedora:44
+RUN dnf -y install --setopt=install_weak_deps=False systemd systemd-pam dbus-broker util-linux findutils procps-ng coreutils \
+ && dnf clean all \
+ && useradd -m -u 1000 tester \
+ && mkdir -p /var/lib/systemd/linger && touch /var/lib/systemd/linger/tester
+CMD ["/sbin/init"]
