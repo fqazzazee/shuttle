@@ -1,0 +1,273 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package fsys
+
+import (
+	"context"
+	"errors"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+// newLocal returns a Local over a fresh temp dir and the dir's OS path.
+func newLocal(t *testing.T) (*Local, string) {
+	t.Helper()
+	dir := t.TempDir()
+	l, err := OpenLocal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	return l, dir
+}
+
+// osPath turns a slash-separated test path into an OS path under dir.
+func osPath(dir, slashPath string) string {
+	return filepath.Join(dir, filepath.FromSlash(slashPath))
+}
+
+func writeOS(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidPath(t *testing.T) {
+	tests := []struct {
+		name string
+		ok   bool
+	}{
+		{".", true},
+		{"a", true},
+		{"a/b.txt", true},
+		{"with space/ünïcode", true},
+		{"", false},
+		{"/etc/passwd", false},
+		{"..", false},
+		{"../x", false},
+		{"a/../../x", false},
+		{"a/./b", false},
+		{"a//b", false},
+		{"a/", false},
+		{"a\x00b", false},
+	}
+	for _, tt := range tests {
+		if got := ValidPath(tt.name); got != tt.ok {
+			t.Errorf("ValidPath(%q) = %v, want %v", tt.name, got, tt.ok)
+		}
+	}
+}
+
+func TestLocalRejectsInvalidPaths(t *testing.T) {
+	l, _ := newLocal(t)
+	ctx := context.Background()
+	for _, name := range []string{"../escape", "/etc/passwd", "a/../../x"} {
+		if _, err := l.Stat(ctx, name); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("Stat(%q) error = %v, want ErrInvalidPath", name, err)
+		}
+		if _, err := l.Create(ctx, name); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("Create(%q) error = %v, want ErrInvalidPath", name, err)
+		}
+		if err := l.Rename(ctx, "ok", name); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("Rename(ok, %q) error = %v, want ErrInvalidPath", name, err)
+		}
+	}
+}
+
+// A symlink inside the tree must not become a way out of it, for reads or
+// writes. This is the case a hostile file server could set up.
+func TestLocalSymlinkCannotEscapeRoot(t *testing.T) {
+	l, dir := newLocal(t)
+	outside := t.TempDir()
+	writeOS(t, filepath.Join(outside, "secret"), "do not read")
+	if err := os.Symlink(outside, filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	if _, err := l.Open(ctx, "link/secret"); err == nil {
+		t.Error("Open through a symlink to outside the root succeeded")
+	}
+	if _, err := l.Create(ctx, "link/planted"); err == nil {
+		t.Error("Create through a symlink to outside the root succeeded")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "planted")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("file appeared outside the root: %v", err)
+	}
+
+	info, err := l.Stat(ctx, "link")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Kind != KindOther {
+		t.Errorf("symlink Kind = %v, want other", info.Kind)
+	}
+}
+
+func TestLocalStat(t *testing.T) {
+	l, dir := newLocal(t)
+	writeOS(t, osPath(dir, "d/f.txt"), "hello")
+	mtime := time.Unix(1_700_000_000, 123_456_789)
+	if err := os.Chtimes(osPath(dir, "d/f.txt"), mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	f, err := l.Stat(ctx, "d/f.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Name != "d/f.txt" || f.Kind != KindFile || f.Size != 5 || !f.ModTime.Equal(mtime) {
+		t.Errorf("Stat(d/f.txt) = %+v", f)
+	}
+
+	d, err := l.Stat(ctx, "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Kind != KindDir || d.Size != 0 {
+		t.Errorf("Stat(d) = %+v, want a dir with size 0", d)
+	}
+
+	if _, err := l.Stat(ctx, "missing"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("Stat(missing) error = %v, want fs.ErrNotExist", err)
+	}
+}
+
+func TestLocalReadDirSortedWithFullNames(t *testing.T) {
+	l, dir := newLocal(t)
+	for _, name := range []string{"sub/c", "sub/a", "sub/b"} {
+		writeOS(t, osPath(dir, name), name)
+	}
+	if err := os.Mkdir(osPath(dir, "sub/z-dir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := l.ReadDir(context.Background(), "sub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"sub/a", "sub/b", "sub/c", "sub/z-dir"}
+	if len(got) != len(want) {
+		t.Fatalf("ReadDir returned %d entries, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i].Name != want[i] {
+			t.Errorf("entry %d = %q, want %q", i, got[i].Name, want[i])
+		}
+	}
+	if got[3].Kind != KindDir {
+		t.Errorf("sub/z-dir Kind = %v, want dir", got[3].Kind)
+	}
+}
+
+func TestLocalCreateIsExclusive(t *testing.T) {
+	l, dir := newLocal(t)
+	writeOS(t, filepath.Join(dir, "exists"), "keep me")
+
+	if _, err := l.Create(context.Background(), "exists"); !errors.Is(err, fs.ErrExist) {
+		t.Fatalf("Create(existing) error = %v, want fs.ErrExist", err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "exists")); string(b) != "keep me" {
+		t.Errorf("existing file changed to %q", b)
+	}
+}
+
+func TestLocalRenameReplacesFile(t *testing.T) {
+	l, dir := newLocal(t)
+	writeOS(t, filepath.Join(dir, "new"), "new")
+	writeOS(t, filepath.Join(dir, "old"), "old")
+
+	if err := l.Rename(context.Background(), "new", "old"); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "old")); string(b) != "new" {
+		t.Errorf("after rename, old = %q, want %q", b, "new")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "new")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("source still exists after rename: %v", err)
+	}
+}
+
+func TestLocalRemoveRefusesNonEmptyDir(t *testing.T) {
+	l, dir := newLocal(t)
+	writeOS(t, osPath(dir, "d/f"), "x")
+	ctx := context.Background()
+
+	if err := l.Remove(ctx, "d"); err == nil {
+		t.Fatal("Remove of a non-empty directory succeeded")
+	}
+	if err := l.Remove(ctx, "d/f"); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Remove(ctx, "d"); err != nil {
+		t.Fatalf("Remove of the now-empty directory: %v", err)
+	}
+}
+
+func TestLocalMkdirAllAndChtimes(t *testing.T) {
+	l, dir := newLocal(t)
+	ctx := context.Background()
+	if err := l.MkdirAll(ctx, "a/b/c"); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.MkdirAll(ctx, "a/b/c"); err != nil {
+		t.Errorf("MkdirAll on an existing dir: %v", err)
+	}
+	writeOS(t, osPath(dir, "a/b/c/f"), "x")
+
+	mtime := time.Date(2024, 2, 29, 12, 0, 0, 500, time.UTC)
+	if err := l.Chtimes(ctx, "a/b/c/f", mtime); err != nil {
+		t.Fatal(err)
+	}
+	info, err := l.Stat(ctx, "a/b/c/f")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.ModTime.Equal(mtime) {
+		t.Errorf("ModTime = %v, want %v", info.ModTime, mtime)
+	}
+}
+
+func TestLocalCancelledContext(t *testing.T) {
+	l, dir := newLocal(t)
+	writeOS(t, filepath.Join(dir, "f"), "x")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := l.Open(ctx, "f"); !errors.Is(err, context.Canceled) {
+		t.Errorf("Open with cancelled ctx error = %v, want context.Canceled", err)
+	}
+	if err := l.Remove(ctx, "f"); !errors.Is(err, context.Canceled) {
+		t.Errorf("Remove with cancelled ctx error = %v, want context.Canceled", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "f")); err != nil {
+		t.Errorf("file removed despite cancelled context: %v", err)
+	}
+}
+
+func TestLocalOpenReadsContent(t *testing.T) {
+	l, dir := newLocal(t)
+	writeOS(t, filepath.Join(dir, "f"), "content")
+
+	r, err := l.Open(context.Background(), "f")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	b, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != "content" {
+		t.Errorf("read %q, want %q", b, "content")
+	}
+}
