@@ -164,58 +164,6 @@ func TestDisablingAndEnablingByEditing(t *testing.T) {
 	}
 }
 
-// The global bandwidth cap applies to the shuttles once the config sets
-// it, without restarting them.
-func TestTheGlobalCapFollowsReloads(t *testing.T) {
-	if testing.Short() {
-		t.Skip("timed")
-	}
-	quickReloads(t)
-	f := newFixture(t, "push", "")
-	f.start()
-	before := f.runnerOf("s")
-	f.writeConfig("[global]\nbandwidth = { up = \"512KiB/s\" }\n" + f.shuttleDoc("push", ""))
-	f.waitFor("s", "the cap", func(Status) bool { return f.d.global.Limits().Up != nil })
-	if f.runnerOf("s") != before {
-		t.Error("a change to the global cap restarted the shuttle")
-	}
-	write(t, f.local, "big.bin", strings.Repeat("x", 256<<10))
-	start := time.Now()
-	f.syncNow()
-	// 512 KiB/s, after the first 64 KiB burst.
-	if took, want := time.Since(start), 300*time.Millisecond; took < want {
-		t.Errorf("256 KiB under a 512 KiB/s cap took %v, want at least %v", took, want)
-	}
-	f.writeConfig(f.shuttleDoc("push", ""))
-	f.waitFor("s", "the cap lifted", func(Status) bool { return f.d.global.Limits().Up == nil })
-}
-
-// The global cap is one cap for every shuttle together, not one each.
-func TestTheGlobalCapIsShared(t *testing.T) {
-	if testing.Short() {
-		t.Skip("timed")
-	}
-	f := newFixture(t, "push", "")
-	doc, local, remote := f.other()
-	f.writeConfig("[global]\nbandwidth = { up = \"512KiB/s\" }\n" + f.shuttleDoc("push", "", doc))
-	big := strings.Repeat("x", 256<<10)
-	write(t, f.local, "s.bin", big)
-	write(t, local, "t.bin", big)
-	f.start()
-	start := time.Now()
-	for _, name := range []string{"s", "t"} {
-		if err := f.d.SyncNow(name); err != nil {
-			t.Fatal(err)
-		}
-	}
-	f.waitFor("s", "both copied", func(Status) bool { return exists(f.mount, "s.bin") && exists(remote, "t.bin") })
-	// 512 KiB at 512 KiB/s together, after the first 64 KiB burst; alone,
-	// each would take under half a second.
-	if took, want := time.Since(start), 800*time.Millisecond; took < want {
-		t.Errorf("two 256 KiB pushes under a shared 512 KiB/s cap took %v, want at least %v", took, want)
-	}
-}
-
 // A broken edit keeps the running config, says why once, and clears once
 // fixed.
 func TestABrokenEditKeepsTheOldConfig(t *testing.T) {
@@ -280,4 +228,56 @@ func TestReloadAsked(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.waitFor("s", "the reload", func(Status) bool { return f.has("t") })
+}
+
+// The global bandwidth cap applies to the shuttles once the config sets
+// it, without restarting them.
+func TestTheGlobalCapFollowsReloads(t *testing.T) {
+	if testing.Short() {
+		t.Skip("timed")
+	}
+	quickReloads(t)
+	f := newFixture(t, "push", "")
+	f.start()
+	before := f.runnerOf("s")
+	f.writeConfig("[global]\nbandwidth = { up = \"512KiB/s\" }\n" + f.shuttleDoc("push", ""))
+	f.waitFor("s", "the cap", func(Status) bool { return f.d.global.Limits().Up != nil })
+	if f.runnerOf("s") != before {
+		t.Error("a change to the global cap restarted the shuttle")
+	}
+	write(t, f.local, "big.bin", strings.Repeat("x", 256<<10))
+	start := time.Now()
+	f.syncNow()
+	// 512 KiB/s, after the first 64 KiB burst.
+	if took, want := time.Since(start), 300*time.Millisecond; took < want {
+		t.Errorf("256 KiB under a 512 KiB/s cap took %v, want at least %v", took, want)
+	}
+	f.writeConfig(f.shuttleDoc("push", ""))
+	f.waitFor("s", "the cap lifted", func(Status) bool { return f.d.global.Limits().Up == nil })
+}
+
+// The global cap is one cap for every shuttle together, not one each.
+func TestTheGlobalCapIsShared(t *testing.T) {
+	if testing.Short() {
+		t.Skip("timed")
+	}
+	f := newFixture(t, "push", "")
+	doc, local, remote := f.other()
+	f.writeConfig("[global]\nbandwidth = { up = \"512KiB/s\" }\n" + f.shuttleDoc("push", "", doc))
+	big := strings.Repeat("x", 256<<10)
+	write(t, f.local, "s.bin", big)
+	write(t, local, "t.bin", big)
+	f.start()
+	start := time.Now()
+	for _, name := range []string{"s", "t"} {
+		if err := f.d.SyncNow(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.waitFor("s", "both copied", func(Status) bool { return exists(f.mount, "s.bin") && exists(remote, "t.bin") })
+	// 512 KiB at 512 KiB/s together, after the first 64 KiB burst; alone,
+	// each would take under half a second.
+	if took, want := time.Since(start), 800*time.Millisecond; took < want {
+		t.Errorf("two 256 KiB pushes under a shared 512 KiB/s cap took %v, want at least %v", took, want)
+	}
 }
