@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/engine"
@@ -197,14 +198,16 @@ func TestPasswordComesOnlyFromTheKeyring(t *testing.T) {
 	}
 	addr, folder := smbFolder(t)
 	cfg, s := smbConfig(t, addr, "shuttle", folder)
-	ctx := context.Background()
+	// A stuck keyring must fail this test, not hang it.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
 	store := secrets.SecretService()
 	k, _ := Key(ptr(cfg.Shares["nas"]))
 	const password = fsystest.SambaPassword
 	if err := store.Set(ctx, k, password); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { store.Delete(context.Background(), k) })
+	t.Cleanup(func() { store.Delete(ctx, k) })
 
 	if err := os.WriteFile(filepath.Join(s.Local, "report.txt"), []byte("pushed over SMB"), 0o644); err != nil {
 		t.Fatal(err)
