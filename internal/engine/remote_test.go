@@ -15,7 +15,7 @@ import (
 
 // The engine tests run the remote side of every shuttle either as a local
 // temp folder, or, when these point at the test Samba server (`make
-// samba-up`, `make test-smb`), as a fresh folder of its share reached over
+// samba-up`, `make test-integration`), as a fresh folder of its share reached over
 // SMB. The share is a folder on this machine too, so the tests set up and
 // inspect the remote side directly either way.
 const (
@@ -53,7 +53,7 @@ func openRemote(dir string) (fsys.FS, error) {
 	}
 	return fsys.DialSMB(context.Background(), &fsys.SMBOptions{
 		Addr: os.Getenv(envSMBAddr), Share: "test", Folder: filepath.ToSlash(folder),
-		User: "shuttle", Password: "shuttle",
+		User: fsystest.SambaUser, Password: fsystest.SambaPassword,
 	})
 }
 

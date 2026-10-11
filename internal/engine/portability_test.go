@@ -28,6 +28,7 @@ func TestCoreHasNoDesktopDependencies(t *testing.T) {
 	forbidden := []string{
 		"github.com/fqazzazee/shuttle/internal/daemon",
 		"github.com/fqazzazee/shuttle/internal/secrets",
+		"github.com/fqazzazee/shuttle/internal/shares",
 		"github.com/fqazzazee/shuttle/internal/tui",
 		"github.com/godbus/",                                            // D-Bus
 		"github.com/coreos/go-systemd",                                  // systemd

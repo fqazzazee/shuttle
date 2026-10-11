@@ -112,7 +112,7 @@ func remoteFiles(t *testing.T, dir string) string {
 func smbOnly(t *testing.T) {
 	t.Helper()
 	if !overSMB() {
-		t.Skip("needs a remote side that ignores case: run with `make test-smb`")
+		t.Skip("needs a remote side that ignores case: run with `make test-integration`")
 	}
 }
 

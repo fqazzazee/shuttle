@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package shares connects a shuttle to its remote side: the share from the
+// config, with its password from the Secret Service. It is the one place a
+// share password passes through on its way from the keyring to the server.
+//
+// This package is desktop-specific (it uses the keyring). The sync core must
+// not import it; see the portability rule in SPEC.md.
+package shares
+
+import (
+	"cmp"
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"path/filepath"
+	"strconv"
+
+	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/secrets"
+)
+
+// smbPort is where SMB servers listen unless a share says otherwise.
+const smbPort = 445
+
+// ErrNotSupported is returned for share types shuttle cannot open yet.
+var ErrNotSupported = errors.New("not supported yet")
+
+// Key is where the password for an SMB share is kept in the keyring. ok is
+// false for shares that need no password: guest SMB shares (no user) and
+// anything that is not SMB.
+func Key(share *config.Share) (k secrets.Key, ok bool) {
+	if share.Type != config.ShareSMB || share.User == "" {
+		return secrets.Key{}, false
+	}
+	return secrets.Key{Host: share.Host, Port: share.Port, Share: share.Share, User: share.User, Domain: share.Domain}, true
+}
+
+// OpenRemote connects to the remote side of shuttle s.
+func OpenRemote(ctx context.Context, cfg *config.Config, s *config.Shuttle, store secrets.Store) (fsys.FS, error) {
+	share, ok := cfg.Shares[s.Share]
+	if !ok {
+		return nil, fmt.Errorf("shuttle %s: no share named %q", s.Name, s.Share)
+	}
+	switch share.Type {
+	case config.SharePath:
+		return fsys.OpenLocal(filepath.Join(share.Path, filepath.FromSlash(s.Remote)))
+	case config.ShareSMB:
+		return openSMB(ctx, &share, s.Remote, store)
+	case config.ShareNFS3:
+		return nil, fmt.Errorf("share %s: NFS: %w (planned)", share.Name, ErrNotSupported)
+	}
+	return nil, fmt.Errorf("share %s: unknown type %q", share.Name, share.Type)
+}
+
+func openSMB(ctx context.Context, share *config.Share, folder string, store secrets.Store) (fsys.FS, error) {
+	o := &fsys.SMBOptions{
+		Addr:   net.JoinHostPort(share.Host, strconv.Itoa(cmp.Or(share.Port, smbPort))),
+		Share:  share.Share,
+		Folder: folder,
+		User:   share.User,
+		Domain: share.Domain,
+	}
+	if k, ok := Key(share); ok {
+		password, err := store.Get(ctx, k)
+		if errors.Is(err, secrets.ErrNotFound) {
+			return nil, fmt.Errorf("share %s: no password stored in the keyring for %s; set it in shuttle's Shares screen: %w",
+				share.Name, k.Account(), err)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("share %s: %w", share.Name, err)
+		}
+		o.Password = password
+	}
+	f, err := fsys.DialSMB(ctx, o)
+	if err != nil {
+		return nil, fmt.Errorf("share %s: %w", share.Name, err)
+	}
+	return f, nil
+}

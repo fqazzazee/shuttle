@@ -233,6 +233,14 @@ func Run(t *testing.T, newFS func(t *testing.T) fsys.FS) {
 	})
 }
 
+// SambaUser and SambaPassword log in to the test Samba server
+// (testdata/samba). The password is distinctive on purpose, so tests can
+// search for it to prove it did not leak.
+const (
+	SambaUser     = "shuttle"
+	SambaPassword = "samba-throwaway-pw"
+)
+
 // UniqueName returns a name for a test's own folder on a shared server.
 func UniqueName(prefix string) string {
 	var b [6]byte
@@ -248,7 +256,7 @@ func Env(t *testing.T, key string) string {
 	t.Helper()
 	v := os.Getenv(key)
 	if v == "" {
-		t.Skipf("%s not set; see `make samba-up` and `make test-smb`", key)
+		t.Skipf("%s not set; see `make samba-up` and `make test-integration`", key)
 	}
 	return v
 }
