@@ -71,6 +71,25 @@ jobs:
       - name: cross-compile linux/arm64
         run: GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./...
 
+  smb:
+    name: smb integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      - name: start the test Samba server
+        run: make samba-up CONTAINER=docker
+      # Every test runs, the SMB ones included; they skip only when no server
+      # is configured, which here is a failure of this job's setup.
+      - run: make test-smb
+      - name: samba log
+        if: failure()
+        run: docker logs shuttle-samba
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest
