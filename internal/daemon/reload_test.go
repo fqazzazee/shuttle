@@ -1,0 +1,231 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package daemon
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/fqazzazee/shuttle/internal/state"
+)
+
+func quickReloads(t *testing.T) {
+	old := configDebounce
+	configDebounce = 20 * time.Millisecond
+	t.Cleanup(func() { configDebounce = old })
+}
+
+// shuttleDoc is a config with shuttle s as newFixture writes it, plus more.
+func (f *fixture) shuttleDoc(mode, extra string, more ...string) string {
+	return fmt.Sprintf("[shares.mnt]\ntype = \"path\"\npath = %q\n[shuttles.s]\nmode = %q\nlocal = %q\nremote = \"mnt:\"\n%s\n%s",
+		f.mount, mode, f.local, extra, strings.Join(more, "\n"))
+}
+
+// other is a second shuttle t, between its own folders on a share of its
+// own: s has all of mnt.
+func (f *fixture) other() (doc, local, remote string) {
+	local, remote = f.t.TempDir(), f.t.TempDir()
+	return fmt.Sprintf("[shares.mnt2]\ntype = \"path\"\npath = %q\n[shuttles.t]\nmode = \"push\"\nlocal = %q\nremote = \"mnt2:\"\n",
+		remote, local), local, remote
+}
+
+// runnerOf is the named shuttle's current runner.
+func (f *fixture) runnerOf(name string) *runner {
+	f.d.runnersMu.RLock()
+	defer f.d.runnersMu.RUnlock()
+	return f.d.runners[name]
+}
+
+func (f *fixture) has(name string) bool {
+	return slices.ContainsFunc(f.d.Statuses(), func(st Status) bool { return st.Name == name })
+}
+
+func TestANewShuttleStarts(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", "")
+	f.start()
+	doc, local, remote := f.other()
+	write(t, local, "a.txt", "a")
+	f.writeConfig(f.shuttleDoc("push", "", doc))
+	f.waitFor("t", "the new shuttle", func(Status) bool { return true })
+	if err := f.d.SyncNow("t"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("t", "its sync", func(Status) bool { return exists(remote, "a.txt") })
+}
+
+// A shuttle the edit does not touch carries on: its run is not interrupted.
+func TestAnUnchangedShuttleCarriesOn(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", slow)
+	slowFiles(t, f.local, 3)
+	f.start()
+	before := f.runnerOf("s")
+	f.d.SyncNow("s")
+	f.waitCopying(f.mount)
+	doc, _, _ := f.other()
+	f.writeConfig(f.shuttleDoc("push", slow, doc))
+	f.waitFor("t", "the reload", func(Status) bool { return true })
+	st := f.settled("s")
+	if f.runnerOf("s") != before || f.runCount() != 1 || st.Copied != 3 {
+		t.Errorf("s was restarted or its run cut short: %d runs, status %+v", f.runCount(), st)
+	}
+}
+
+// A changed shuttle finishes the file it is on, then carries on under the
+// new settings, keeping what the user set and the run still owed.
+func TestAChangedShuttleRestartsAfterItsFile(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", slow)
+	slowFiles(t, f.local, 3)
+	write(t, f.local, "skip.tmp", "x")
+	f.start()
+	f.d.SyncNow("s")
+	f.waitCopying(f.mount)
+	f.writeConfig(f.shuttleDoc("push", slow+"\nignore = [\"*.tmp\"]"))
+	f.waitFor("s", "the new runner's run", func(st Status) bool {
+		return f.runnerOf("s").shuttle.Settings.Ignore != nil && st.State == StateIdle && !st.Pending &&
+			exists(f.mount, "f2.bin")
+	})
+	for i := range 3 {
+		if !exists(f.mount, fmt.Sprintf("f%d.bin", i)) {
+			t.Errorf("f%d.bin missing: the stopped run was not resumed", i)
+		}
+	}
+	entries, _ := os.ReadDir(f.mount)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".shuttle-tmp-") {
+			t.Errorf("half-written file left: %s", e.Name())
+		}
+	}
+
+	f.d.SetPaused("s", true)
+	f.writeConfig(f.shuttleDoc("push", slow))
+	f.waitFor("s", "the reload", func(Status) bool { return f.runnerOf("s").shuttle.Settings.Ignore == nil })
+	if st := f.d.Statuses()[0]; !st.Paused {
+		t.Errorf("status = %+v: the pause was lost in the reload", st)
+	}
+}
+
+func TestARemovedShuttleStops(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", "")
+	doc, _, _ := f.other()
+	f.writeConfig(f.shuttleDoc("push", "", doc))
+	f.start()
+	var mu sync.Mutex
+	var removed []string
+	stop := f.d.WatchReloads(func(r *Reloaded) {
+		mu.Lock()
+		removed = append(removed, r.Removed...)
+		mu.Unlock()
+	})
+	defer stop()
+	f.writeConfig(f.shuttleDoc("push", ""))
+	f.waitFor("s", "t gone", func(Status) bool { return !f.has("t") })
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Equal(removed, []string{"t"}) {
+		t.Errorf("removed = %v, want [t]", removed)
+	}
+	if err := f.d.SyncNow("t"); !errors.Is(err, ErrUnknownShuttle) {
+		t.Errorf("SyncNow(t) = %v, want ErrUnknownShuttle", err)
+	}
+	// Its state is released: it can be opened again.
+	db, err := state.Open(filepath.Join(f.paths.StateDir, "t.db"))
+	if err != nil {
+		t.Fatalf("t's state is still held: %v", err)
+	}
+	db.Close()
+}
+
+func TestDisablingAndEnablingByEditing(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", "")
+	write(t, f.local, "a.txt", "a")
+	f.start()
+	f.writeConfig(f.shuttleDoc("push", "enabled = false"))
+	f.waitFor("s", "disabled", func(st Status) bool { return st.State == StateDisabled })
+	if err := f.d.SyncNow("s"); !errors.Is(err, ErrDisabled) {
+		t.Errorf("SyncNow on a disabled shuttle = %v", err)
+	}
+	f.writeConfig(f.shuttleDoc("push", ""))
+	f.waitFor("s", "enabled again", func(st Status) bool { return st.State == StateIdle })
+	f.syncNow()
+	if !exists(f.mount, "a.txt") {
+		t.Error("the re-enabled shuttle did not sync")
+	}
+}
+
+// A broken edit keeps the running config, says why once, and clears once
+// fixed.
+func TestABrokenEditKeepsTheOldConfig(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", "")
+	write(t, f.local, "a.txt", "a")
+	f.start()
+	f.writeConfig(f.shuttleDoc("both", ""))
+	f.waitFor("s", "the config error", func(Status) bool { return f.d.ConfigError() != "" })
+	if !strings.Contains(f.d.ConfigError(), `"both" must be one of`) || f.d.State() != StateError {
+		t.Errorf("config error %q, state %s", f.d.ConfigError(), f.d.State())
+	}
+	f.syncNow() // still runs, with the old config
+	if !exists(f.mount, "a.txt") {
+		t.Error("the shuttle stopped working after a broken edit")
+	}
+	f.writeConfig(f.shuttleDoc("both", "")) // the same again: not news
+	time.Sleep(10 * configDebounce)
+	if got := f.eventsOf(EventConfigError); len(got) != 1 {
+		t.Errorf("config error events = %+v, want one", got)
+	}
+	if err := f.d.Reload(); !errors.Is(err, ErrConfig) {
+		t.Errorf("Reload with a broken config = %v, want ErrConfig", err)
+	}
+	f.writeConfig(f.shuttleDoc("push", ""))
+	f.waitFor("s", "the fix", func(Status) bool { return f.d.ConfigError() == "" })
+	if f.d.State() == StateError {
+		t.Error("still in error after the fix")
+	}
+}
+
+// A config that is a symlink, as from a dotfiles repository, is followed.
+func TestASymlinkedConfigIsFollowed(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", "")
+	real := filepath.Join(t.TempDir(), "dotfiles.toml")
+	if err := os.Rename(f.paths.Config, real); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, f.paths.Config); err != nil {
+		t.Fatal(err)
+	}
+	f.start()
+	doc, _, _ := f.other()
+	if err := os.WriteFile(real, []byte(f.shuttleDoc("push", "", doc)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("s", "the reload", func(Status) bool { return f.has("t") })
+}
+
+// Reload applies a valid config without waiting for the file watcher.
+func TestReloadAsked(t *testing.T) {
+	// Before start, so it is restored after the daemon stops.
+	old := configDebounce
+	configDebounce = time.Hour // the watcher would never get to it
+	t.Cleanup(func() { configDebounce = old })
+	f := newFixture(t, "push", "")
+	f.start()
+	doc, _, _ := f.other()
+	f.writeConfig(f.shuttleDoc("push", "", doc))
+	if err := f.d.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("s", "the reload", func(Status) bool { return f.has("t") })
+}

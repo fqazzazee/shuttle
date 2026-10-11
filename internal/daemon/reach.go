@@ -55,7 +55,7 @@ func reachable(ctx context.Context, s *config.Share, folder string) bool {
 // watchShare probes one shuttle's share until quit, and tells the runner
 // when it becomes reachable or unreachable.
 func (r *runner) watchShare(quit <-chan struct{}) {
-	share := r.d.cfg.Shares[r.shuttle.Share]
+	share := r.cfg.Shares[r.shuttle.Share]
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {

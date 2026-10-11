@@ -19,16 +19,22 @@ import (
 	"github.com/fqazzazee/shuttle/internal/state"
 )
 
-// runner runs one shuttle, one run at a time.
+// runner runs one shuttle, one run at a time. A reload that changes the
+// shuttle replaces its runner with a new one.
 type runner struct {
 	d       *Daemon
+	cfg     *config.Config // the config it was made from
 	shuttle *config.Shuttle
-	db      *state.DB
+	db      *state.DB // open between openState and stop
 	// kick wakes the loop. It holds at most one wake-up, so any number of
 	// triggers during a run add up to one more run.
-	kick chan struct{}
+	kick     chan struct{}
+	quit     chan struct{}  // closed to stop the triggers
+	bg       sync.WaitGroup // the triggers: share probe, schedule, watcher
+	loopDone chan struct{}  // closed when the loop has returned
 
 	mu        sync.Mutex
+	stopping  bool // the run in progress finishes its file; no more start
 	st        Status
 	paused    bool // this shuttle, by itself
 	pending   bool
@@ -42,8 +48,8 @@ type runner struct {
 	announced      announced
 }
 
-func newRunner(d *Daemon, s *config.Shuttle) *runner {
-	r := &runner{d: d, shuttle: s, kick: make(chan struct{}, 1)}
+func newRunner(d *Daemon, cfg *config.Config, s *config.Shuttle) *runner {
+	r := &runner{d: d, cfg: cfg, shuttle: s, kick: make(chan struct{}, 1), quit: make(chan struct{})}
 	r.st = Status{Name: s.Name, State: StateIdle}
 	if !s.Enabled {
 		r.st.State = StateDisabled
@@ -116,11 +122,17 @@ func (r *runner) isPaused() bool {
 
 // shouldStop is the engine's Stop: pausing or shutting down ends a run after
 // the file in progress.
-func (r *runner) shouldStop() bool { return r.isPaused() || r.d.isStopping() }
+func (r *runner) shouldStop() bool { return r.isPaused() || r.isStopping() }
+
+func (r *runner) isStopping() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.stopping
+}
 
 func (r *runner) loop() {
 	for range r.kick {
-		if r.d.isStopping() {
+		if r.isStopping() {
 			return
 		}
 		r.mu.Lock()
@@ -232,7 +244,7 @@ func (r *runner) open(ctx context.Context) (local, remote fsys.FS, err error) {
 	}
 	openCtx, cancel := context.WithTimeout(ctx, r.d.o.KeyringTimeout)
 	defer cancel()
-	rem, err := shares.OpenRemote(openCtx, r.d.cfg, r.shuttle, r.d.o.Store)
+	rem, err := shares.OpenRemote(openCtx, r.cfg, r.shuttle, r.d.o.Store)
 	if err != nil {
 		l.Close()
 		return nil, nil, err

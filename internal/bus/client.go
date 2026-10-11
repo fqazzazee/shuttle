@@ -79,6 +79,20 @@ func (c *Client) AllowDeletions(ctx context.Context, name string) error {
 	return clientErr(c.call(ctx, "AllowDeletions", name).Err)
 }
 
+// Reload asks the daemon to re-read its config file now.
+func (c *Client) Reload(ctx context.Context) error {
+	return clientErr(c.call(ctx, "ReloadConfig").Err)
+}
+
+// ConfigError returns why the daemon's config file did not load, or "".
+func (c *Client) ConfigError(ctx context.Context) (string, error) {
+	var msg string
+	if err := c.obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, Interface, "ConfigError").Store(&msg); err != nil {
+		return "", clientErr(err)
+	}
+	return msg, nil
+}
+
 // State returns the overall state and whether everything is paused.
 func (c *Client) State(ctx context.Context) (daemon.State, bool, error) {
 	var state string
@@ -147,6 +161,8 @@ func clientErr(err error) error {
 		return fmt.Errorf("%s: %w", msg, daemon.ErrUnknownShuttle)
 	case errDisabled:
 		return fmt.Errorf("%s: %w", msg, daemon.ErrDisabled)
+	case errConfig:
+		return fmt.Errorf("%s: %w", msg, daemon.ErrConfig)
 	}
 	return errors.New(msg)
 }

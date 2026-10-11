@@ -14,6 +14,7 @@ const (
 	EventCompleted      EventKind = "completed"       // a run finished (notify.completed)
 	EventShareLost      EventKind = "share-lost"      // a share went away (notify.share)
 	EventShareConnected EventKind = "share-connected" // a share came back (notify.share)
+	EventConfigError    EventKind = "config-error"    // the config file did not load (always)
 )
 
 // Event is something worth a desktop notification. The daemon sends each
@@ -26,7 +27,7 @@ type Event struct {
 	Share    string   // share events: the share's name
 	Shuttles []string // share events: the enabled shuttles that use it
 
-	Error         string         // EventError: why the run failed
+	Error         string         // EventError: why the run failed; EventConfigError: why it did not load
 	Errors        []engine.Issue // EventError: the paths that could not be synced
 	Conflicts     []engine.Issue // EventConflicts: the conflicts not announced before
 	HeldDeletions int            // EventDeletionsHeld
@@ -107,12 +108,11 @@ func (d *Daemon) shareChanged(share string) {
 	defer d.shareMu.Unlock()
 	now, users, notify := "", []string(nil), false
 	unknown := false
-	for _, name := range d.names() {
-		r := d.runners[name]
+	for _, r := range d.all() {
 		if r.shuttle.Share != share || !r.shuttle.Enabled {
 			continue
 		}
-		users = append(users, name)
+		users = append(users, r.shuttle.Name)
 		notify = notify || r.shuttle.Settings.Notify.Share
 		switch r.share() {
 		case ShareOnline:

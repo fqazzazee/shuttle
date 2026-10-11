@@ -35,6 +35,7 @@ type fixture struct {
 	c            *Client
 	connect      func() *dbus.Conn
 	serveConn    *dbus.Conn // the daemon's own connection
+	config       string     // the config file
 }
 
 func newFixture(t *testing.T, mode, extra string) *fixture {
@@ -47,6 +48,7 @@ func newFixture(t *testing.T, mode, extra string) *fixture {
 	if err := os.WriteFile(cfg, []byte(doc), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	f.config = cfg
 	d, err := daemon.New(&daemon.Options{Paths: daemon.Paths{Config: cfg, StateDir: filepath.Join(dir, "state")}, Store: noKeyring{}})
 	if err != nil {
 		t.Fatal(err)
@@ -302,5 +304,77 @@ func TestClosedBusDoesNotStopTheDaemon(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(f.mount, "a.txt")); err != nil {
 		t.Error("the run did not push")
+	}
+}
+
+// Config edits reach the bus: a broken one as ConfigError and a refused
+// ReloadConfig, a removed shuttle as ShuttleRemoved.
+func TestReloadOverTheBus(t *testing.T) {
+	f := newFixture(t, "push", "")
+	conn := f.connect()
+	if err := conn.AddMatchSignal(dbus.WithMatchObjectPath(Path), dbus.WithMatchMember("ShuttleRemoved")); err != nil {
+		t.Fatal(err)
+	}
+	signals := make(chan *dbus.Signal, 8)
+	conn.Signal(signals)
+
+	broken := strings.Replace(mustRead(t, f.config), `mode = "push"`, `mode = "both"`, 1)
+	if err := os.WriteFile(f.config, []byte(broken), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.c.Reload(ctx(t)); !errors.Is(err, daemon.ErrConfig) || !strings.Contains(err.Error(), `"both"`) {
+		t.Errorf("Reload with a broken config = %v, want the config error", err)
+	}
+	waitUntil(t, "ConfigError over the bus", func() bool {
+		msg, err := f.c.ConfigError(ctx(t))
+		return err == nil && strings.Contains(msg, `"both" must be one of`)
+	})
+	if state, _, _ := f.c.State(ctx(t)); state != daemon.StateError {
+		t.Errorf("overall state = %s, want error while the config is broken", state)
+	}
+
+	other := t.TempDir()
+	fixed := fmt.Sprintf("[shares.mnt]\ntype = \"path\"\npath = %q\n[shuttles.t]\nmode = \"push\"\nlocal = %q\nremote = \"mnt:\"\n", f.mount, other)
+	if err := os.WriteFile(f.config, []byte(fixed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.c.Reload(ctx(t)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case sig := <-signals:
+		if len(sig.Body) != 1 || sig.Body[0] != "s" {
+			t.Errorf("signal %s %v, want ShuttleRemoved(s)", sig.Name, sig.Body)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("no ShuttleRemoved")
+	}
+	waitUntil(t, "the error cleared", func() bool {
+		msg, err := f.c.ConfigError(ctx(t))
+		return err == nil && msg == ""
+	})
+	all, err := f.c.Shuttles(ctx(t))
+	if err != nil || len(all) != 1 || all[0].Name != "t" {
+		t.Errorf("Shuttles = %+v, %v; want only t", all, err)
+	}
+}
+
+func mustRead(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func waitUntil(t *testing.T, what string, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !ok() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
