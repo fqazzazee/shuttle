@@ -21,6 +21,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/fqazzazee/shuttle/internal/config"
@@ -86,9 +87,11 @@ type Result struct {
 	// overwritten or deleted; VersionsPruned, old versions retention removed.
 	Versioned      int
 	VersionsPruned int
-	BytesToLocal   int64
-	BytesToRemote  int64
-	Conflicts      []Issue // changed on both sides, or a file/folder clash
+	// TempsRemoved counts leftover temp files of interrupted writes removed.
+	TempsRemoved  int
+	BytesToLocal  int64
+	BytesToRemote int64
+	Conflicts     []Issue // changed on both sides, or a file/folder clash
 	// Held is set when an unresolved "ask" conflict held the whole shuttle:
 	// nothing but the conflicts was looked at.
 	Held bool
@@ -114,6 +117,23 @@ func newExecutor(ctx context.Context, o *Options, res *Result) *executor {
 	return e
 }
 
+// staleTemp is how old a leftover temp file must be before a run removes it.
+// A write in progress keeps touching its temp file, so this only catches
+// writes that died; the margin leaves alone another machine that is writing
+// to the same share right now.
+const staleTemp = time.Hour
+
+// removeStaleTemps removes temp files left by writes that were interrupted,
+// for example by a crash or a dropped connection. Failures are harmless (scans
+// skip temp files) and are not reported.
+func (e *executor) removeStaleTemps(f fsys.FS, temps []fsys.FileInfo) {
+	for _, t := range temps {
+		if e.now().Sub(t.ModTime) > staleTemp && f.Remove(e.ctx, t.Name) == nil {
+			e.res.TempsRemoved++
+		}
+	}
+}
+
 func onlyConflicts(actions []Action) []Action {
 	var out []Action
 	for _, a := range actions {
@@ -130,7 +150,7 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	local, remote, _, err := scanBoth(ctx, o.Local, o.Remote, ignored)
+	local, remote, err := scanBoth(ctx, o.Local, o.Remote, ignored)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +158,7 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Plan(o.Settings.Mode, o.Settings.Deletions, local, remote, records), nil
+	return Plan(o.Settings.Mode, o.Settings.Deletions, local.entries, remote.entries, records), nil
 }
 
 // Run syncs one shuttle once. The error is for problems that stop the whole
@@ -150,22 +170,24 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	if err != nil {
 		return res, err
 	}
-	local, remote, unsupported, err := scanBoth(ctx, o.Local, o.Remote, ignored)
+	local, remote, err := scanBoth(ctx, o.Local, o.Remote, ignored)
 	if err != nil {
 		return res, err
 	}
-	res.Unsupported = unsupported
+	res.Unsupported = slices.Concat(local.unsupported, remote.unsupported)
 	records, err := o.State.All()
 	if err != nil {
 		return res, err
 	}
-	actions := Plan(o.Settings.Mode, o.Settings.Deletions, local, remote, records)
+	actions := Plan(o.Settings.Mode, o.Settings.Deletions, local.entries, remote.entries, records)
 	res.Planned = len(actions)
 	if !o.AllowDeletions {
-		actions, res.HeldDeletions = guardDeletions(actions, local, remote, o.Settings.DeletionGuard)
+		actions, res.HeldDeletions = guardDeletions(actions, local.entries, remote.entries, o.Settings.DeletionGuard)
 	}
 
 	e := newExecutor(ctx, o, res)
+	e.removeStaleTemps(o.Local, local.temps)
+	e.removeStaleTemps(o.Remote, remote.temps)
 	if err := e.compareAll(actions); err != nil {
 		return res, err
 	}
