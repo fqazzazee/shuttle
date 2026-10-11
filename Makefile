@@ -10,7 +10,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Pinned to match CI. `go run` builds it on first use, so no separate install.
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-keyring
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-keyring test-systemd
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -88,6 +88,14 @@ test-integration:
 # gnome-keyring-daemon.
 test-keyring:
 	internal/secrets/testdata/with-test-keyring.sh go test -race -count=1 -v ./internal/secrets/
+
+# Phase 3's exit condition under a real systemd: a throwaway container with
+# systemd as PID 1 runs the unit, every trigger, kill -9 mid-run and a broken
+# config. About three minutes. PODMAN="sudo podman" where rootless fails.
+test-systemd:
+	PODMAN="$(PODMAN)" test/systemd/run.sh
+
+PODMAN ?= podman
 
 clean:
 	rm -rf bin/ dist/ coverage.out

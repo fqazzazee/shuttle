@@ -94,6 +94,21 @@ jobs:
         if: failure()
         run: docker logs shuttle-samba
 
+  systemd:
+    name: systemd
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      # Rootless podman cannot run a systemd container on the runner (no
+      # cgroup delegation for its user), so this one uses sudo.
+      - run: make test-systemd PODMAN="sudo podman"
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest
