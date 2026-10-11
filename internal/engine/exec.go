@@ -41,6 +41,9 @@ func (e *executor) run(actions []Action) error {
 			return errors.Join(err, e.flush())
 		}
 		a := &actions[i]
+		if a.skip {
+			continue
+		}
 		err := e.do(a)
 		e.report(a, err)
 		if len(e.pending) >= flushEvery || e.now().Sub(e.lastFlush) >= flushInterval {
@@ -74,32 +77,29 @@ func (e *executor) do(a *Action) error {
 	case OpDeleteLocal, OpDeleteRemote:
 		return e.delete(a, a.Op == OpDeleteRemote)
 	case OpAdopt:
-		e.record(a.Path, a.Local, a.Remote, nil)
+		e.record(a.Path, a.Local, a.Remote, a.hash)
 		e.res.Adopted++
 		return nil
-	case OpCompare:
-		return e.compare(a)
 	case OpForget:
 		e.pending = append(e.pending, func(tx *state.Tx) error { return tx.Delete(a.Path) })
 		return nil
 	case OpConflict:
-		e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: a.Op, Reason: a.Reason})
-		return nil
+		return e.conflict(a)
 	}
 	return fmt.Errorf("unknown op %v", a.Op)
 }
 
-// sides returns the FS and scanned entry of the source and destination, for
-// an action that writes to the remote side when toRemote is set.
-func (e *executor) sides(a *Action, toRemote bool) (src, dst fsys.FS, srcInfo, dstInfo *fsys.FileInfo) {
+// sides returns the destination FS and the scanned source and destination
+// entries, for an action that writes to the remote side when toRemote is set.
+func (e *executor) sides(a *Action, toRemote bool) (dst fsys.FS, srcInfo, dstInfo *fsys.FileInfo) {
 	if toRemote {
-		return e.o.Local, e.o.Remote, a.Local, a.Remote
+		return e.o.Remote, a.Local, a.Remote
 	}
-	return e.o.Remote, e.o.Local, a.Remote, a.Local
+	return e.o.Local, a.Remote, a.Local
 }
 
 func (e *executor) mkdir(a *Action, toRemote bool) error {
-	_, dst, srcInfo, dstInfo := e.sides(a, toRemote)
+	dst, srcInfo, dstInfo := e.sides(a, toRemote)
 	if _, err := e.unchanged(dst, a.Path, dstInfo); err != nil {
 		return err
 	}
@@ -120,25 +120,36 @@ func (e *executor) mkdir(a *Action, toRemote bool) error {
 }
 
 func (e *executor) copy(a *Action, toRemote bool) error {
-	src, dst, srcInfo, dstInfo := e.sides(a, toRemote)
-	if _, err := e.unchanged(src, a.Path, srcInfo); err != nil {
+	_, srcInfo, dstInfo := e.sides(a, toRemote)
+	return e.copyFile(a.Path, toRemote, srcInfo, dstInfo)
+}
+
+// copyFile copies p from one side to the other. srcInfo and dstInfo are what
+// the two sides are expected to hold (dstInfo nil: nothing); if either side
+// no longer matches, nothing is written.
+func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.FileInfo) error {
+	src, dst := e.o.Remote, e.o.Local
+	if toRemote {
+		src, dst = e.o.Local, e.o.Remote
+	}
+	if _, err := e.unchanged(src, p, srcInfo); err != nil {
 		return err
 	}
-	if _, err := e.unchanged(dst, a.Path, dstInfo); err != nil {
+	if _, err := e.unchanged(dst, p, dstInfo); err != nil {
 		return err
 	}
-	if dir := path.Dir(a.Path); dir != "." {
+	if dir := path.Dir(p); dir != "." {
 		if err := dst.MkdirAll(e.ctx, dir); err != nil {
 			return err
 		}
 	}
 
-	r, err := src.Open(e.ctx, a.Path)
+	r, err := src.Open(e.ctx, p)
 	if err != nil {
 		return err
 	}
 	h := sha256.New()
-	n, err := fsys.WriteFile(e.ctx, dst, a.Path, io.TeeReader(r, h), srcInfo.ModTime)
+	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(r, h), srcInfo.ModTime)
 	r.Close()
 	if err != nil {
 		return err
@@ -153,18 +164,18 @@ func (e *executor) copy(a *Action, toRemote bool) error {
 	// If the source changed while it was being read, the copy may mix old and
 	// new content. Leave it unrecorded: the next run sees both sides changed
 	// and compares them, rather than trusting this copy.
-	after, err := e.unchanged(src, a.Path, srcInfo)
+	after, err := e.unchanged(src, p, srcInfo)
 	if err != nil {
 		return fmt.Errorf("source %w", err)
 	}
-	written, err := dst.Stat(e.ctx, a.Path)
+	written, err := dst.Stat(e.ctx, p)
 	if err != nil {
 		return err
 	}
 	if toRemote {
-		e.record(a.Path, &after, &written, h.Sum(nil))
+		e.record(p, &after, &written, h.Sum(nil))
 	} else {
-		e.record(a.Path, &written, &after, h.Sum(nil))
+		e.record(p, &written, &after, h.Sum(nil))
 	}
 	return nil
 }
@@ -185,9 +196,29 @@ func (e *executor) delete(a *Action, onRemote bool) error {
 	return nil
 }
 
-// compare settles a file present on both sides that changed on both, or has
-// no history: identical contents are recorded as synced; otherwise the
-// action's OnDiffer applies.
+// compareAll settles every OpCompare before anything is written: identical
+// contents become OpAdopt, anything else the action's OnDiffer. Doing this
+// up front, read-only, means every conflict is known before the first write,
+// which is what lets an "ask" conflict hold the whole shuttle.
+func (e *executor) compareAll(actions []Action) error {
+	for i := range actions {
+		a := &actions[i]
+		if a.Op != OpCompare {
+			continue
+		}
+		if err := e.ctx.Err(); err != nil {
+			return err
+		}
+		err := e.compare(a)
+		if err != nil {
+			// Unreadable or changed since the scan: leave it for the next run.
+			e.report(a, err)
+			a.Op, a.skip = OpForget, true
+		}
+	}
+	return nil
+}
+
 func (e *executor) compare(a *Action) error {
 	if _, err := e.unchanged(e.o.Local, a.Path, a.Local); err != nil {
 		return err
@@ -200,15 +231,11 @@ func (e *executor) compare(a *Action) error {
 		return err
 	}
 	if same {
-		e.record(a.Path, a.Local, a.Remote, sum)
-		e.res.Adopted++
-		return nil
+		a.Op, a.hash = OpAdopt, sum
+	} else {
+		a.Op = a.OnDiffer
 	}
-	if a.OnDiffer == OpConflict {
-		e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: OpConflict, Reason: a.Reason})
-		return nil
-	}
-	return e.copy(a, a.OnDiffer == OpCopyToRemote)
+	return nil
 }
 
 // sameContent decides whether both copies of a.Path hold the same bytes. A
