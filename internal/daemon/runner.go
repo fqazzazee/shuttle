@@ -33,6 +33,9 @@ type runner struct {
 	attempted time.Time       // when a run was last triggered by the schedule, or completed before start
 	own       map[string]bool // local paths this shuttle's run wrote; see startOwnWrites
 	ownUntil  time.Time
+
+	allowDeletions bool       // the next run may pass the deletion guard
+	runMu          sync.Mutex // held by a run, and by Resolve: they never overlap
 }
 
 func newRunner(d *Daemon, s *config.Shuttle) *runner {
@@ -146,13 +149,13 @@ func (r *runner) status() Status {
 }
 
 func (r *runner) changed() {
-	if r.d.o.OnChange != nil {
-		st := r.status()
-		r.d.o.OnChange(&st)
-	}
+	st := r.status()
+	r.d.notify(&st)
 }
 
 func (r *runner) runOnce() {
+	r.runMu.Lock()
+	defer r.runMu.Unlock()
 	log := r.d.o.Log.With("shuttle", r.shuttle.Name)
 	r.changed() // the loop has set StateRunning
 	log.Info("run started")
@@ -194,34 +197,55 @@ func (r *runner) runOnce() {
 	}
 }
 
+// open opens both sides of the shuttle. The caller closes them.
+func (r *runner) open(ctx context.Context) (local, remote fsys.FS, err error) {
+	l, err := fsys.OpenLocal(r.shuttle.Local)
+	if err != nil {
+		// Never create it: a missing folder is often an unmounted drive, and
+		// syncing an empty stand-in would read as everything deleted.
+		return nil, nil, fmt.Errorf("local folder %s: %w (is the drive mounted?)", r.shuttle.Local, err)
+	}
+	openCtx, cancel := context.WithTimeout(ctx, r.d.o.KeyringTimeout)
+	defer cancel()
+	rem, err := shares.OpenRemote(openCtx, r.d.cfg, r.shuttle, r.d.o.Store)
+	if err != nil {
+		l.Close()
+		return nil, nil, err
+	}
+	return l, rem, nil
+}
+
+// options are the engine options for this shuttle's two sides.
+func (r *runner) options(local, remote fsys.FS) *engine.Options {
+	return &engine.Options{
+		Local: local, Remote: remote, State: r.db, Settings: &r.shuttle.Settings,
+		LocalName: r.d.hostname, RemoteName: r.shuttle.Share,
+		Stop: r.shouldStop, Now: r.d.o.Now, OnAction: r.noteOwnWrite,
+	}
+}
+
 // sync opens both sides and runs the engine once.
 func (r *runner) sync() (*engine.Result, error) {
 	// Runs are not cancelled by shutdown: Stop ends them after the current
 	// file instead. Only waiting for the keyring and the share is bounded.
 	ctx := context.Background()
-	local, err := fsys.OpenLocal(r.shuttle.Local)
-	if err != nil {
-		// Never create it: a missing folder is often an unmounted drive, and
-		// syncing an empty stand-in would read as everything deleted.
-		return nil, fmt.Errorf("local folder %s: %w (is the drive mounted?)", r.shuttle.Local, err)
-	}
-	defer local.Close()
-
-	openCtx, cancel := context.WithTimeout(ctx, r.d.o.KeyringTimeout)
-	remote, err := shares.OpenRemote(openCtx, r.d.cfg, r.shuttle, r.d.o.Store)
-	cancel()
+	local, remote, err := r.open(ctx)
 	if err != nil {
 		return nil, err
 	}
+	defer local.Close()
 	defer remote.Close()
+
+	r.mu.Lock()
+	allow := r.allowDeletions
+	r.allowDeletions = false
+	r.mu.Unlock()
 
 	r.startOwnWrites()
 	defer r.endOwnWrites()
-	return engine.Run(ctx, &engine.Options{
-		Local: local, Remote: remote, State: r.db, Settings: &r.shuttle.Settings,
-		LocalName: r.d.hostname, RemoteName: r.shuttle.Share,
-		Stop: r.shouldStop, Now: r.d.o.Now, OnAction: r.noteOwnWrite,
-	})
+	o := r.options(local, remote)
+	o.AllowDeletions = allow
+	return engine.Run(ctx, o)
 }
 
 // isOffline tells "the share's server cannot be reached right now" apart
