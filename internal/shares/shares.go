@@ -46,7 +46,12 @@ func OpenRemote(ctx context.Context, cfg *config.Config, s *config.Shuttle, stor
 	}
 	switch share.Type {
 	case config.SharePath:
-		return fsys.OpenLocal(filepath.Join(share.Path, filepath.FromSlash(s.Remote)))
+		dir := filepath.Join(share.Path, filepath.FromSlash(s.Remote))
+		f, err := fsys.OpenLocal(dir)
+		if err != nil {
+			return nil, fmt.Errorf("share %s: folder %s: %w (is the share mounted?)", share.Name, dir, err)
+		}
+		return f, nil
 	case config.ShareSMB:
 		return openSMB(ctx, &share, s.Remote, store)
 	case config.ShareNFS3:
