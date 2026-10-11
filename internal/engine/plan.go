@@ -27,11 +27,12 @@ const (
 	OpCompare                // same name, no usable history: compare contents
 	OpForget                 // gone from both sides: drop the record
 	OpConflict               // cannot be decided automatically: hold it
+	OpPrune                  // remove versions that retention lets go (never planned)
 )
 
 var opNames = [...]string{
 	"mkdir-local", "mkdir-remote", "copy-to-local", "copy-to-remote", "delete-local",
-	"delete-remote", "adopt", "compare", "forget", "conflict",
+	"delete-remote", "adopt", "compare", "forget", "conflict", "prune-versions",
 }
 
 func (o Op) String() string { return opNames[o] }

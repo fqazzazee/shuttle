@@ -148,10 +148,25 @@ func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.File
 	if err != nil {
 		return err
 	}
+	// The file about to be replaced goes to the versions folder first. If the
+	// new copy then fails, it is put back, so a failed copy loses nothing.
+	var kept string
+	if dstInfo != nil && dstInfo.Kind == fsys.KindFile {
+		if kept, err = e.keepVersion(dst, p); err != nil {
+			r.Close()
+			return err
+		}
+	}
 	h := sha256.New()
 	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(r, h), srcInfo.ModTime)
 	r.Close()
 	if err != nil {
+		if kept != "" {
+			if rerr := dst.Rename(context.WithoutCancel(e.ctx), kept, p); rerr != nil {
+				return fmt.Errorf("%w; the replaced file is kept at %s", err, kept)
+			}
+			e.res.Versioned--
+		}
 		return err
 	}
 	if toRemote {
@@ -188,8 +203,17 @@ func (e *executor) delete(a *Action, onRemote bool) error {
 	if _, err := e.unchanged(target, a.Path, info); err != nil {
 		return err
 	}
-	if err := target.Remove(e.ctx, a.Path); err != nil {
-		return err
+	kept := ""
+	if info.Kind == fsys.KindFile {
+		var err error
+		if kept, err = e.keepVersion(target, a.Path); err != nil {
+			return err
+		}
+	}
+	if kept == "" {
+		if err := target.Remove(e.ctx, a.Path); err != nil {
+			return err
+		}
 	}
 	e.pending = append(e.pending, func(tx *state.Tx) error { return tx.DeleteTree(a.Path) })
 	e.res.Deleted++
