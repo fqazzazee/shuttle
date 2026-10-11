@@ -23,7 +23,6 @@ import (
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/secrets"
-	"github.com/fqazzazee/shuttle/internal/state"
 )
 
 // Paths are where the daemon finds its config and keeps its state.
@@ -77,28 +76,36 @@ var (
 	ErrAlreadyRunning = errors.New("another shuttle daemon is already running")
 )
 
-// Daemon runs the shuttles of one config.
+// Daemon runs the shuttles of one config, and follows the config as it
+// changes.
 type Daemon struct {
-	o       Options
-	cfg     *config.Config
-	runners map[string]*runner
+	o Options
 
-	ready chan struct{}  // closed once Run has every state database open
-	quit  chan struct{}  // closed when Run starts shutting down
-	bg    sync.WaitGroup // schedulers and share watchers
+	ready  chan struct{} // closed once Run has every state database open
+	quit   chan struct{} // closed when Run starts shutting down
+	reload chan struct{} // asks the config watcher for a reload now
+
+	// runnersMu guards the config and the runners, which a reload replaces.
+	// Taken after shareMu and before any runner's mu.
+	runnersMu sync.RWMutex
+	cfg       *config.Config
+	runners   map[string]*runner
+
+	reloadMu  sync.Mutex // one reload at a time, and none during shutdown
+	configErr string     // why the config on disk was not loaded; "" when it was
+	errShown  string     // the config error last announced
 
 	listenMu  sync.Mutex
 	listeners map[int]func(*Status)
+	reloads   map[int]func(*Reloaded)
 	nextID    int
 
-	shareMu sync.Mutex        // taken before any runner's mu
+	shareMu sync.Mutex        // taken before runnersMu
 	shares  map[string]string // share -> ShareOnline or ShareOffline, as last announced
 
-	mu          sync.Mutex
-	pausedAll   bool
-	stopping    bool
-	hostname    string
-	runnersDone sync.WaitGroup
+	mu        sync.Mutex
+	pausedAll bool
+	hostname  string
 }
 
 // New loads the config. Nothing runs until Run.
@@ -122,84 +129,55 @@ func New(opts *Options) (*Daemon, error) {
 		host = "local"
 	}
 	d := &Daemon{o: o, cfg: cfg, runners: map[string]*runner{}, hostname: host, shares: map[string]string{},
-		ready: make(chan struct{}), quit: make(chan struct{})}
+		ready: make(chan struct{}), quit: make(chan struct{}), reload: make(chan struct{}, 1)}
 	for i := range cfg.Shuttles {
 		s := &cfg.Shuttles[i]
-		d.runners[s.Name] = newRunner(d, s)
+		d.runners[s.Name] = newRunner(d, cfg, s)
 	}
 	return d, nil
 }
 
 // Run opens every enabled shuttle's state and runs the shuttles until ctx is
-// done. It then lets each run in progress finish the file it is on, starts
-// nothing more, and returns once every state database is closed.
+// done, reloading the config whenever it changes. It then lets each run in
+// progress finish the file it is on, starts nothing more, and returns once
+// every state database is closed.
 func (d *Daemon) Run(ctx context.Context) error {
 	if err := os.MkdirAll(d.o.Paths.StateDir, 0o700); err != nil {
 		return err
 	}
+	// Every database first: a second daemon is refused before anything runs.
 	var opened []*runner
-	for _, name := range d.names() {
-		r := d.runners[name]
+	for _, r := range d.all() {
 		if !r.shuttle.Enabled {
 			continue
 		}
-		db, err := state.Open(filepath.Join(d.o.Paths.StateDir, name+".db"))
-		if err != nil {
-			for _, o := range opened {
-				o.db.Close()
-			}
-			if errors.Is(err, state.ErrLocked) {
-				return fmt.Errorf("%w (shuttle %s's state is in use)", ErrAlreadyRunning, name)
-			}
+		if err := r.openState(); err != nil {
+			_ = closeAll(opened) // the open error is the one to report
 			return err
-		}
-		r.db = db
-		if reset, err := db.Bind(pairOf(d.cfg, r.shuttle)); err != nil {
-			for _, o := range append(opened, r) {
-				o.db.Close()
-			}
-			return err
-		} else if reset {
-			d.o.Log.Warn("the shuttle's folders changed: starting afresh, as a first sync (nothing is deleted; files that differ are conflicts)",
-				"shuttle", name)
-		}
-		// The schedule counts from the last complete run, so a slot missed
-		// while the machine was off runs at start.
-		if last, err := db.LastComplete(); err == nil {
-			r.markAttempt(last)
 		}
 		opened = append(opened, r)
 	}
+	for _, r := range opened {
+		r.launch()
+	}
 	d.o.Log.Info("daemon started", "config", d.o.Paths.Config, "shuttles", len(opened))
 
-	for _, r := range opened {
-		d.runnersDone.Go(r.loop)
-		d.bg.Go(func() { r.watchShare(d.quit) })
-		if r.shuttle.Settings.Has(config.TriggerSchedule) {
-			d.bg.Go(func() { r.schedule(d.quit) })
-		}
-		if hasRealtime(&r.shuttle.Settings) {
-			d.bg.Go(func() { r.realtime(d.quit) })
-		}
-	}
+	reloads := d.watchConfig()
+	watching := make(chan struct{})
+	go func() {
+		defer close(watching)
+		reloads()
+	}()
 	close(d.ready)
 	<-ctx.Done()
 	close(d.quit)
-	d.bg.Wait()
+	<-watching
 
-	d.mu.Lock()
-	d.stopping = true
-	d.mu.Unlock()
-	for _, r := range opened {
-		r.wake()
-	}
-	d.runnersDone.Wait()
-	var errs []error
-	for _, r := range opened {
-		errs = append(errs, r.db.Close())
-	}
+	d.reloadMu.Lock() // no reload from now on
+	defer d.reloadMu.Unlock()
+	err := stopAll(d.all())
 	d.o.Log.Info("daemon stopped")
-	return errors.Join(errs...)
+	return err
 }
 
 // Ready is closed once Run holds every enabled shuttle's state and its
@@ -228,7 +206,7 @@ func (d *Daemon) SetPaused(name string, paused bool) error {
 		d.mu.Lock()
 		d.pausedAll = paused
 		d.mu.Unlock()
-		for _, r := range d.runners {
+		for _, r := range d.all() {
 			r.pausedChanged()
 		}
 		return nil
@@ -278,7 +256,11 @@ func (d *Daemon) Paused() bool { return d.isPausedAll() }
 
 // State is the state of the shuttles taken together, for one icon: the most
 // urgent of them, in the order error, held, offline, running, paused, idle.
+// A config file that did not load counts as an error.
 func (d *Daemon) State() State {
+	if d.ConfigError() != "" {
+		return StateError
+	}
 	rank := map[State]int{StateError: 6, StateHeld: 5, StateOffline: 4, StateRunning: 3, StatePaused: 2, StateIdle: 1}
 	best := StateIdle
 	all := d.Statuses()
@@ -335,15 +317,18 @@ func (d *Daemon) AllowDeletions(name string) error {
 
 // Statuses returns every shuttle's status, sorted by name.
 func (d *Daemon) Statuses() []Status {
-	out := make([]Status, 0, len(d.runners))
-	for _, name := range d.names() {
-		out = append(out, d.runners[name].status())
+	all := d.all()
+	out := make([]Status, 0, len(all))
+	for _, r := range all {
+		out = append(out, r.status())
 	}
 	return out
 }
 
 func (d *Daemon) runner(name string) (*runner, error) {
+	d.runnersMu.RLock()
 	r, ok := d.runners[name]
+	d.runnersMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("%q: %w", name, ErrUnknownShuttle)
 	}
@@ -353,19 +338,15 @@ func (d *Daemon) runner(name string) (*runner, error) {
 	return r, nil
 }
 
-func (d *Daemon) names() []string {
-	names := make([]string, 0, len(d.runners))
-	for n := range d.runners {
-		names = append(names, n)
+// all returns the current runners, sorted by name.
+func (d *Daemon) all() []*runner {
+	d.runnersMu.RLock()
+	defer d.runnersMu.RUnlock()
+	out := make([]*runner, 0, len(d.runners))
+	for _, name := range slices.Sorted(maps.Keys(d.runners)) {
+		out = append(out, d.runners[name])
 	}
-	slices.Sort(names)
-	return names
-}
-
-func (d *Daemon) isStopping() bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.stopping
+	return out
 }
 
 func (d *Daemon) isPausedAll() bool {

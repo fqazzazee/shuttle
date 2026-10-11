@@ -88,7 +88,14 @@ deletions, when a run completes, and when a share is lost or comes back. Each ha
 under `notify`, all on by default except "completed" for real-time shuttles. A run you
 did not ask for is only announced when it changed something.
 
-A broken config stops the service with a message in `journalctl --user -u shuttle`, rather
+The service follows the config file: save a change and it applies within a second, with no
+restart. Shuttles you didn't touch carry on; a changed one finishes the file it is copying,
+then continues with the new settings. If an edit has a mistake, the service keeps the previous
+settings, and says what is wrong in `shuttle status`, a notification and the journal. If you
+point a shuttle at other folders, it starts afresh, like a first sync: nothing is deleted, and
+files that differ become conflicts.
+
+A broken config at startup stops the service with a message in `journalctl --user -u shuttle`, rather
 than restarting it over and over.
 
 ## Use

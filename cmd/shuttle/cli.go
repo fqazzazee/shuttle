@@ -84,6 +84,9 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 	if paused {
 		fmt.Fprintln(w, "All shuttles are paused (shuttle resume).")
 	}
+	if msg, err := c.ConfigError(ctx); err == nil && msg != "" {
+		fmt.Fprintf(w, "The config file has an error, so the previous settings are in use:\n%s\n\n", msg)
+	}
 	if len(all) == 0 {
 		fmt.Fprintln(w, "No shuttles in the config.")
 		return nil

@@ -31,6 +31,7 @@ const (
 const (
 	errUnknownShuttle = Interface + ".Error.UnknownShuttle"
 	errDisabled       = Interface + ".Error.Disabled"
+	errConfig         = Interface + ".Error.Config"
 	errInvalid        = Interface + ".Error.InvalidArgs"
 	errFailed         = Interface + ".Error.Failed"
 )
@@ -59,6 +60,9 @@ func Serve(ctx context.Context, conn *dbus.Conn, d *daemon.Daemon) error {
 	props, err := prop.Export(conn, Path, prop.Map{Interface: {
 		"Paused": {Value: d.Paused(), Emit: prop.EmitTrue},
 		"State":  {Value: string(d.State()), Emit: prop.EmitTrue},
+		// Why the config file did not load ("" when it did); the daemon then
+		// runs the config it last loaded.
+		"ConfigError": {Value: d.ConfigError(), Emit: prop.EmitTrue},
 	}})
 	if err != nil {
 		return err
@@ -76,6 +80,7 @@ func Serve(ctx context.Context, conn *dbus.Conn, d *daemon.Daemon) error {
 				Signals: []introspect.Signal{
 					{Name: "ShuttleChanged", Args: []introspect.Arg{{Name: "name", Type: "s"}, {Name: "status", Type: "a{sv}"}}},
 					{Name: "ConflictRaised", Args: []introspect.Arg{{Name: "name", Type: "s"}, {Name: "path", Type: "s"}, {Name: "reason", Type: "s"}}},
+					{Name: "ShuttleRemoved", Args: []introspect.Arg{{Name: "name", Type: "s"}}},
 				},
 			},
 		},
@@ -90,6 +95,8 @@ func Serve(ctx context.Context, conn *dbus.Conn, d *daemon.Daemon) error {
 	// Stop emitting before Serve returns: the caller may close conn next.
 	stop := d.Watch(s.changed)
 	defer stop()
+	stopReloads := d.WatchReloads(s.reloaded)
+	defer stopReloads()
 
 	reply, err := conn.RequestName(Name, dbus.NameFlagDoNotQueue)
 	if err != nil {
@@ -112,6 +119,19 @@ func (s *server) changed(st *daemon.Status) {
 	}
 	s.setProp("State", string(s.d.State()))
 	s.setProp("Paused", s.d.Paused())
+}
+
+// reloaded is the daemon's reload listener: it emits ShuttleRemoved and
+// updates the properties.
+func (s *server) reloaded(r *daemon.Reloaded) {
+	for _, name := range r.Removed {
+		s.mu.Lock()
+		delete(s.held, name)
+		s.mu.Unlock()
+		_ = s.conn.Emit(Path, Interface+".ShuttleRemoved", name)
+	}
+	s.setProp("ConfigError", r.ConfigError)
+	s.setProp("State", string(s.d.State()))
 }
 
 // setProp updates a read-only property and emits PropertiesChanged. prop's
@@ -158,6 +178,8 @@ func busErr(err error) *dbus.Error {
 		return dbus.NewError(errUnknownShuttle, []any{err.Error()})
 	case errors.Is(err, daemon.ErrDisabled):
 		return dbus.NewError(errDisabled, []any{err.Error()})
+	case errors.Is(err, daemon.ErrConfig):
+		return dbus.NewError(errConfig, []any{err.Error()})
 	}
 	return dbus.NewError(errFailed, []any{err.Error()})
 }
@@ -189,6 +211,12 @@ func (s *server) ResolveConflict(name, path, choice string) *dbus.Error {
 		return busErr(s.d.Resolve(context.Background(), name, path, c))
 	}
 	return dbus.NewError(errInvalid, []any{fmt.Sprintf("choice %q must be keep-local, keep-remote or keep-both", choice)})
+}
+
+// ReloadConfig re-reads the config file now. A broken one is refused with
+// its error, and the running config stays in use.
+func (s *server) ReloadConfig() *dbus.Error {
+	return busErr(s.d.Reload())
 }
 
 func (s *server) AllowDeletions(name string) *dbus.Error {

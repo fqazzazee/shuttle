@@ -45,6 +45,8 @@ func TestMessage(t *testing.T) {
 			"completed/docs", "docs: synced", "Nothing to do: already in step.", "transfer.complete"},
 		{daemon.Event{Kind: daemon.EventShareLost, Share: "nas", Shuttles: []string{"docs", "music", "photos"}},
 			"share/nas", "Share nas lost", "Waiting for it: docs, music and photos.", "network.disconnected"},
+		{daemon.Event{Kind: daemon.EventConfigError, Error: `shuttles.docs.mode: "both" must be one of push, pull, sync`},
+			"config", "shuttle: config not loaded", "shuttles.docs.mode: \"both\" must be one of push, pull, sync\nThe previous settings stay in use", "transfer.error"},
 		{daemon.Event{Kind: daemon.EventShareConnected, Share: "nas", Shuttles: []string{"docs"}},
 			"share/nas", "Share nas connected", "Can sync again: docs.", "network.connected"},
 	} {

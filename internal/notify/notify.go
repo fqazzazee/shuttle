@@ -167,6 +167,9 @@ func message(e *daemon.Event) note {
 	case daemon.EventShareLost:
 		return note{key: "share/" + e.Share, icon: "network-offline-symbolic", category: "network.disconnected",
 			summary: "Share " + e.Share + " lost", body: "Waiting for it: " + names(e.Shuttles) + "."}
+	case daemon.EventConfigError:
+		return note{key: "config", icon: "dialog-error-symbolic", category: "transfer.error",
+			summary: "shuttle: config not loaded", body: e.Error + "\nThe previous settings stay in use until it is fixed."}
 	case daemon.EventShareConnected:
 		return note{key: "share/" + e.Share, icon: "network-server-symbolic", category: "network.connected",
 			summary: "Share " + e.Share + " connected", body: "Can sync again: " + names(e.Shuttles) + "."}

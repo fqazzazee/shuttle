@@ -191,6 +191,26 @@ echo "stopped in ${took}s, no half-written file left"
 systemctl --user start shuttle
 wait_for "the rest after restarting" 30 test -f "$share/rt/stop-10"
 
+step "config edits apply without a restart"
+pid=$(prop MainPID)
+mkdir -p ~/n "$share/n"
+echo n >~/n/one
+printf '\n[shuttles.n]\nmode = "push"\nlocal = "~/n"\nremote = "disk:/n"\n' >>~/.config/shuttle/config.toml
+wait_for "the added shuttle in shuttle status" 10 sh -c "\"$shuttle\" status | grep -q '^n '"
+"$shuttle" sync n
+wait_for "its sync" 10 test -f "$share/n/one"
+cp ~/.config/shuttle/config.toml ~/good.toml
+echo 'bogus = 1' >>~/.config/shuttle/config.toml
+wait_for "the config error in shuttle status" 10 sh -c "\"$shuttle\" status | grep -q 'previous settings are in use'"
+wait_for "the config error notification" 10 note '^transfer\.error\|shuttle: config not loaded\|.*bogus'
+echo n >~/n/two
+"$shuttle" sync n
+wait_for "a sync under the previous settings" 10 test -f "$share/n/two"
+cp ~/good.toml ~/.config/shuttle/config.toml
+wait_for "the error to clear" 10 sh -c "! \"$shuttle\" status | grep -q 'previous settings'"
+[ "$(prop MainPID)" = "$pid" ] || fail "the daemon restarted for a config edit"
+echo "added a shuttle, survived a broken edit and its fix, all in process $pid"
+
 step "a broken config: exit 78, and no restarts"
 sed -i 's/mode = "push"/mode = "both"/' ~/.config/shuttle/config.toml
 systemctl --user restart shuttle 2>/dev/null && fail "started with a broken config"
