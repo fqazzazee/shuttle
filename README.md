@@ -23,11 +23,10 @@ like Syncthing.
 Early, but usable from the command line: the sync engine, SMB shares, the keyring and the
 background service work and are tested against a real Samba server. Still to come:
 
-1. Desktop notifications
-2. Terminal UI (until then: edit the config file, use the commands below)
-3. NFSv3 backend, plus already-mounted paths for NFSv4-only servers
-4. GNOME Shell 50 extension: indicator and Quick Settings toggle
-5. Packages: RPM (Fedora COPR), DEB, extensions.gnome.org
+1. Terminal UI (until then: edit the config file, use the commands below)
+2. NFSv3 backend, plus already-mounted paths for NFSv4-only servers
+3. GNOME Shell 50 extension: indicator and Quick Settings toggle
+4. Packages: RPM (Fedora COPR), DEB, extensions.gnome.org
 
 ### Not planned
 
@@ -62,6 +61,7 @@ user = "you"              # the password goes in the keyring, never here
 mode = "sync"                                   # push, pull or sync
 triggers = ["realtime", "share-available"]      # or "schedule" with interval/at
 versioning = { kind = "trash", keep = "30d" }
+notify = { completed = false }                  # errors, conflicts, completed, share
 
 [shuttles.documents]
 profile = "live"
@@ -82,6 +82,11 @@ Then start the service with your desktop session:
 systemctl --user daemon-reload
 systemctl --user enable --now shuttle
 ```
+
+The service shows desktop notifications when a run fails, meets conflicts or holds back
+deletions, when a run completes, and when a share is lost or comes back. Each has a switch
+under `notify`, all on by default except "completed" for real-time shuttles. A run you
+did not ask for is only announced when it changed something.
 
 A broken config stops the service with a message in `journalctl --user -u shuttle`, rather
 than restarting it over and over.

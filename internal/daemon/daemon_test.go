@@ -36,8 +36,10 @@ type fixture struct {
 	cancel       context.CancelFunc
 	done         chan error
 	mu           sync.Mutex
-	runs         int   // how many times a shuttle entered StateRunning
-	last         State // the state of the last change seen
+	runs         int     // how many times a shuttle entered StateRunning
+	ended        int     // how many times one left it
+	last         State   // the state of the last change seen
+	events       []Event // what the daemon would notify, in order
 }
 
 // newFixture writes a config with one shuttle, s, between local and the
@@ -78,7 +80,7 @@ func (f *fixture) start() {
 // build creates the daemon without running it, so a test can adjust it.
 func (f *fixture) build() {
 	f.t.Helper()
-	d, err := New(&Options{Paths: f.paths, Store: noKeyring{f.t}, OnChange: f.onChange})
+	d, err := New(&Options{Paths: f.paths, Store: noKeyring{f.t}, OnChange: f.onChange, OnEvent: f.onEvent})
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -126,6 +128,9 @@ func (f *fixture) onChange(st *Status) {
 	defer f.mu.Unlock()
 	if st.State == StateRunning && f.last != StateRunning {
 		f.runs++
+	}
+	if st.State != StateRunning && f.last == StateRunning {
+		f.ended++
 	}
 	f.last = st.State
 }

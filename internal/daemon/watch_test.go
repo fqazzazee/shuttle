@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fqazzazee/shuttle/internal/state"
 )
 
 // realtime starts a daemon whose shuttle s has the real-time trigger, with
@@ -36,6 +38,34 @@ func TestRealtimeRunsAtStart(t *testing.T) {
 	f.settled("s")
 	if !exists(f.mount, "a.txt") {
 		t.Error("the first run did not push")
+	}
+}
+
+// Changes made while the daemon was not running are only seen by a run, so
+// a real-time shuttle runs at start even if its last run was a moment ago,
+// as after a crash and restart.
+func TestRealtimeRunsAtStartAfterARecentRun(t *testing.T) {
+	fast(t)
+	f := newFixture(t, "push", `triggers = ["realtime"]`)
+	write(t, f.local, "while-down.txt", "w")
+	if err := os.MkdirAll(f.paths.StateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	db, err := state.Open(filepath.Join(f.paths.StateDir, "s.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetLastComplete(time.Now().Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	f.build()
+	f.d.runners["s"].shuttle.Settings.PollInterval = time.Hour
+	f.run()
+	f.waitFor("s", "the run at start", func(Status) bool { return exists(f.mount, "while-down.txt") })
+	quiet()
+	if got := f.runCount(); got != 1 {
+		t.Errorf("%d runs at start, want 1", got)
 	}
 }
 

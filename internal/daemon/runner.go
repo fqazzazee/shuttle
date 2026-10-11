@@ -30,12 +30,14 @@ type runner struct {
 	st        Status
 	paused    bool // this shuttle, by itself
 	pending   bool
+	requested bool            // the user asked for the pending run (SyncNow)
 	attempted time.Time       // when a run was last triggered by the schedule, or completed before start
 	own       map[string]bool // local paths this shuttle's run wrote; see startOwnWrites
 	ownUntil  time.Time
 
 	allowDeletions bool       // the next run may pass the deletion guard
 	runMu          sync.Mutex // held by a run, and by Resolve: they never overlap
+	announced      announced
 }
 
 func newRunner(d *Daemon, s *config.Shuttle) *runner {
@@ -121,15 +123,16 @@ func (r *runner) loop() {
 		}
 		r.mu.Lock()
 		run := r.pending && !r.isPausedLocked()
+		requested := r.requested
 		if run {
 			// Together, under one lock: in between, the status would claim
 			// "idle, nothing pending" while a run is about to start.
-			r.pending = false
+			r.pending, r.requested = false, false
 			r.st.State = StateRunning
 		}
 		r.mu.Unlock()
 		if run {
-			r.runOnce()
+			r.runOnce(requested)
 		}
 		r.changed()
 	}
@@ -148,12 +151,19 @@ func (r *runner) status() Status {
 	return st
 }
 
+// share is what the last probe found: ShareOnline, ShareOffline or "".
+func (r *runner) share() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.st.Share
+}
+
 func (r *runner) changed() {
 	st := r.status()
 	r.d.notify(&st)
 }
 
-func (r *runner) runOnce() {
+func (r *runner) runOnce(requested bool) {
 	r.runMu.Lock()
 	defer r.runMu.Unlock()
 	log := r.d.o.Log.With("shuttle", r.shuttle.Name)
@@ -171,6 +181,7 @@ func (r *runner) runOnce() {
 	case errors.Is(err, engine.ErrStopped):
 		st.State = StateIdle // shown as paused while paused; resumes as pending
 		r.pending = true
+		r.requested = r.requested || requested
 	case isOffline(err):
 		st.State, st.Error = StateOffline, err.Error()
 	case err != nil:
@@ -187,7 +198,19 @@ func (r *runner) runOnce() {
 		st.Conflicts, st.Errors, st.HeldDeletions = res.Conflicts, res.Errors, len(res.HeldDeletions)
 	}
 	state := st.State
+	done := *st
 	r.mu.Unlock()
+
+	if !errors.Is(err, engine.ErrStopped) {
+		events := r.runEvents(&done, res != nil, requested)
+		for i := range events {
+			r.d.event(&events[i])
+		}
+	}
+	if isOffline(err) {
+		// Tell at once, rather than at the next probe.
+		r.shareChanged(false)
+	}
 
 	if err != nil && !errors.Is(err, engine.ErrStopped) {
 		log.Warn("run failed", "state", state, "err", err)

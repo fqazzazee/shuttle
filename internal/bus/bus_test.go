@@ -3,12 +3,10 @@
 package bus
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,41 +16,10 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/dbustest"
 	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
-
-// privateBus starts a dbus-daemon of the test's own and returns a function
-// that opens connections to it. The user's session bus is never touched.
-func privateBus(t *testing.T) func() *dbus.Conn {
-	t.Helper()
-	bin, err := exec.LookPath("dbus-daemon")
-	if err != nil {
-		t.Skip("dbus-daemon not installed")
-	}
-	cmd := exec.Command(bin, "--session", "--nofork", "--print-address=1")
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
-	addr, err := bufio.NewReader(out).ReadString('\n')
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr = strings.TrimSpace(addr)
-	return func() *dbus.Conn {
-		conn, err := dbus.Connect(addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { conn.Close() })
-		return conn
-	}
-}
 
 type noKeyring struct{}
 
@@ -72,7 +39,7 @@ type fixture struct {
 
 func newFixture(t *testing.T, mode, extra string) *fixture {
 	t.Helper()
-	f := &fixture{t: t, local: t.TempDir(), mount: t.TempDir(), connect: privateBus(t)}
+	f := &fixture{t: t, local: t.TempDir(), mount: t.TempDir(), connect: dbustest.Bus(t)}
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "config.toml")
 	doc := fmt.Sprintf("[shares.mnt]\ntype = \"path\"\npath = %q\n[shuttles.s]\nmode = %q\nlocal = %q\nremote = \"mnt:\"\n%s\n",
@@ -293,7 +260,7 @@ func TestSecondDaemonCannotTakeTheName(t *testing.T) {
 }
 
 func TestClientWithoutADaemon(t *testing.T) {
-	c := NewClient(privateBus(t)())
+	c := NewClient(dbustest.Bus(t)())
 	if _, err := c.Shuttles(ctx(t)); !errors.Is(err, ErrNotRunning) {
 		t.Errorf("Shuttles = %v, want ErrNotRunning", err)
 	}

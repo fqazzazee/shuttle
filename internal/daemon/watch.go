@@ -146,6 +146,11 @@ func (r *runner) realtime(quit <-chan struct{}) {
 		events, watchErrs = lw.w.Events, lw.w.Errors
 	}
 
+	// Changes made while the daemon was not running are only seen by a run:
+	// run at start, however recent the last run, then poll from now.
+	r.markAttempt(r.d.o.Now())
+	r.trigger()
+
 	var first, last time.Time // of the changes waiting to settle
 	// Changes seen while a run is in progress wait here: inotify reports a
 	// run's writes while the run is still making them, before it has noted

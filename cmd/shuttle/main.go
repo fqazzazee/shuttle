@@ -14,12 +14,14 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"sync"
 	"syscall"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/notify"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
@@ -81,14 +83,16 @@ func buildVersion() string {
 }
 
 // runDaemon runs every shuttle in the user's config, and serves the D-Bus
-// interface once their state is held, until ctx is done.
+// interface once their state is held and shows desktop notifications, until
+// ctx is done.
 func runDaemon(ctx context.Context, stderr io.Writer) error {
 	paths, err := daemon.DefaultPaths()
 	if err != nil {
 		return err
 	}
 	log := slog.New(slog.NewTextHandler(stderr, nil))
-	d, err := daemon.New(&daemon.Options{Paths: paths, Store: secrets.SecretService(), Log: log})
+	notifier := notify.New(log)
+	d, err := daemon.New(&daemon.Options{Paths: paths, Store: secrets.SecretService(), Log: log, OnEvent: notifier.Send})
 	if err != nil {
 		return err
 	}
@@ -98,8 +102,11 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 	}
 	defer conn.Close()
 
+	var notifying sync.WaitGroup
+	defer notifying.Wait() // after cancel, before conn closes
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	notifying.Go(func() { notifier.Run(ctx, conn) })
 	runErr := make(chan error, 1)
 	go func() { runErr <- d.Run(ctx) }()
 	select {
