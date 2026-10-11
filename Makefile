@@ -38,12 +38,20 @@ smoke:
 CONTAINER    ?= podman
 SAMBA_IMAGE  := shuttle-test-samba
 SAMBA_PORT   ?= 1445
+# The share's files, on the host: tests set up and inspect them directly.
+SAMBA_DIR    ?= $(CURDIR)/.cache/samba-share
 SHELL        := /bin/bash # samba-up waits on /dev/tcp
-SMB_TEST_ENV := SHUTTLE_TEST_SMB_ADDR=127.0.0.1:$(SAMBA_PORT)
+SMB_TEST_ENV := SHUTTLE_TEST_SMB_ADDR=127.0.0.1:$(SAMBA_PORT) SHUTTLE_TEST_SMB_DIR=$(SAMBA_DIR)
+# Rootless podman: map the host user to the same UID inside, so files Samba
+# writes belong to whoever runs the tests. Rootful docker needs nothing.
+USERNS       := $(if $(filter podman,$(CONTAINER)),--userns=keep-id --user root)
 
 samba-up:
-	$(CONTAINER) build -q -t $(SAMBA_IMAGE) -f internal/fsys/testdata/samba/Containerfile internal/fsys/testdata/samba
-	$(CONTAINER) run -d --rm --name shuttle-samba -p 127.0.0.1:$(SAMBA_PORT):445 $(SAMBA_IMAGE)
+	mkdir -p $(SAMBA_DIR)
+	$(CONTAINER) build -q -t $(SAMBA_IMAGE) --build-arg UID=$$(id -u) \
+		-f internal/fsys/testdata/samba/Containerfile internal/fsys/testdata/samba
+	$(CONTAINER) run -d --rm --name shuttle-samba $(USERNS) -p 127.0.0.1:$(SAMBA_PORT):445 \
+		-v $(SAMBA_DIR):/share:z $(SAMBA_IMAGE)
 	@for i in $$(seq 30); do \
 		(exec 3<>/dev/tcp/127.0.0.1/$(SAMBA_PORT)) 2>/dev/null && exit 0; sleep 1; \
 	done; $(CONTAINER) logs shuttle-samba; echo "samba did not come up"; exit 1
