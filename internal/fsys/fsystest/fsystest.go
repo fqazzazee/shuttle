@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -211,6 +212,36 @@ func Run(t *testing.T, newFS func(t *testing.T) fsys.FS) {
 		}
 		if _, err := f.Stat(ctx, "a"); err != nil {
 			t.Errorf("file gone after a cancelled Remove: %v", err)
+		}
+	})
+
+	t.Run("concurrent scan", func(t *testing.T) {
+		f := newFS(t)
+		var want []string
+		for i := range 6 {
+			d := "d" + strconv.Itoa(i)
+			mkdirs(t, f, d+"/sub")
+			want = append(want, d, d+"/sub")
+			for j := range 5 {
+				p := d + "/sub/f" + strconv.Itoa(j)
+				put(t, f, p, p)
+				want = append(want, p)
+			}
+		}
+		calls := 0 // not atomic: the race detector catches concurrent calls
+		var got []string
+		err := fsys.ScanTree(ctx, f, ".", 8, func(info fsys.FileInfo) error {
+			calls++
+			got = append(got, info.Name)
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		slices.Sort(got)
+		slices.Sort(want)
+		if !slices.Equal(got, want) || calls != len(want) {
+			t.Errorf("scanned %d entries:\n%v\nwant %d:\n%v", calls, got, len(want), want)
 		}
 	})
 
