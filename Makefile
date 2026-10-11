@@ -42,7 +42,7 @@ SHELL        := /bin/bash # samba-up waits on /dev/tcp
 SMB_TEST_ENV := SHUTTLE_TEST_SMB_ADDR=127.0.0.1:$(SAMBA_PORT)
 
 samba-up:
-	$(CONTAINER) build -q -t $(SAMBA_IMAGE) internal/fsys/testdata/samba
+	$(CONTAINER) build -q -t $(SAMBA_IMAGE) -f internal/fsys/testdata/samba/Containerfile internal/fsys/testdata/samba
 	$(CONTAINER) run -d --rm --name shuttle-samba -p 127.0.0.1:$(SAMBA_PORT):445 $(SAMBA_IMAGE)
 	@for i in $$(seq 30); do \
 		(exec 3<>/dev/tcp/127.0.0.1/$(SAMBA_PORT)) 2>/dev/null && exit 0; sleep 1; \
