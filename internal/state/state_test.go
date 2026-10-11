@@ -299,3 +299,39 @@ func BenchmarkPutBatched1000(b *testing.B) {
 	}
 	b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(i), "ns/record")
 }
+
+func TestBind(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.Put(&Record{Path: "a.txt", Kind: fsys.KindFile}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetLastComplete(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range []struct {
+		pair      string
+		wantReset bool
+	}{
+		{"one", false}, // a database from before pairs: kept as is
+		{"one", false},
+		{"two", true},
+		{"two", false},
+	} {
+		reset, err := db.Bind(step.pair)
+		if err != nil || reset != step.wantReset {
+			t.Fatalf("Bind(%q) = %v, %v; want reset %v", step.pair, reset, err, step.wantReset)
+		}
+	}
+	all, err := db.All()
+	if err != nil || len(all) != 0 {
+		t.Errorf("after a reset: records %v, %v; want none", all, err)
+	}
+	if last, _ := db.LastComplete(); !last.IsZero() {
+		t.Errorf("after a reset: last complete %v, want none (a first sync)", last)
+	}
+}

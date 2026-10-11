@@ -3,10 +3,12 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -199,6 +201,9 @@ func (r *runner) runOnce(requested bool) {
 	}
 	state := st.State
 	done := *st
+	// Still shown as running until its events are out: whoever sees the run
+	// over can count on them having been sent.
+	st.State = StateRunning
 	r.mu.Unlock()
 
 	if !errors.Is(err, engine.ErrStopped) {
@@ -207,6 +212,9 @@ func (r *runner) runOnce(requested bool) {
 			r.d.event(&events[i])
 		}
 	}
+	r.mu.Lock()
+	r.st.State = state
+	r.mu.Unlock()
 	if isOffline(err) {
 		// Tell at once, rather than at the next probe.
 		r.shareChanged(false)
@@ -278,4 +286,24 @@ func isOffline(err error) bool {
 	var netErr *net.OpError
 	var dnsErr *net.DNSError
 	return errors.As(err, &netErr) || errors.As(err, &dnsErr)
+}
+
+// pairOf names the two folders a shuttle syncs, for state.Bind: the local
+// folder, and the folder on the server the share reaches as its user,
+// whatever the share is called. Another user may see other files, so it is
+// a new pair: starting afresh deletes nothing, while files the new user
+// cannot see would read as deleted against the old history.
+func pairOf(cfg *config.Config, s *config.Shuttle) string {
+	sh := cfg.Shares[s.Share]
+	var server string
+	switch sh.Type {
+	case config.ShareSMB:
+		// SMB names are case-insensitive: host, share, user and domain.
+		server = strings.ToLower(fmt.Sprintf("smb://%s;%s@%s:%d/%s", sh.Domain, sh.User, sh.Host, cmp.Or(sh.Port, 445), sh.Share))
+	case config.ShareNFS3:
+		server = fmt.Sprintf("nfs://%s:%d%s", strings.ToLower(sh.Host), cmp.Or(sh.Port, 2049), sh.Export)
+	default:
+		server = "path:" + sh.Path
+	}
+	return s.Local + "\n" + server + "\n" + s.Remote
 }

@@ -154,6 +154,15 @@ func (d *Daemon) Run(ctx context.Context) error {
 			return err
 		}
 		r.db = db
+		if reset, err := db.Bind(pairOf(d.cfg, r.shuttle)); err != nil {
+			for _, o := range append(opened, r) {
+				o.db.Close()
+			}
+			return err
+		} else if reset {
+			d.o.Log.Warn("the shuttle's folders changed: starting afresh, as a first sync (nothing is deleted; files that differ are conflicts)",
+				"shuttle", name)
+		}
 		// The schedule counts from the last complete run, so a slot missed
 		// while the machine was off runs at start.
 		if last, err := db.LastComplete(); err == nil {
