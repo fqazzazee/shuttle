@@ -4,26 +4,29 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/fqazzazee/shuttle/internal/bus"
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 )
 
 // callTimeout bounds one CLI request to the daemon.
 const callTimeout = 10 * time.Second
 
-// runClient runs a command that talks to the daemon: status, sync, pause
-// and resume. It returns the process exit code.
+// runClient runs a command that talks to the daemon: status, sync, pause,
+// resume, enable and disable. It returns the process exit code.
 func runClient(ctx context.Context, cmd string, args []string, stdout, stderr io.Writer) int {
 	var name string
 	switch {
 	case cmd == "status" && len(args) == 0:
-	case cmd == "sync" && len(args) == 1:
+	case (cmd == "sync" || cmd == "enable" || cmd == "disable") && len(args) == 1:
 		name = args[0]
 	case (cmd == "pause" || cmd == "resume") && len(args) <= 1:
 		if len(args) == 1 {
@@ -36,6 +39,9 @@ func runClient(ctx context.Context, cmd string, args []string, stdout, stderr io
 	}
 
 	c, err := bus.Connect()
+	if err != nil && (cmd == "enable" || cmd == "disable") {
+		return setEnabledOffline(name, cmd == "enable", stdout, stderr)
+	}
 	if err != nil {
 		fmt.Fprintf(stderr, "shuttle %s: connecting to the session bus: %v\n", cmd, err)
 		return 1
@@ -51,6 +57,14 @@ func runClient(ctx context.Context, cmd string, args []string, stdout, stderr io
 		if err = c.SyncNow(ctx, name); err == nil {
 			fmt.Fprintf(stdout, "syncing %s\n", name)
 		}
+	case "enable", "disable":
+		err = c.SetEnabled(ctx, name, cmd == "enable")
+		if errors.Is(err, bus.ErrNotRunning) {
+			return setEnabledOffline(name, cmd == "enable", stdout, stderr)
+		}
+		if err == nil {
+			fmt.Fprintf(stdout, "%sd %s\n", cmd, name)
+		}
 	case "pause", "resume":
 		if err = c.SetPaused(ctx, name, cmd == "pause"); err == nil {
 			done := map[string]string{"pause": "paused", "resume": "resumed"}[cmd]
@@ -61,6 +75,25 @@ func runClient(ctx context.Context, cmd string, args []string, stdout, stderr io
 		fmt.Fprintf(stderr, "shuttle %s: %v\n", cmd, err)
 		return 1
 	}
+	return 0
+}
+
+// setEnabledOffline edits the config file itself when no daemon is there to
+// do it: the change applies when the daemon starts.
+func setEnabledOffline(name string, on bool, stdout, stderr io.Writer) int {
+	cmd := map[bool]string{true: "enable", false: "disable"}[on]
+	paths, err := daemon.DefaultPaths()
+	if err == nil {
+		var home string
+		if home, err = os.UserHomeDir(); err == nil {
+			_, err = config.SetEnabled(paths.Config, home, name, on)
+		}
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "shuttle %s: %v\n", cmd, err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "%sd %s (the daemon is not running: it applies when the daemon starts)\n", cmd, name)
 	return 0
 }
 

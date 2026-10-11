@@ -276,7 +276,8 @@ func TestIntrospection(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{Interface, "ListShuttles", "SyncNow", "SetPaused", "ResolveConflict",
-		"AllowDeletions", "ShuttleChanged", "ConflictRaised", `name="State"`, `name="Paused"`} {
+		"AllowDeletions", "SetEnabled", "ReloadConfig", "ShuttleChanged", "ConflictRaised", "ShuttleRemoved",
+		`name="State"`, `name="Paused"`, `name="ConfigError"`} {
 		if !strings.Contains(xml, want) {
 			t.Errorf("introspection lacks %s", want)
 		}
@@ -376,5 +377,29 @@ func waitUntil(t *testing.T, what string, ok func() bool) {
 			t.Fatalf("timed out waiting for %s", what)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestSetEnabledOverTheBus(t *testing.T) {
+	f := newFixture(t, "push", "")
+	if err := f.c.SetEnabled(ctx(t), "s", false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(mustRead(t, f.config), "enabled = false") {
+		t.Errorf("config after disabling:\n%s", mustRead(t, f.config))
+	}
+	waitUntil(t, "s disabled", func() bool {
+		all, err := f.c.Shuttles(ctx(t))
+		return err == nil && len(all) == 1 && all[0].State == daemon.StateDisabled
+	})
+	if err := f.c.SetEnabled(ctx(t), "s", true); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "s enabled again", func() bool {
+		all, err := f.c.Shuttles(ctx(t))
+		return err == nil && len(all) == 1 && all[0].State == daemon.StateIdle
+	})
+	if err := f.c.SetEnabled(ctx(t), "nope", true); !errors.Is(err, daemon.ErrUnknownShuttle) {
+		t.Errorf("SetEnabled(nope) = %v, want ErrUnknownShuttle", err)
 	}
 }

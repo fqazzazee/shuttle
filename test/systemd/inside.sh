@@ -211,6 +211,19 @@ wait_for "the error to clear" 10 sh -c "! \"$shuttle\" status | grep -q 'previou
 [ "$(prop MainPID)" = "$pid" ] || fail "the daemon restarted for a config edit"
 echo "added a shuttle, survived a broken edit and its fix, all in process $pid"
 
+step "shuttle disable and enable: saved in the config, applied without a restart"
+"$shuttle" disable n
+grep -q '^enabled = false$' ~/.config/shuttle/config.toml || fail "disable did not write the config"
+wait_for "n disabled in shuttle status" 10 sh -c "\"$shuttle\" status | grep -q '^n  *disabled'"
+"$shuttle" sync n 2>/dev/null && fail "a disabled shuttle synced"
+"$shuttle" enable n
+grep -q '^enabled' ~/.config/shuttle/config.toml && fail "enable left the enabled key"
+[ "$(sha256sum <~/good.toml)" = "$(sha256sum <~/.config/shuttle/config.toml)" ] ||
+	fail "disable and enable changed more than the enabled key"
+wait_for "n enabled in shuttle status" 10 sh -c "\"$shuttle\" status | grep -q '^n  *idle'"
+[ "$(prop MainPID)" = "$pid" ] || fail "the daemon restarted for enable or disable"
+echo "disabled and enabled n, config back byte for byte"
+
 step "a broken config: exit 78, and no restarts"
 sed -i 's/mode = "push"/mode = "both"/' ~/.config/shuttle/config.toml
 systemctl --user restart shuttle 2>/dev/null && fail "started with a broken config"

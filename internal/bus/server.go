@@ -213,6 +213,12 @@ func (s *server) ResolveConflict(name, path, choice string) *dbus.Error {
 	return dbus.NewError(errInvalid, []any{fmt.Sprintf("choice %q must be keep-local, keep-remote or keep-both", choice)})
 }
 
+// SetEnabled turns a shuttle on or off in the config file, which the
+// daemon then reloads.
+func (s *server) SetEnabled(name string, on bool) *dbus.Error {
+	return busErr(s.d.SetEnabled(name, on))
+}
+
 // ReloadConfig re-reads the config file now. A broken one is refused with
 // its error, and the running config stays in use.
 func (s *server) ReloadConfig() *dbus.Error {

@@ -105,7 +105,12 @@ shuttle status            # one line per shuttle
 shuttle sync documents    # sync now
 shuttle pause [documents] # pause one shuttle, or all
 shuttle resume [documents]
+shuttle disable documents # turn a shuttle off, or on again with enable
 ```
+
+`enable` and `disable` are saved in the config file, as `enabled = false` under the shuttle, and
+change nothing else in it. Without a running daemon they edit the file directly, and the change
+applies when the daemon starts.
 
 ## Development
 
