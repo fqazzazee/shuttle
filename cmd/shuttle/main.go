@@ -52,6 +52,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		return 0
+	case "status", "sync", "pause", "resume":
+		return runClient(ctx, args[0], args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "shuttle: unknown command %q\n\n", args[0])
 		usage(stderr)
@@ -118,8 +120,12 @@ func usage(w io.Writer) {
 	fmt.Fprint(w, `Usage: shuttle <command>
 
 Commands:
-  daemon    Run the background service (normally started by systemd)
-  version   Print the version
-  help      Show this help
+  status            Show every shuttle's state
+  sync <name>       Sync a shuttle now
+  pause [<name>]    Pause a shuttle, or all of them
+  resume [<name>]   Resume a shuttle, or all of them
+  daemon            Run the background service (normally started by systemd)
+  version           Print the version
+  help              Show this help
 `)
 }
