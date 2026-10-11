@@ -31,6 +31,7 @@ type executor struct {
 	now       func() time.Time
 	pending   []func(*state.Tx) error
 	lastFlush time.Time
+	own       Limits // this shuttle's bandwidth limits
 }
 
 func (e *executor) run(actions []Action) error {
@@ -158,7 +159,7 @@ func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.File
 		}
 	}
 	h := sha256.New()
-	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(r, h), srcInfo.ModTime)
+	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(e.limit(r, toRemote), h), srcInfo.ModTime)
 	r.Close()
 	if err != nil {
 		if kept != "" {
@@ -295,7 +296,11 @@ func (e *executor) hash(f fsys.FS, p string) ([]byte, error) {
 	}
 	defer r.Close()
 	h := sha256.New()
-	if _, err := io.Copy(h, r); err != nil {
+	var src io.Reader = r
+	if f == e.o.Remote {
+		src = e.limit(r, false) // reading the share counts as download
+	}
+	if _, err := io.Copy(h, src); err != nil {
 		return nil, err
 	}
 	return h.Sum(nil), nil

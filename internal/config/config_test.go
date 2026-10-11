@@ -305,6 +305,12 @@ mode = "push"
 versioning = { kind = "trash", size_cap = "lots" }
 local = "/d"
 remote = "nas:"`, "invalid size"},
+		{"bad ignore pattern", minimalShare + `
+[shuttles.s]
+mode = "push"
+ignore = ["*.tmp", "file[0-9"]
+local = "/d"
+remote = "nas:"`, `ignore: ignore pattern "file[0-9": unclosed [`},
 		{"relative local", minimalShare + `
 [shuttles.s]
 mode = "push"
