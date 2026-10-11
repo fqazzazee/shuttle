@@ -167,7 +167,8 @@ echo "killed with SIGKILL while copying"
 wait_for "systemd to restart it (RestartSec=10)" 30 sh -c "[ \$(systemctl --user show -P NRestarts shuttle) -gt $restarts ] && [ \$(systemctl --user show -P ActiveState shuttle) = active ]"
 files() { (cd "$1" && find . -type f ! -path './.shuttle-versions/*' ! -name '.shuttle-tmp-*' | sort); }
 synced() { [ "$(files ~/rt)" = "$(files "$share/rt")" ]; }
-wait_for "the restarted daemon to finish the sync" 90 synced
+# A real-time shuttle runs at start: well within its 60 s poll interval.
+wait_for "the restarted daemon to finish the sync" 30 synced
 [ "$(tree ~/rt)" = "$before" ] || fail "the local folder changed"
 [ "$(tree "$share/rt")" = "$before" ] || fail "the share's copy differs from the local folder"
 [ -f ~/rt/hello ] && [ -f "$share/rt/hello" ] || fail "a file synced before the crash was deleted"
@@ -188,7 +189,7 @@ took=$(($(date +%s) - start))
 [ -z "$(new_temps)" ] || fail "stopping left a half-written file: $(new_temps)"
 echo "stopped in ${took}s, no half-written file left"
 systemctl --user start shuttle
-wait_for "the rest after restarting" 60 test -f "$share/rt/stop-10"
+wait_for "the rest after restarting" 30 test -f "$share/rt/stop-10"
 
 step "a broken config: exit 78, and no restarts"
 sed -i 's/mode = "push"/mode = "both"/' ~/.config/shuttle/config.toml
