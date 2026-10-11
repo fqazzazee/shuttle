@@ -51,8 +51,8 @@ func TestDaemonWithoutConfig(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("XDG_STATE_HOME", dir)
 	var stdout, stderr bytes.Buffer
-	if code := run(context.Background(), []string{"daemon"}, &stdout, &stderr); code != 1 {
-		t.Errorf("exit code = %d, want 1", code)
+	if code := run(context.Background(), []string{"daemon"}, &stdout, &stderr); code != exitConfig {
+		t.Errorf("exit code = %d, want %d (EX_CONFIG: the unit does not restart on it)", code, exitConfig)
 	}
 	if !strings.Contains(stderr.String(), dir+"/shuttle/config.toml") {
 		t.Errorf("stderr = %q, want it to name the missing config file", stderr.String())

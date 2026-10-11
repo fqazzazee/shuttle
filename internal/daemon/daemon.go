@@ -67,6 +67,9 @@ var (
 	ErrUnknownShuttle = errors.New("no shuttle by that name")
 	// ErrDisabled means the shuttle is disabled in the config.
 	ErrDisabled = errors.New("shuttle is disabled in the config")
+	// ErrConfig means the config file is missing or invalid: running again
+	// will not help until the user fixes it.
+	ErrConfig = errors.New("config")
 	// ErrAlreadyRunning means another daemon holds the shuttles' state.
 	ErrAlreadyRunning = errors.New("another shuttle daemon is already running")
 )
@@ -106,7 +109,7 @@ func New(opts *Options) (*Daemon, error) {
 	}
 	cfg, err := config.Load(o.Paths.Config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrConfig, err)
 	}
 	host, err := os.Hostname()
 	if err != nil {

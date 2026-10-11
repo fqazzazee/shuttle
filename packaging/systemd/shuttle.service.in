@@ -1,0 +1,30 @@
+# shuttle: sync folders with network shares. A user service:
+#   systemctl --user enable --now shuttle
+# @BINDIR@ is filled in by `make install`.
+
+[Unit]
+Description=shuttle: sync folders with network shares
+Documentation=https://github.com/fqazzazee/shuttle
+# With the desktop session: the keyring is unlocked there, and an unlock
+# prompt has a display to appear on.
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+# Started means the bus name is taken, which the daemon does only once it
+# holds every shuttle's state.
+Type=dbus
+BusName=io.github.fqazzazee.Shuttle
+ExecStart=@BINDIR@/shuttle daemon
+# SIGTERM lets a copy in progress finish; a SIGKILL after this is still safe.
+TimeoutStopSec=90
+Restart=on-failure
+RestartSec=10
+# 78 (EX_CONFIG) is a broken config.toml: restarting will not fix it.
+RestartPreventExitStatus=78
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+
+[Install]
+WantedBy=graphical-session.target

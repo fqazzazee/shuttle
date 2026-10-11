@@ -1,12 +1,16 @@
 BINARY  := shuttle
 PREFIX  ?= $(HOME)/.local
+BINDIR  ?= $(PREFIX)/bin
+# Found by systemd from ~/.local/share/systemd/user for a user install;
+# packages set /usr/lib/systemd/user.
+USERUNITDIR ?= $(PREFIX)/share/systemd/user
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Pinned to match CI. `go run` builds it on first use, so no separate install.
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
-.PHONY: build test lint fmt-check install uninstall smoke clean samba-up samba-down test-integration test-keyring
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-keyring
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -22,17 +26,31 @@ fmt-check:
 	@unformatted=$$(gofmt -l .); \
 	if [ -n "$$unformatted" ]; then echo "not gofmt'd:"; echo "$$unformatted"; exit 1; fi
 
+# Installs; enabling and starting are left to the user (the message says how).
 install: build
-	install -Dm755 bin/$(BINARY) $(DESTDIR)$(PREFIX)/bin/$(BINARY)
+	install -Dm755 bin/$(BINARY) $(DESTDIR)$(BINDIR)/$(BINARY)
+	install -d $(DESTDIR)$(USERUNITDIR)
+	sed 's|@BINDIR@|$(BINDIR)|g' packaging/systemd/shuttle.service.in > $(DESTDIR)$(USERUNITDIR)/shuttle.service
+	@echo "Installed. To run it with your desktop session:"
+	@echo "  systemctl --user daemon-reload && systemctl --user enable --now shuttle"
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/$(BINARY)
+	rm -f $(DESTDIR)$(BINDIR)/$(BINARY) $(DESTDIR)$(USERUNITDIR)/shuttle.service
+
+# Checks the systemd unit as installed. systemd-analyze only warns about a
+# bad setting, so any output at all fails the check.
+unit-check:
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT && \
+	$(MAKE) -s install PREFIX="$$tmp" >/dev/null && \
+	out=$$(systemd-analyze --user verify "$$tmp/share/systemd/user/shuttle.service" 2>&1) ; \
+	if [ -n "$$out" ]; then echo "$$out"; exit 1; fi; echo "shuttle.service: ok"
 
 # Runs the installed copy from outside the source tree, so a binary that only
 # works from a checkout fails here.
 smoke:
-	cd / && "$(DESTDIR)$(PREFIX)/bin/$(BINARY)" version
-	cd / && "$(DESTDIR)$(PREFIX)/bin/$(BINARY)" help >/dev/null
+	cd / && "$(DESTDIR)$(BINDIR)/$(BINARY)" version
+	cd / && "$(DESTDIR)$(BINDIR)/$(BINARY)" help >/dev/null
+	grep -qx 'ExecStart=$(BINDIR)/$(BINARY) daemon' "$(DESTDIR)$(USERUNITDIR)/shuttle.service"
 
 # SMB integration tests run against a throwaway Samba container.
 CONTAINER    ?= podman
