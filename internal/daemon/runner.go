@@ -30,7 +30,9 @@ type runner struct {
 	st        Status
 	paused    bool // this shuttle, by itself
 	pending   bool
-	attempted time.Time // when a run was last triggered by the schedule, or completed before start
+	attempted time.Time       // when a run was last triggered by the schedule, or completed before start
+	own       map[string]bool // local paths this shuttle's run wrote; see startOwnWrites
+	ownUntil  time.Time
 }
 
 func newRunner(d *Daemon, s *config.Shuttle) *runner {
@@ -213,10 +215,12 @@ func (r *runner) sync() (*engine.Result, error) {
 	}
 	defer remote.Close()
 
+	r.startOwnWrites()
+	defer r.endOwnWrites()
 	return engine.Run(ctx, &engine.Options{
 		Local: local, Remote: remote, State: r.db, Settings: &r.shuttle.Settings,
 		LocalName: r.d.hostname, RemoteName: r.shuttle.Share,
-		Stop: r.shouldStop, Now: r.d.o.Now,
+		Stop: r.shouldStop, Now: r.d.o.Now, OnAction: r.noteOwnWrite,
 	})
 }
 

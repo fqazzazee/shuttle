@@ -157,11 +157,11 @@ func (f *fixture) waitFor(name, what string, ok func(Status) bool) Status {
 // waitCopying waits until a file is being written to the share: a temp file
 // there means a copy is in progress, which a fixed sleep cannot promise on a
 // busy machine.
-func (f *fixture) waitCopying() {
+func (f *fixture) waitCopying(dir string) {
 	f.t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		entries, _ := os.ReadDir(f.mount)
+		entries, _ := os.ReadDir(dir)
 		for _, e := range entries {
 			if strings.HasPrefix(e.Name(), ".shuttle-tmp-") {
 				return
@@ -275,7 +275,7 @@ func TestPauseFinishesTheCurrentFile(t *testing.T) {
 	slowFiles(t, f.local, 3)
 	f.start()
 	f.d.SyncNow("s")
-	f.waitCopying()
+	f.waitCopying(f.mount)
 	f.d.SetPaused("s", true)
 
 	st := f.waitFor("s", "the paused run to end", func(st Status) bool { return st.State == StatePaused })
@@ -311,7 +311,7 @@ func TestShutdownFinishesAndReleasesState(t *testing.T) {
 	slowFiles(t, f.local, 3)
 	f.start()
 	f.d.SyncNow("s")
-	f.waitCopying()
+	f.waitCopying(f.mount)
 	f.stop()
 
 	g := &fixture{t: t, paths: f.paths}
