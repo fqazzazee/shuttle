@@ -18,11 +18,11 @@ import (
 )
 
 // Records are committed in batches (see package state for why that is safe):
-// whichever comes first of this many changes or this much time.
-const (
-	flushEvery    = 1000
-	flushInterval = time.Second
-)
+// whichever comes first of this many changes or this much time. A variable so
+// the crash tests can also commit after every change.
+var flushEvery = 1000
+
+const flushInterval = time.Second
 
 type executor struct {
 	ctx       context.Context

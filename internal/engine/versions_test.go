@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -248,5 +249,53 @@ func TestFailedCopyPutsTheOldVersionBack(t *testing.T) {
 	h.run()
 	if got, _ := read(t, h.remoteDir, "a.txt"); got != "v2" {
 		t.Errorf("after recovery, remote a.txt = %q", got)
+	}
+}
+
+// TestEveryVersioningKindEndToEnd overwrites a file three times, an hour
+// apart, through real runs, then checks what each kind keeps four days on.
+func TestEveryVersioningKindEndToEnd(t *testing.T) {
+	tests := []struct {
+		name string
+		v    config.Versioning
+		want int // versions left
+	}{
+		{"none", config.Versioning{Kind: config.VersioningNone}, 0},
+		{"trash keeps what is young enough", config.Versioning{Kind: config.VersioningTrash, Keep: 5 * 24 * time.Hour}, 3},
+		{"trash past its keep", config.Versioning{Kind: config.VersioningTrash, Keep: 3 * 24 * time.Hour}, 0},
+		{"simple keeps the last 2", config.Versioning{Kind: config.VersioningSimple, Count: 2}, 2},
+		// Aged 4 days and 0.5 to 2.5 hours, all three fall in one daily bucket:
+		// the newest stays.
+		{"staggered thins to one a day", config.Versioning{Kind: config.VersioningStaggered, Keep: 365 * 24 * time.Hour}, 1},
+		// Each version is 2 bytes: a 4-byte cap fits the newest two.
+		{"size cap keeps what fits", config.Versioning{Kind: config.VersioningTrash, Keep: 5 * 24 * time.Hour, SizeCap: 4}, 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t, config.ModePush, config.DeletionsAdditive)
+			h.settings.Versioning = tt.v
+			now := versionedAt
+			h.opts.Now = func() time.Time { return now }
+			write(t, h.localDir, "a.txt", "v0", t0)
+			h.run()
+			for i := 1; i <= 3; i++ { // each overwrite keeps a 2-byte version
+				now = versionedAt.Add(time.Duration(i) * time.Hour)
+				write(t, h.localDir, "a.txt", "v"+strconv.Itoa(i), t0.Add(time.Duration(i)*time.Hour))
+				h.run()
+			}
+			now = versionedAt.Add(4*24*time.Hour + 3*time.Hour + 30*time.Minute)
+			h.run() // nothing to sync; retention runs
+
+			got := 0
+			if l := versionsListing(t, h.remoteDir); l != "" {
+				got = len(strings.Fields(l))
+			}
+			if got != tt.want {
+				t.Errorf("%d versions left (%s), want %d", got, versionsListing(t, h.remoteDir), tt.want)
+			}
+			if c, _ := read(t, h.remoteDir, "a.txt"); c != "v3" {
+				t.Errorf("remote a.txt = %q", c)
+			}
+		})
 	}
 }
