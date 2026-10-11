@@ -44,6 +44,10 @@ const ModTimeWindow = 2 * time.Second
 // ErrChanged marks an action skipped because a path changed after the scan.
 var ErrChanged = errors.New("changed during the run; left for the next run")
 
+// ErrStopped means Options.Stop asked the run to stop early: it finished the
+// action in progress, recorded what it had done, and left the rest.
+var ErrStopped = errors.New("stopped before finishing; the rest is left for the next run")
+
 // Options are the inputs of one run.
 type Options struct {
 	Local, Remote fsys.FS
@@ -59,6 +63,10 @@ type Options struct {
 	// AllowDeletions lets one run through the deletion guard, after the user
 	// has confirmed that the deletions it held are wanted.
 	AllowDeletions bool
+	// Stop, if set, is asked before each action whether to stop. The action in
+	// progress (a whole file copy, say) always finishes; the run then returns
+	// ErrStopped. Pausing and shutting down use this.
+	Stop func() bool
 	// OnAction, if set, is called after each action with its outcome: nil when
 	// it was carried out, an error wrapping ErrChanged when it was skipped.
 	OnAction func(a *Action, err error)

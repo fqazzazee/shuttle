@@ -408,3 +408,32 @@ func TestPreviewChangesNothing(t *testing.T) {
 		t.Errorf("remote = %s after a preview", got)
 	}
 }
+
+// Stop is asked between actions: the copy in progress finishes, nothing
+// more starts, what was done is recorded, and the next run does the rest.
+func TestStopFinishesTheCurrentAction(t *testing.T) {
+	h := newHarness(t, config.ModePush, config.DeletionsAdditive)
+	for _, p := range []string{"a", "b", "c"} {
+		write(t, h.localDir, p, p, t0)
+	}
+	done := 0
+	h.opts.OnAction = func(*Action, error) { done++ }
+	h.opts.Stop = func() bool { return done >= 1 }
+
+	res, err := Run(context.Background(), &h.opts)
+	if !errors.Is(err, ErrStopped) {
+		t.Fatalf("Run error = %v, want ErrStopped", err)
+	}
+	if res.Copied != 1 {
+		t.Errorf("copied %d before stopping, want exactly 1", res.Copied)
+	}
+	if got := listing(t, h.remoteDir); got != "a=a" {
+		t.Errorf("remote = %s, want only the finished copy", got)
+	}
+
+	h.opts.Stop, h.opts.OnAction = nil, nil
+	res = h.run()
+	if res.Planned != 2 || res.Copied != 2 {
+		t.Errorf("next run planned %d, copied %d; want the remaining 2 (a was recorded)", res.Planned, res.Copied)
+	}
+}

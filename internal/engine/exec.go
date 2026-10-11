@@ -45,6 +45,9 @@ func (e *executor) run(actions []Action) error {
 		if a.skip {
 			continue
 		}
+		if e.o.Stop != nil && e.o.Stop() {
+			return errors.Join(ErrStopped, e.flush())
+		}
 		err := e.do(a)
 		e.report(a, err)
 		if len(e.pending) >= flushEvery || e.now().Sub(e.lastFlush) >= flushInterval {
