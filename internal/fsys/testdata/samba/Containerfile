@@ -1,0 +1,12 @@
+# A throwaway Samba server for the SMB integration tests: one writable share,
+# "test", for the user "shuttle" with password "shuttle". Never use outside
+# tests.
+FROM docker.io/library/alpine:3.24
+RUN apk add --no-cache samba-server samba-common-tools \
+ && adduser -D -H shuttle \
+ && printf 'shuttle\nshuttle\n' | smbpasswd -a -s shuttle \
+ && mkdir -p /share \
+ && chown shuttle /share
+COPY smb.conf /etc/samba/smb.conf
+EXPOSE 445
+CMD ["smbd", "--foreground", "--no-process-group", "--debug-stdout"]
