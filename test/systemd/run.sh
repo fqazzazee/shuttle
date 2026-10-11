@@ -18,7 +18,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-(cd "$root" && CGO_ENABLED=0 go build -trimpath -o "$tmp/shuttle" ./cmd/shuttle)
+(cd "$root" && CGO_ENABLED=0 go build -trimpath -o "$tmp/shuttle" ./cmd/shuttle &&
+	CGO_ENABLED=0 go build -trimpath -o "$tmp/fakenotify" ./test/systemd/fakenotify)
 cp "$root/packaging/systemd/shuttle.service.in" "$here/inside.sh" "$tmp/"
 chmod -R a+rX "$tmp"
 

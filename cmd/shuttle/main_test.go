@@ -3,17 +3,19 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/godbus/dbus/v5"
+
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/dbustest"
+	"github.com/fqazzazee/shuttle/internal/notify/notifytest"
 )
 
 func TestRun(t *testing.T) {
@@ -64,30 +66,22 @@ func TestDaemonWithoutConfig(t *testing.T) {
 // user's real session bus.
 func privateSessionBus(t *testing.T) {
 	t.Helper()
-	bin, err := exec.LookPath("dbus-daemon")
-	if err != nil {
-		t.Skip("dbus-daemon not installed")
-	}
-	cmd := exec.Command(bin, "--session", "--nofork", "--print-address=1")
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
-	addr, err := bufio.NewReader(out).ReadString('\n')
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("DBUS_SESSION_BUS_ADDRESS", strings.TrimSpace(addr))
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", dbustest.Start(t))
 }
 
-// The daemon starts, serves D-Bus, runs until its context ends, and exits
-// cleanly.
+// The daemon starts, serves D-Bus, shows notifications, runs until its
+// context ends, and exits cleanly.
 func TestDaemonRunsUntilStopped(t *testing.T) {
 	privateSessionBus(t)
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	notes, err := notifytest.Serve(conn, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("XDG_STATE_HOME", dir)
@@ -120,6 +114,18 @@ func TestDaemonRunsUntilStopped(t *testing.T) {
 	}
 	if err != nil || len(shuttles) != 1 || shuttles[0].Name != "s" {
 		t.Fatalf("over the bus: %+v, %v", shuttles, err)
+	}
+	if err := c.SyncNow(context.Background(), "s"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; len(notes.Notes()) == 0; i++ {
+		if i == 500 {
+			t.Fatal("no notification within 5s of the run asked for")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n := notes.Notes()[0]; n.Summary != "s: synced" {
+		t.Errorf("notification = %+v, want the run's completion", n)
 	}
 
 	cancel()

@@ -55,6 +55,9 @@ type Options struct {
 	// OnChange, if set, is called with a copy of a shuttle's status after it
 	// changes. It runs on the runner's goroutine and must not block.
 	OnChange func(*Status)
+	// OnEvent, if set, is called with what is worth a desktop notification
+	// (see Event). Like OnChange, it must not block or keep the pointer.
+	OnEvent func(*Event)
 	// KeyringTimeout bounds waiting for the keyring, including an unlock
 	// prompt the user has not answered. Zero means two minutes.
 	KeyringTimeout time.Duration
@@ -88,6 +91,9 @@ type Daemon struct {
 	listeners map[int]func(*Status)
 	nextID    int
 
+	shareMu sync.Mutex        // taken before any runner's mu
+	shares  map[string]string // share -> ShareOnline or ShareOffline, as last announced
+
 	mu          sync.Mutex
 	pausedAll   bool
 	stopping    bool
@@ -115,7 +121,7 @@ func New(opts *Options) (*Daemon, error) {
 	if err != nil {
 		host = "local"
 	}
-	d := &Daemon{o: o, cfg: cfg, runners: map[string]*runner{}, hostname: host,
+	d := &Daemon{o: o, cfg: cfg, runners: map[string]*runner{}, hostname: host, shares: map[string]string{},
 		ready: make(chan struct{}), quit: make(chan struct{})}
 	for i := range cfg.Shuttles {
 		s := &cfg.Shuttles[i]
@@ -192,12 +198,16 @@ func (d *Daemon) Run(ctx context.Context) error {
 func (d *Daemon) Ready() <-chan struct{} { return d.ready }
 
 // SyncNow triggers a run of the named shuttle. A shuttle that is running runs
-// once more when it finishes; one that is paused runs when resumed.
+// once more when it finishes; one that is paused runs when resumed. The user
+// asked for it, so its completion is announced even if nothing changed.
 func (d *Daemon) SyncNow(name string) error {
 	r, err := d.runner(name)
 	if err != nil {
 		return err
 	}
+	r.mu.Lock()
+	r.requested = true
+	r.mu.Unlock()
 	r.trigger()
 	return nil
 }

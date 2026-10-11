@@ -16,6 +16,8 @@ fail() {
 	echo "FAIL: $*"
 	echo "--- journal"
 	journalctl --user -u shuttle --no-pager | tail -60
+	echo "--- notifications"
+	cat ~/notes 2>/dev/null || true
 	exit 1
 }
 # wait_for <what> <seconds> <command...>: poll until the command succeeds.
@@ -35,11 +37,15 @@ tree() {
 		sort -z | xargs -0 -r sha256sum)
 }
 temps() { find "$share/rt" -name '.shuttle-tmp-*' | wc -l; }
+# note <regex>: fakenotify has shown a matching category|summary|body line.
+note() { grep -qE "$1" ~/notes; }
+notes() { grep -cE "$1" ~/notes || true; }
 
 step "install the unit the way make install does"
 mkdir -p ~/.local/share/systemd/user ~/.config/shuttle
 sed 's|@BINDIR@|/opt/shuttle|g' /opt/shuttle/shuttle.service.in >~/.local/share/systemd/user/shuttle.service
 mkdir -p ~/m ~/rt ~/sch ~/sa "$share/m" "$share/rt" "$share/sch" # not "$share/sa": it comes online later
+mkdir -p ~/c ~/u "$share/c" "$share/e" "$share/q" ~/usb/u          # not ~/e or ~/q: their runs fail
 cat >~/.config/shuttle/config.toml <<EOF
 [shares.disk]
 type = "path"
@@ -69,10 +75,38 @@ mode = "push"
 triggers = ["share-available"]
 local = "~/sa"
 remote = "disk:/sa"
+
+[shuttles.c]
+mode = "sync"
+local = "~/c"
+remote = "disk:/c"
+
+[shuttles.e]
+mode = "push"
+local = "~/e"
+remote = "disk:/e"
+
+[shuttles.q]
+mode = "push"
+local = "~/q"
+remote = "disk:/q"
+notify = { errors = false }
+
+[shares.usb]
+type = "path"
+path = "$HOME/usb"
+
+[shuttles.u]
+mode = "push"
+local = "~/u"
+remote = "usb:/u"
 EOF
 echo "first" >~/sch/first
 echo "waits for the share" >~/sa/x
 systemctl --user daemon-reload
+# The desktop's notification server, standing in for GNOME Shell's.
+systemd-run --user -q --unit=fakenotify /opt/shuttle/fakenotify ~/notes
+wait_for "the notification server" 10 sh -c "busctl --user status org.freedesktop.Notifications >/dev/null 2>&1"
 
 step "start: Type=dbus, so start returns once the bus name is taken"
 systemctl --user start shuttle || fail "start"
@@ -85,6 +119,7 @@ step "manual: shuttle sync"
 echo a >~/m/a
 "$shuttle" sync m
 wait_for "the manual sync" 10 test -f "$share/m/a"
+wait_for "its notification" 10 note '^transfer\.complete\|m: synced\|Copied 1 file\.$'
 
 step "real-time: a local change syncs by itself"
 echo hello >~/rt/hello
@@ -96,6 +131,30 @@ echo later >~/sch/later
 mkdir "$share/sa"
 wait_for "the share-available run (probe every 30s)" 45 test -f "$share/sa/x"
 wait_for "the schedule's next run" 75 test -f "$share/sch/later"
+
+step "notifications, each per its switch"
+"$shuttle" sync e
+"$shuttle" sync q
+wait_for "the error notification" 10 note '^transfer\.error\|e: sync failed\|local folder .*/e: .*is the drive mounted\?\)$'
+"$shuttle" sync e # fails the same way: not news
+echo base >~/c/f
+"$shuttle" sync c
+wait_for "c's first sync" 10 test -f "$share/c/f"
+echo "local edit" >~/c/f
+echo "remote edit" >"$share/c/f"
+touch -d '+1 minute' "$share/c/f"
+"$shuttle" sync c
+wait_for "the conflict notification" 10 note '^transfer\|c: 1 conflict\|f: kept both: '
+mv ~/usb/u ~/usb/u.away # the "usb" share is unplugged
+wait_for "the share lost notification (probe every 30s)" 45 note '^network\.disconnected\|Share usb lost\|Waiting for it: u\.$'
+mv ~/usb/u.away ~/usb/u
+wait_for "the share connected notification" 45 note '^network\.connected\|Share usb connected\|Can sync again: u\.$'
+[ "$(notes '\|e: sync failed\|')" = 1 ] || fail "e's unchanged error was announced again"
+[ "$(notes '\|q: ')" = 0 ] || fail "q has notify.errors off, but notified"
+[ "$(notes '\|rt: synced\|')" = 0 ] || fail "real-time rt announced its runs (notify.completed is off by default)"
+[ "$(notes '^network\.')" = 2 ] || fail "share notifications other than usb's lost and connected (at start?)"
+echo "shown:"
+sed 's/^/  /' ~/notes
 
 step "kill -9 mid-run: no lost files, no false deletions"
 for i in $(seq 1 60); do head -c 524288 /dev/urandom >~/rt/big-"$i"; done # 30 MB at 4 MB/s
@@ -138,4 +197,4 @@ journalctl --user -u shuttle --no-pager | grep -q 'mode: "both" must be one of' 
 echo "failed once with 78; the journal says why"
 
 echo
-echo "PASS: Phase 3 exit condition under systemd (notifications pending)"
+echo "PASS: Phase 3 exit condition under systemd"

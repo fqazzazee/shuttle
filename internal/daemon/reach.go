@@ -88,6 +88,7 @@ func (r *runner) shareChanged(up bool) {
 		return
 	}
 	r.d.o.Log.Info("share "+now, "shuttle", r.shuttle.Name, "share", r.shuttle.Share)
+	r.d.shareChanged(r.shuttle.Share)
 	if up && r.shuttle.Settings.Has(config.TriggerShareAvailable) {
 		r.trigger()
 		return
