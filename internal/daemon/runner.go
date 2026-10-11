@@ -201,6 +201,9 @@ func (r *runner) runOnce(requested bool) {
 	}
 	state := st.State
 	done := *st
+	// Still shown as running until its events are out: whoever sees the run
+	// over can count on them having been sent.
+	st.State = StateRunning
 	r.mu.Unlock()
 
 	if !errors.Is(err, engine.ErrStopped) {
@@ -209,6 +212,9 @@ func (r *runner) runOnce(requested bool) {
 			r.d.event(&events[i])
 		}
 	}
+	r.mu.Lock()
+	r.st.State = state
+	r.mu.Unlock()
 	if isOffline(err) {
 		// Tell at once, rather than at the next probe.
 		r.shareChanged(false)
