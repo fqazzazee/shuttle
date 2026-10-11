@@ -71,12 +71,26 @@ func (f *fixture) writeConfig(doc string) {
 // start creates and runs the daemon; the test's cleanup stops it.
 func (f *fixture) start() {
 	f.t.Helper()
+	f.build()
+	f.run()
+}
+
+// build creates the daemon without running it, so a test can adjust it.
+func (f *fixture) build() {
+	f.t.Helper()
 	d, err := New(&Options{Paths: f.paths, Store: noKeyring{f.t}, OnChange: f.onChange})
 	if err != nil {
 		f.t.Fatal(err)
 	}
+	f.d = d
+}
+
+// run starts the built daemon and waits until it is ready.
+func (f *fixture) run() {
+	f.t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	f.d, f.cancel, f.done = d, cancel, make(chan error, 1)
+	f.cancel, f.done = cancel, make(chan error, 1)
+	d := f.d
 	go func() { f.done <- d.Run(ctx) }()
 	f.t.Cleanup(f.stop)
 	select {

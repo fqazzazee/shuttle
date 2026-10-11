@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/engine"
@@ -25,10 +26,11 @@ type runner struct {
 	// triggers during a run add up to one more run.
 	kick chan struct{}
 
-	mu      sync.Mutex
-	st      Status
-	paused  bool // this shuttle, by itself
-	pending bool
+	mu        sync.Mutex
+	st        Status
+	paused    bool // this shuttle, by itself
+	pending   bool
+	attempted time.Time // when a run was last triggered by the schedule, or completed before start
 }
 
 func newRunner(d *Daemon, s *config.Shuttle) *runner {
@@ -38,6 +40,23 @@ func newRunner(d *Daemon, s *config.Shuttle) *runner {
 		r.st.State = StateDisabled
 	}
 	return r
+}
+
+// lastAttempt is when the shuttle last ran or was due: what the schedule
+// counts from.
+func (r *runner) lastAttempt() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.st.LastRun.After(r.attempted) {
+		return r.st.LastRun
+	}
+	return r.attempted
+}
+
+func (r *runner) markAttempt(t time.Time) {
+	r.mu.Lock()
+	r.attempted = t
+	r.mu.Unlock()
 }
 
 func (r *runner) wake() {
