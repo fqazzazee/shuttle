@@ -25,8 +25,9 @@ const (
 type Status struct {
 	Name    string
 	State   State
-	Paused  bool // paused by the user, itself or with all shuttles
-	Pending bool // a run is waiting: triggered while paused or while running
+	Paused  bool   // paused by the user, itself or with all shuttles
+	Pending bool   // a run is waiting: triggered while paused or while running
+	Share   string // ShareOnline or ShareOffline; "" before the first check
 
 	LastRun time.Time // when the last run ended, however it ended
 	LastOK  time.Time // when a run last completed without errors

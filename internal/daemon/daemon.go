@@ -75,7 +75,9 @@ type Daemon struct {
 	cfg     *config.Config
 	runners map[string]*runner
 
-	ready chan struct{} // closed once Run has every state database open
+	ready chan struct{}  // closed once Run has every state database open
+	quit  chan struct{}  // closed when Run starts shutting down
+	bg    sync.WaitGroup // schedulers and share watchers
 
 	mu          sync.Mutex
 	pausedAll   bool
@@ -104,7 +106,8 @@ func New(opts *Options) (*Daemon, error) {
 	if err != nil {
 		host = "local"
 	}
-	d := &Daemon{o: o, cfg: cfg, runners: map[string]*runner{}, hostname: host, ready: make(chan struct{})}
+	d := &Daemon{o: o, cfg: cfg, runners: map[string]*runner{}, hostname: host,
+		ready: make(chan struct{}), quit: make(chan struct{})}
 	for i := range cfg.Shuttles {
 		s := &cfg.Shuttles[i]
 		d.runners[s.Name] = newRunner(d, s)
@@ -136,15 +139,26 @@ func (d *Daemon) Run(ctx context.Context) error {
 			return err
 		}
 		r.db = db
+		// The schedule counts from the last complete run, so a slot missed
+		// while the machine was off runs at start.
+		if last, err := db.LastComplete(); err == nil {
+			r.markAttempt(last)
+		}
 		opened = append(opened, r)
 	}
 	d.o.Log.Info("daemon started", "config", d.o.Paths.Config, "shuttles", len(opened))
 
 	for _, r := range opened {
 		d.runnersDone.Go(r.loop)
+		d.bg.Go(func() { r.watchShare(d.quit) })
+		if r.shuttle.Settings.Has(config.TriggerSchedule) {
+			d.bg.Go(func() { r.schedule(d.quit) })
+		}
 	}
 	close(d.ready)
 	<-ctx.Done()
+	close(d.quit)
+	d.bg.Wait()
 
 	d.mu.Lock()
 	d.stopping = true
