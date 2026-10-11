@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,6 +16,9 @@ import (
 	"runtime/debug"
 	"syscall"
 
+	"github.com/godbus/dbus/v5"
+
+	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
@@ -67,7 +71,8 @@ func buildVersion() string {
 	return version
 }
 
-// runDaemon runs every shuttle in the user's config until ctx is done.
+// runDaemon runs every shuttle in the user's config, and serves the D-Bus
+// interface once their state is held, until ctx is done.
 func runDaemon(ctx context.Context, stderr io.Writer) error {
 	paths, err := daemon.DefaultPaths()
 	if err != nil {
@@ -78,7 +83,35 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return d.Run(ctx)
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return fmt.Errorf("connecting to the session bus: %w", err)
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	runErr := make(chan error, 1)
+	go func() { runErr <- d.Run(ctx) }()
+	select {
+	case err := <-runErr: // failed before it held the state, e.g. already running
+		return err
+	case <-d.Ready():
+	}
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- bus.Serve(ctx, conn, d) }()
+	log.Info("serving D-Bus", "name", bus.Name)
+
+	// Whichever ends first ends the other: a daemon nobody can reach, or a
+	// bus name with no daemon behind it, is no use.
+	select {
+	case err := <-serveErr:
+		cancel()
+		return errors.Join(err, <-runErr)
+	case err := <-runErr:
+		cancel()
+		return errors.Join(err, <-serveErr)
+	}
 }
 
 func usage(w io.Writer) {

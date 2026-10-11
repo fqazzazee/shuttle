@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
@@ -78,6 +79,9 @@ type Daemon struct {
 	ready chan struct{}  // closed once Run has every state database open
 	quit  chan struct{}  // closed when Run starts shutting down
 	bg    sync.WaitGroup // schedulers and share watchers
+
+	listenMu  sync.Mutex
+	listeners []func(*Status)
 
 	mu          sync.Mutex
 	pausedAll   bool
@@ -210,6 +214,88 @@ func (d *Daemon) SetPaused(name string, paused bool) error {
 		return err
 	}
 	r.setPaused(paused)
+	return nil
+}
+
+// Watch registers fn to be called with a copy of a shuttle's status after
+// every change, besides Options.OnChange. fn runs on the runner's goroutine
+// and must not block.
+func (d *Daemon) Watch(fn func(*Status)) {
+	d.listenMu.Lock()
+	d.listeners = append(d.listeners, fn)
+	d.listenMu.Unlock()
+}
+
+func (d *Daemon) notify(st *Status) {
+	if d.o.OnChange != nil {
+		d.o.OnChange(st)
+	}
+	d.listenMu.Lock()
+	ls := slices.Clone(d.listeners)
+	d.listenMu.Unlock()
+	for _, fn := range ls {
+		cp := *st
+		fn(&cp)
+	}
+}
+
+// Paused reports whether every shuttle is paused (SetPaused("", true)).
+func (d *Daemon) Paused() bool { return d.isPausedAll() }
+
+// State is the state of the shuttles taken together, for one icon: the most
+// urgent of them, in the order error, held, offline, running, paused, idle.
+func (d *Daemon) State() State {
+	rank := map[State]int{StateError: 6, StateHeld: 5, StateOffline: 4, StateRunning: 3, StatePaused: 2, StateIdle: 1}
+	best := StateIdle
+	all := d.Statuses()
+	for i := range all {
+		if s := all[i].State; rank[s] > rank[best] {
+			best = s
+		}
+	}
+	if d.isPausedAll() && rank[best] < rank[StateRunning] {
+		best = StatePaused
+	}
+	return best
+}
+
+// Resolve settles a held conflict of the named shuttle the way the user
+// chose, then syncs the shuttle. It waits for a run in progress to end.
+func (d *Daemon) Resolve(ctx context.Context, name, path string, choice engine.Choice) error {
+	r, err := d.runner(name)
+	if err != nil {
+		return err
+	}
+	if err := func() error {
+		r.runMu.Lock()
+		defer r.runMu.Unlock()
+		local, remote, err := r.open(ctx)
+		if err != nil {
+			return err
+		}
+		defer local.Close()
+		defer remote.Close()
+		return engine.Resolve(ctx, r.options(local, remote), path, choice)
+	}(); err != nil {
+		return err
+	}
+	d.o.Log.Info("conflict resolved", "shuttle", name, "path", path, "choice", choice)
+	r.trigger()
+	return nil
+}
+
+// AllowDeletions lets the named shuttle's next run delete what the deletion
+// guard has been holding back, and starts that run.
+func (d *Daemon) AllowDeletions(name string) error {
+	r, err := d.runner(name)
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	r.allowDeletions = true
+	r.mu.Unlock()
+	d.o.Log.Info("deletions allowed for one run", "shuttle", name)
+	r.trigger()
 	return nil
 }
 
