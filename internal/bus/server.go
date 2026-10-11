@@ -87,7 +87,9 @@ func Serve(ctx context.Context, conn *dbus.Conn, d *daemon.Daemon) error {
 	for i := range all {
 		s.newlyHeld(&all[i]) // what is already held at start is not news
 	}
-	d.Watch(s.changed)
+	// Stop emitting before Serve returns: the caller may close conn next.
+	stop := d.Watch(s.changed)
+	defer stop()
 
 	reply, err := conn.RequestName(Name, dbus.NameFlagDoNotQueue)
 	if err != nil {
@@ -108,8 +110,18 @@ func (s *server) changed(st *daemon.Status) {
 	for _, c := range s.newlyHeld(st) {
 		_ = s.conn.Emit(Path, Interface+".ConflictRaised", st.Name, c.Path, c.Reason)
 	}
-	s.props.SetMust(Interface, "State", string(s.d.State()))
-	s.props.SetMust(Interface, "Paused", s.d.Paused())
+	s.setProp("State", string(s.d.State()))
+	s.setProp("Paused", s.d.Paused())
+}
+
+// setProp updates a read-only property and emits PropertiesChanged. prop's
+// only setter for read-only properties, SetMust, panics if emitting fails
+// (the bus connection closed); that must never take the sync daemon down,
+// so the panic stops here. (Properties.Set is the clients' setter: it
+// refuses read-only properties.)
+func (s *server) setProp(name string, v any) {
+	defer func() { _ = recover() }()
+	s.props.SetMust(Interface, name, v)
 }
 
 // newlyHeld returns the held conflicts of st not announced before, and

@@ -67,6 +67,7 @@ type fixture struct {
 	d            *daemon.Daemon
 	c            *Client
 	connect      func() *dbus.Conn
+	serveConn    *dbus.Conn // the daemon's own connection
 }
 
 func newFixture(t *testing.T, mode, extra string) *fixture {
@@ -92,7 +93,8 @@ func newFixture(t *testing.T, mode, extra string) *fixture {
 		<-runDone
 	})
 	<-d.Ready()
-	go func() { serveDone <- Serve(ctx, f.connect(), d) }()
+	f.serveConn = f.connect()
+	go func() { serveDone <- Serve(ctx, f.serveConn, d) }()
 	f.d, f.c = d, NewClient(f.connect())
 	f.waitForName()
 	return f
@@ -309,5 +311,29 @@ func TestIntrospection(t *testing.T) {
 		if !strings.Contains(xml, want) {
 			t.Errorf("introspection lacks %s", want)
 		}
+	}
+}
+
+// If the daemon's bus connection goes away (the bus restarts, say), status
+// changes must not panic: syncing has to carry on without the bus.
+func TestClosedBusDoesNotStopTheDaemon(t *testing.T) {
+	f := newFixture(t, "push", "")
+	write(t, f.local, "a.txt", "a")
+	f.serveConn.Close()
+	if err := f.d.SyncNow("s"); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if st := f.d.Statuses()[0]; ran(&st) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the run did not finish")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if _, err := os.Stat(filepath.Join(f.mount, "a.txt")); err != nil {
+		t.Error("the run did not push")
 	}
 }

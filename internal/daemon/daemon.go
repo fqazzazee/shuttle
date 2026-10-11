@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -81,7 +82,8 @@ type Daemon struct {
 	bg    sync.WaitGroup // schedulers and share watchers
 
 	listenMu  sync.Mutex
-	listeners []func(*Status)
+	listeners map[int]func(*Status)
+	nextID    int
 
 	mu          sync.Mutex
 	pausedAll   bool
@@ -218,12 +220,22 @@ func (d *Daemon) SetPaused(name string, paused bool) error {
 }
 
 // Watch registers fn to be called with a copy of a shuttle's status after
-// every change, besides Options.OnChange. fn runs on the runner's goroutine
-// and must not block.
-func (d *Daemon) Watch(fn func(*Status)) {
+// every change, besides Options.OnChange, until the returned function is
+// called. fn runs on the runner's goroutine and must not block.
+func (d *Daemon) Watch(fn func(*Status)) (stop func()) {
 	d.listenMu.Lock()
-	d.listeners = append(d.listeners, fn)
-	d.listenMu.Unlock()
+	defer d.listenMu.Unlock()
+	if d.listeners == nil {
+		d.listeners = map[int]func(*Status){}
+	}
+	id := d.nextID
+	d.nextID++
+	d.listeners[id] = fn
+	return func() {
+		d.listenMu.Lock()
+		delete(d.listeners, id)
+		d.listenMu.Unlock()
+	}
 }
 
 func (d *Daemon) notify(st *Status) {
@@ -231,7 +243,7 @@ func (d *Daemon) notify(st *Status) {
 		d.o.OnChange(st)
 	}
 	d.listenMu.Lock()
-	ls := slices.Clone(d.listeners)
+	ls := slices.Collect(maps.Values(d.listeners))
 	d.listenMu.Unlock()
 	for _, fn := range ls {
 		cp := *st
