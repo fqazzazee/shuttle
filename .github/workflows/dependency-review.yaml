@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/dependency-review-action@v5
+      - uses: actions/dependency-review-action@v5.0.0   # no floating v5 tag exists
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
