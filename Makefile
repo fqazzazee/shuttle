@@ -6,7 +6,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Pinned to match CI. `go run` builds it on first use, so no separate install.
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
-.PHONY: build test lint fmt-check install uninstall smoke clean samba-up samba-down test-smb
+.PHONY: build test lint fmt-check install uninstall smoke clean samba-up samba-down test-smb test-keyring
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -62,6 +62,12 @@ samba-down:
 # Runs every test, the SMB ones included. Needs `make samba-up` first.
 test-smb:
 	$(SMB_TEST_ENV) go test -race -count=1 ./...
+
+# Keyring tests run in a private D-Bus session with a throwaway GNOME Keyring;
+# the user's own keyring is never touched. Needs dbus-run-session and
+# gnome-keyring-daemon.
+test-keyring:
+	internal/secrets/testdata/with-test-keyring.sh go test -race -count=1 -v ./internal/secrets/
 
 clean:
 	rm -rf bin/ dist/ coverage.out

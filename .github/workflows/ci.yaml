@@ -90,6 +90,21 @@ jobs:
         if: failure()
         run: docker logs shuttle-samba
 
+  keyring:
+    name: keyring integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      - name: install a Secret Service
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnome-keyring dbus libsecret-tools
+      # A private D-Bus session with a throwaway keyring; see the script.
+      - run: make test-keyring
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest

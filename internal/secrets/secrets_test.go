@@ -1,0 +1,164 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package secrets
+
+import (
+	"context"
+	"errors"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/godbus/dbus/v5"
+)
+
+// Tests that talk to a Secret Service only run inside the throwaway keyring
+// of testdata/with-test-keyring.sh (`make test-keyring`). Anywhere else they
+// would read and write the user's own keyring.
+func isolated(t *testing.T) {
+	t.Helper()
+	if os.Getenv("SHUTTLE_TEST_KEYRING") != "isolated" {
+		t.Skip("needs the throwaway keyring: run `make test-keyring`")
+	}
+}
+
+var key = Key{Host: "nas.example", Share: "home", User: "user"}
+
+func TestAccount(t *testing.T) {
+	for k, want := range map[Key]string{
+		key: "smb://user@nas.example/home",
+		{Host: "nas.example", Port: 1445, Share: "home", User: "user", Domain: "WORKGROUP"}: "smb://WORKGROUP;user@nas.example:1445/home",
+	} {
+		if got := k.Account(); got != want {
+			t.Errorf("Account() = %q, want %q", got, want)
+		}
+	}
+}
+
+func TestIncompleteKeysAreRefused(t *testing.T) {
+	ctx := context.Background()
+	s := SecretService()
+	for _, k := range []Key{{Share: "home", User: "u"}, {Host: "h", User: "u"}, {Host: "h", Share: "s"}} {
+		if _, err := s.Get(ctx, k); err == nil {
+			t.Errorf("Get(%+v) succeeded", k)
+		}
+		if err := s.Set(ctx, k, "pw"); err == nil {
+			t.Errorf("Set(%+v) succeeded", k)
+		}
+	}
+}
+
+// With no bus to reach, the answer must be "unavailable": go-keyring on its
+// own would say "not found", and the daemon would then ask the user for a
+// password it cannot store.
+func TestNoBusIsUnavailableNotNotFound(t *testing.T) {
+	if os.Getenv("SHUTTLE_TEST_KEYRING") == "isolated" {
+		t.Skip("the isolated run already holds a working bus connection")
+	}
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/shuttle-test-bus")
+	_, err := SecretService().Get(context.Background(), key)
+	if !errors.Is(err, ErrUnavailable) || errors.Is(err, ErrNotFound) {
+		t.Errorf("Get = %v, want ErrUnavailable", err)
+	}
+}
+
+func TestRoundTrip(t *testing.T) {
+	isolated(t)
+	ctx := context.Background()
+	s := SecretService()
+	other := Key{Host: "nas.example", Share: "photos", User: "user"}
+
+	if _, err := s.Get(ctx, key); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Get before Set = %v, want ErrNotFound", err)
+	}
+	if err := s.Set(ctx, key, "first password"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Set(ctx, other, "other password"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Set(ctx, key, "second password"); err != nil { // replaces, not adds
+		t.Fatal(err)
+	}
+	if got, err := s.Get(ctx, key); err != nil || got != "second password" {
+		t.Errorf("Get = %q, %v", got, err)
+	}
+	if got, err := s.Get(ctx, other); err != nil || got != "other password" {
+		t.Errorf("Get(other) = %q, %v: keys must not share a password", got, err)
+	}
+	if err := s.Delete(ctx, key); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get(ctx, key); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Get after Delete = %v, want ErrNotFound", err)
+	}
+	if err := s.Set(ctx, key, ""); err == nil {
+		t.Error("an empty password was stored")
+	}
+}
+
+// The stored item is an ordinary keyring entry other tools can see, labelled
+// so the user can tell what it is in Passwords and Keys.
+func TestVisibleToOtherTools(t *testing.T) {
+	isolated(t)
+	tool, err := exec.LookPath("secret-tool")
+	if err != nil {
+		t.Skip("secret-tool not installed")
+	}
+	if err := SecretService().Set(context.Background(), key, "seen by secret-tool"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(tool, "lookup", "service", "shuttle", "username", key.Account()).Output()
+	if err != nil || string(out) != "seen by secret-tool" {
+		t.Errorf("secret-tool lookup = %q, %v", out, err)
+	}
+}
+
+func TestCancelledContext(t *testing.T) {
+	isolated(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := SecretService().Set(ctx, key, "never stored"); !errors.Is(err, context.Canceled) {
+		t.Errorf("Set = %v, want context.Canceled", err)
+	}
+}
+
+// Errors name the key, never the password.
+func TestErrorsNeverCarryThePassword(t *testing.T) {
+	isolated(t)
+	const secret = "do-not-print-me"
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := SecretService().Set(ctx, key, secret)
+	if err == nil || strings.Contains(err.Error(), secret) {
+		t.Errorf("error = %v", err)
+	}
+}
+
+// TestZLockedKeyring runs last (Go runs tests in source order): it locks the
+// throwaway keyring, and nothing can unlock it without a display.
+func TestZLockedKeyring(t *testing.T) {
+	isolated(t)
+	conn, err := dbus.SessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var locked []dbus.ObjectPath
+	var prompt dbus.ObjectPath
+	err = conn.Object(secretsName, "/org/freedesktop/secrets").
+		Call("org.freedesktop.Secret.Service.Lock", 0, []dbus.ObjectPath{"/org/freedesktop/secrets/collection/login"}).
+		Store(&locked, &prompt)
+	if err != nil || len(locked) != 1 {
+		t.Fatalf("locking the test keyring: %v %v", locked, err)
+	}
+	// With no display, the unlock prompt fails at once; the timeout is only
+	// there so a prompt that does appear somewhere cannot hang the test.
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err = SecretService().Get(ctx, key)
+	if !errors.Is(err, ErrLocked) {
+		t.Errorf("Get on a locked keyring = %v, want ErrLocked", err)
+	}
+}
