@@ -283,16 +283,17 @@ func isOffline(err error) bool {
 }
 
 // pairOf names the two folders a shuttle syncs, for state.Bind: the local
-// folder, and the folder on the server the share reaches, whatever the
-// share is called. A user name, a password or a setting changing is not a
-// new pair; the server, the share on it or either folder is.
+// folder, and the folder on the server the share reaches as its user,
+// whatever the share is called. Another user may see other files, so it is
+// a new pair: starting afresh deletes nothing, while files the new user
+// cannot see would read as deleted against the old history.
 func pairOf(cfg *config.Config, s *config.Shuttle) string {
 	sh := cfg.Shares[s.Share]
 	var server string
 	switch sh.Type {
 	case config.ShareSMB:
-		// Host names and SMB share names are case-insensitive.
-		server = fmt.Sprintf("smb://%s:%d/%s", strings.ToLower(sh.Host), cmp.Or(sh.Port, 445), strings.ToLower(sh.Share))
+		// SMB names are case-insensitive: host, share, user and domain.
+		server = strings.ToLower(fmt.Sprintf("smb://%s;%s@%s:%d/%s", sh.Domain, sh.User, sh.Host, cmp.Or(sh.Port, 445), sh.Share))
 	case config.ShareNFS3:
 		server = fmt.Sprintf("nfs://%s:%d%s", strings.ToLower(sh.Host), cmp.Or(sh.Port, 2049), sh.Export)
 	default:

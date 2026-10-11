@@ -66,6 +66,13 @@ func TestPairOf(t *testing.T) {
 			}}, &config.Shuttle{Name: "docs", Local: "/home/u/Documents", Share: "nas", Remote: "docs",
 				Settings: config.Settings{Mode: config.ModeSync}}
 	}
+	share := func(f func(*config.Share)) func(*config.Config, *config.Shuttle) {
+		return func(c *config.Config, _ *config.Shuttle) {
+			sh := c.Shares["nas"]
+			f(&sh)
+			c.Shares["nas"] = sh
+		}
+	}
 	cfg, s := base()
 	want := pairOf(cfg, s)
 	for _, tc := range []struct {
@@ -73,17 +80,9 @@ func TestPairOf(t *testing.T) {
 		change func(*config.Config, *config.Shuttle)
 		same   bool
 	}{
-		{"another user", func(c *config.Config, _ *config.Shuttle) {
-			sh := c.Shares["nas"]
-			sh.User = "admin"
-			c.Shares["nas"] = sh
-		}, true},
-		{"the host's case", func(c *config.Config, _ *config.Shuttle) {
-			sh := c.Shares["nas"]
-			sh.Host = "nas.EXAMPLE"
-			c.Shares["nas"] = sh
-		}, true},
-		{"the default port spelled out", func(c *config.Config, _ *config.Shuttle) { sh := c.Shares["nas"]; sh.Port = 445; c.Shares["nas"] = sh }, true},
+		{"the host's case", share(func(sh *config.Share) { sh.Host = "nas.EXAMPLE" }), true},
+		{"the user's case", share(func(sh *config.Share) { sh.User = "USER" }), true},
+		{"the default port spelled out", share(func(sh *config.Share) { sh.Port = 445 }), true},
 		{"the share renamed in the config", func(c *config.Config, s *config.Shuttle) {
 			sh := c.Shares["nas"]
 			sh.Name = "home"
@@ -93,17 +92,13 @@ func TestPairOf(t *testing.T) {
 		{"another mode", func(_ *config.Config, s *config.Shuttle) { s.Settings.Mode = config.ModePush }, true},
 		{"another local folder", func(_ *config.Config, s *config.Shuttle) { s.Local = "/home/u/Docs" }, false},
 		{"another remote folder", func(_ *config.Config, s *config.Shuttle) { s.Remote = "documents" }, false},
-		{"another server", func(c *config.Config, _ *config.Shuttle) {
-			sh := c.Shares["nas"]
-			sh.Host = "nas2.example"
-			c.Shares["nas"] = sh
-		}, false},
-		{"another share on the server", func(c *config.Config, _ *config.Shuttle) {
-			sh := c.Shares["nas"]
-			sh.Share = "backup"
-			c.Shares["nas"] = sh
-		}, false},
-		{"another port", func(c *config.Config, _ *config.Shuttle) { sh := c.Shares["nas"]; sh.Port = 1445; c.Shares["nas"] = sh }, false},
+		{"another server", share(func(sh *config.Share) { sh.Host = "nas2.example" }), false},
+		{"another share on the server", share(func(sh *config.Share) { sh.Share = "backup" }), false},
+		{"another port", share(func(sh *config.Share) { sh.Port = 1445 }), false},
+		// Another user may not see the same files: files it cannot see would
+		// read as deleted against the old history.
+		{"another user", share(func(sh *config.Share) { sh.User = "guest" }), false},
+		{"another domain", share(func(sh *config.Share) { sh.Domain = "CORP" }), false},
 	} {
 		cfg, s := base()
 		tc.change(cfg, s)
