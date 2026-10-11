@@ -284,3 +284,47 @@ remote = "nas:"
 		t.Errorf("share lost events = %+v, want one", got)
 	}
 }
+
+// Whoever sees a run over, through Statuses or OnChange, can count on its
+// events having been sent: tests and the bus rely on it.
+func TestARunEndsAfterItsEvents(t *testing.T) {
+	f := newFixture(t, "push", "")
+	f.start()
+	stop := make(chan struct{})
+	broken := make(chan string, 1)
+	go func() {
+		var seen time.Time
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			st := f.d.Statuses()[0]
+			if st.State == StateRunning || !st.LastRun.After(seen) {
+				continue
+			}
+			seen = st.LastRun
+			// Every run here is asked for, so each sends "completed".
+			ended := len(f.eventsOf(EventCompleted))
+			f.mu.Lock()
+			runs := f.runs
+			f.mu.Unlock()
+			if ended < runs {
+				select {
+				case broken <- fmt.Sprintf("run %d seen over with %d completed events", runs, ended):
+				default:
+				}
+			}
+		}
+	}()
+	for range 200 {
+		f.syncNow()
+	}
+	close(stop)
+	select {
+	case msg := <-broken:
+		t.Error(msg)
+	default:
+	}
+}

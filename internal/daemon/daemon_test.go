@@ -36,8 +36,9 @@ type fixture struct {
 	cancel       context.CancelFunc
 	done         chan error
 	mu           sync.Mutex
-	runs         int     // how many times a shuttle entered StateRunning
-	ended        int     // how many times one left it
+	runs         int // how many times a shuttle entered StateRunning
+	ended        int // how many runs of s ended, by their LastRun
+	lastEnd      time.Time
 	last         State   // the state of the last change seen
 	events       []Event // what the daemon would notify, in order
 }
@@ -129,7 +130,10 @@ func (f *fixture) onChange(st *Status) {
 	if st.State == StateRunning && f.last != StateRunning {
 		f.runs++
 	}
-	if st.State != StateRunning && f.last == StateRunning {
+	// Not by state changes: the share probe publishes too, and a snapshot it
+	// took before a run can arrive after the run's "running".
+	if st.Name == "s" && st.State != StateRunning && st.LastRun.After(f.lastEnd) {
+		f.lastEnd = st.LastRun
 		f.ended++
 	}
 	f.last = st.State

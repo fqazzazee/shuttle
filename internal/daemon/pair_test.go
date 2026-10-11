@@ -61,10 +61,12 @@ func TestSameFoldersKeepTheirHistory(t *testing.T) {
 
 func TestPairOf(t *testing.T) {
 	base := func() (*config.Config, *config.Shuttle) {
-		return &config.Config{Shares: map[string]config.Share{
-				"nas": {Name: "nas", Type: config.ShareSMB, Host: "NAS.example", Share: "Home", User: "user"},
-			}}, &config.Shuttle{Name: "docs", Local: "/home/u/Documents", Share: "nas", Remote: "docs",
-				Settings: config.Settings{Mode: config.ModeSync}}
+		cfg := &config.Config{Shares: map[string]config.Share{
+			"nas": {Name: "nas", Type: config.ShareSMB, Host: "NAS.example", Share: "Home", User: "user"},
+		}}
+		s := &config.Shuttle{Name: "docs", Local: "/home/u/Documents", Share: "nas", Remote: "docs",
+			Settings: config.Settings{Mode: config.ModeSync}}
+		return cfg, s
 	}
 	share := func(f func(*config.Share)) func(*config.Config, *config.Shuttle) {
 		return func(c *config.Config, _ *config.Shuttle) {
