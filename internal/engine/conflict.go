@@ -21,7 +21,7 @@ import (
 // both sides, or is a file on one side and a folder on the other.
 func (e *executor) conflict(a *Action) error {
 	policy := e.o.Settings.Conflicts
-	if policy == config.ConflictAsk {
+	if policy == config.ConflictAsk || a.alwaysHold {
 		e.hold(a)
 		return nil
 	}

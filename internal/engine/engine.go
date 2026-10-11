@@ -134,6 +134,18 @@ func (e *executor) removeStaleTemps(f fsys.FS, temps []fsys.FileInfo) {
 	}
 }
 
+// plan is Plan for a run: on a remote side that ignores case, the two scans
+// are first lined up by matchCase.
+func plan(o *Options, local, remote map[string]fsys.FileInfo, records map[string]state.Record) []Action {
+	if !fsys.FoldsCase(o.Remote) {
+		return Plan(o.Settings.Mode, o.Settings.Deletions, local, remote, records)
+	}
+	m := matchCase(local, remote, records)
+	actions := slices.Concat(m.held, Plan(o.Settings.Mode, o.Settings.Deletions, m.local, m.remote, m.records))
+	slices.SortStableFunc(actions, executionOrder)
+	return actions
+}
+
 func onlyConflicts(actions []Action) []Action {
 	var out []Action
 	for _, a := range actions {
@@ -158,7 +170,7 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Plan(o.Settings.Mode, o.Settings.Deletions, local.entries, remote.entries, records), nil
+	return plan(o, local.entries, remote.entries, records), nil
 }
 
 // Run syncs one shuttle once. The error is for problems that stop the whole
@@ -179,7 +191,7 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	if err != nil {
 		return res, err
 	}
-	actions := Plan(o.Settings.Mode, o.Settings.Deletions, local.entries, remote.entries, records)
+	actions := plan(o, local.entries, remote.entries, records)
 	res.Planned = len(actions)
 	if !o.AllowDeletions {
 		actions, res.HeldDeletions = guardDeletions(actions, local.entries, remote.entries, o.Settings.DeletionGuard)

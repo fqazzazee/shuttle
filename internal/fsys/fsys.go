@@ -70,6 +70,18 @@ type FS interface {
 	Close() error
 }
 
+// CaseInsensitive is implemented by file systems that may treat names
+// differing only in case as the same file.
+type CaseInsensitive interface {
+	FoldsCase() bool
+}
+
+// FoldsCase reports whether f treats names differing only in case as one.
+func FoldsCase(f FS) bool {
+	c, ok := f.(CaseInsensitive)
+	return ok && c.FoldsCase()
+}
+
 // ErrInvalidPath is returned for a path that is absolute, contains "..", empty
 // or "." elements, a trailing slash, or a NUL byte.
 var ErrInvalidPath = errors.New("invalid path")
