@@ -6,11 +6,17 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"slices"
 	"sync"
 
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/ignore"
 )
+
+// scanWorkers is how many folder listings a scan keeps in flight. A scan of
+// a network share is bound by round trips per folder (DECISIONS.md,
+// 2026-10-11), so listing several at once is the cheap way to speed it up.
+const scanWorkers = 8
 
 // scanned is one side's scan.
 type scanned struct {
@@ -26,7 +32,7 @@ type scanned struct {
 // not descended into.
 func scan(ctx context.Context, f fsys.FS, side string, ignored *ignore.Matcher) (scanned, error) {
 	out := scanned{entries: map[string]fsys.FileInfo{}}
-	err := fsys.Walk(ctx, f, ".", func(info fsys.FileInfo) error {
+	err := fsys.ScanTree(ctx, f, ".", scanWorkers, func(info fsys.FileInfo) error {
 		switch {
 		case info.Name == VersionsDir:
 			return fs.SkipDir
@@ -45,6 +51,7 @@ func scan(ctx context.Context, f fsys.FS, side string, ignored *ignore.Matcher) 
 		}
 		return nil
 	})
+	slices.Sort(out.unsupported) // listings finish in any order
 	return out, err
 }
 
