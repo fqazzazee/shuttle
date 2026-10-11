@@ -174,13 +174,18 @@ wait_for "the restarted daemon to finish the sync" 90 synced
 echo "all $(echo "$before" | wc -l) files intact on both sides; leftover temp files from the kill: $(temps) (removed after an hour)"
 
 step "SIGTERM: stopping finishes the file in progress"
+# The kill left temp files behind, and a run may still be copying: new
+# copies are told apart by name (temp names are random), not by count.
+temp_names() { find "$share/rt" -name '.shuttle-tmp-*' | sort; }
+old_temps=$(temp_names)
+new_temps() { comm -13 <(echo "$old_temps") <(temp_names); }
+copying() { [ -n "$(new_temps)" ]; }
 for i in $(seq 1 10); do head -c 1048576 /dev/urandom >~/rt/stop-"$i"; done
-temps_before=$(temps)
-wait_for "a copy in progress" 30 sh -c "[ \$(find '$share/rt' -name '.shuttle-tmp-*' | wc -l) -gt $temps_before ]"
+wait_for "a copy in progress" 30 copying
 start=$(date +%s)
 systemctl --user stop shuttle
 took=$(($(date +%s) - start))
-[ "$(temps)" = "$temps_before" ] || fail "stopping left a half-written file"
+[ -z "$(new_temps)" ] || fail "stopping left a half-written file: $(new_temps)"
 echo "stopped in ${took}s, no half-written file left"
 systemctl --user start shuttle
 wait_for "the rest after restarting" 60 test -f "$share/rt/stop-10"
