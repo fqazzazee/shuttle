@@ -36,8 +36,8 @@ type fixture struct {
 	cancel       context.CancelFunc
 	done         chan error
 	mu           sync.Mutex
-	runs         int     // how many times a shuttle entered StateRunning
-	ended        int     // how many runs of s ended, by their LastRun
+	runs         int // how many times a shuttle entered StateRunning
+	ended        int // how many runs of s ended, by their LastRun
 	lastEnd      time.Time
 	last         State   // the state of the last change seen
 	events       []Event // what the daemon would notify, in order
