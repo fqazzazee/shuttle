@@ -1,0 +1,63 @@
+# The example from SPEC.md, plus a share of each type.
+
+[global]
+bandwidth = { up = "50MB/s" }
+
+[shares.nas]
+type = "smb"
+host = "nas.example"
+share = "home"
+user = "user"
+
+[shares.backup]
+type = "nfs3"
+host = "backup.example"
+export = "/volume1/backup"
+
+[shares.mounted]
+type = "path"
+path = "/mnt/nas"
+
+[profiles.live]
+mode = "sync"
+triggers = ["realtime", "share-available"]
+conflicts = "keep-both"
+versioning = { kind = "staggered", keep = "365d", size_cap = "20GB" }
+ignore = ["*.tmp", "~$*", ".DS_Store"]
+
+[profiles.backup]
+mode = "push"
+triggers = ["schedule"]
+at = ["02:00"]
+deletions = "additive"
+versioning = { kind = "trash", keep = "30d" }
+bandwidth = { up = "20MB/s" }
+
+[profiles.manual]
+mode = "sync"
+triggers = ["manual"]
+
+[shuttles.documents]
+profile = "live"
+local = "~/Documents"
+remote = "nas:/docs"
+
+[shuttles.projects]
+profile = "live"
+local = "~/git"
+remote = "nas:/proj"
+ignore_add = ["node_modules/", "bin/"]
+notify = { completed = true }
+
+[shuttles.photos]
+profile = "backup"
+local = "~/Pictures"
+remote = "backup:/photos"
+bandwidth = { down = "5MB/s" }
+
+[shuttles.archive]
+profile = "manual"
+local = "~/archive"
+remote = "mounted:old"
+versioning = { kind = "simple", count = 3 }
+enabled = false
