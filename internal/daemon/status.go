@@ -28,6 +28,7 @@ type Status struct {
 	Paused  bool   // paused by the user, itself or with all shuttles
 	Pending bool   // a run is waiting: triggered while paused or while running
 	Share   string // ShareOnline or ShareOffline; "" before the first check
+	Note    string // something degraded but working, e.g. polling instead of watching
 
 	LastRun time.Time // when the last run ended, however it ended
 	LastOK  time.Time // when a run last completed without errors

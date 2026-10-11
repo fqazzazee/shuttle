@@ -96,9 +96,13 @@ func TestNextDue(t *testing.T) {
 
 // fast shortens the daemon's timers for a test.
 func fast(t *testing.T) {
-	old := [3]time.Duration{recheckEvery, probeEvery, probeTimeout}
+	old := [6]time.Duration{recheckEvery, probeEvery, probeTimeout, settleQuiet, settleMax, ownGrace}
 	recheckEvery, probeEvery, probeTimeout = 20*time.Millisecond, 50*time.Millisecond, 500*time.Millisecond
-	t.Cleanup(func() { recheckEvery, probeEvery, probeTimeout = old[0], old[1], old[2] })
+	settleQuiet, settleMax, ownGrace = 100*time.Millisecond, 500*time.Millisecond, 300*time.Millisecond
+	t.Cleanup(func() {
+		recheckEvery, probeEvery, probeTimeout = old[0], old[1], old[2]
+		settleQuiet, settleMax, ownGrace = old[3], old[4], old[5]
+	})
 }
 
 func TestIntervalScheduleRunsByItself(t *testing.T) {

@@ -154,6 +154,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 		if r.shuttle.Settings.Has(config.TriggerSchedule) {
 			d.bg.Go(func() { r.schedule(d.quit) })
 		}
+		if hasRealtime(&r.shuttle.Settings) {
+			d.bg.Go(func() { r.realtime(d.quit) })
+		}
 	}
 	close(d.ready)
 	<-ctx.Done()
