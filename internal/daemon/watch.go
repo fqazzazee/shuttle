@@ -26,9 +26,10 @@ import (
 // ownGrace is how long after a run its own writes are still recognised:
 // inotify delivers them with a little delay.
 var (
-	settleQuiet = 2 * time.Second
-	settleMax   = 10 * time.Second
-	ownGrace    = 2 * time.Second
+	settleQuiet   = 2 * time.Second
+	settleMax     = 10 * time.Second
+	ownGrace      = 2 * time.Second
+	runCheckEvery = 100 * time.Millisecond // how often queued changes wait for a run to end
 )
 
 // errTooManyWatches means the kernel's inotify watch limit was reached.
@@ -146,9 +147,31 @@ func (r *runner) realtime(quit <-chan struct{}) {
 	}
 
 	var first, last time.Time // of the changes waiting to settle
+	// Changes seen while a run is in progress wait here: inotify reports a
+	// run's writes while the run is still making them, before it has noted
+	// them as its own, so they can only be judged once the run has ended.
+	var duringRun []string
+	noteChange := func(at time.Time) {
+		if first.IsZero() {
+			first = at
+		}
+		last = at
+	}
 	for {
 		now := r.d.o.Now()
+		if len(duringRun) > 0 && !r.isRunning() {
+			for _, rel := range duringRun {
+				if !r.ownWrite(rel) {
+					noteChange(now)
+					break
+				}
+			}
+			duringRun = nil
+		}
 		wait := recheckEvery
+		if len(duringRun) > 0 {
+			wait = runCheckEvery // to judge them soon after the run ends
+		}
 		if due := r.lastAttempt().Add(r.shuttle.Settings.PollInterval); !due.After(now) {
 			r.markAttempt(now)
 			r.trigger()
@@ -185,11 +208,12 @@ func (r *runner) realtime(quit <-chan struct{}) {
 					r.setNote(fmt.Sprintf("not watching every folder (%v)", err))
 				}
 			}
-			if changed && !r.ownWrite(rel) {
-				if first.IsZero() {
-					first = now
-				}
-				last = now
+			switch {
+			case !changed:
+			case r.isRunning():
+				duringRun = append(duringRun, rel)
+			case !r.ownWrite(rel):
+				noteChange(now)
 			}
 		case err, ok := <-watchErrs:
 			if !ok {
@@ -231,6 +255,12 @@ func (r *runner) noteOwnWrite(a *engine.Action, _ error) {
 	for p := a.Path; p != "." && p != "/"; p = path.Dir(p) {
 		r.own[p] = true
 	}
+}
+
+func (r *runner) isRunning() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.st.State == StateRunning
 }
 
 func (r *runner) ownWrite(rel string) bool {
