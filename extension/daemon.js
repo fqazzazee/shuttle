@@ -5,6 +5,7 @@
 // It imports nothing from GNOME Shell.
 
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 
 // The daemon's D-Bus API: internal/bus/server.go.
@@ -80,6 +81,36 @@ export const Daemon = GObject.registerClass({
 
     get rateDown() {
         return this._property('RateDown') ?? 0;
+    }
+
+    // syncNow asks for a run of the named shuttle now.
+    syncNow(name) {
+        return this._call('SyncNow', new GLib.Variant('(s)', [name]));
+    }
+
+    // setPaused pauses or resumes the named shuttle, or every shuttle for "".
+    setPaused(name, paused) {
+        return this._call('SetPaused', new GLib.Variant('(sb)', [name, paused]));
+    }
+
+    // _call calls a method of the daemon. The promise fails with the
+    // daemon's own words, e.g. that the shuttle is turned off.
+    _call(method, params) {
+        return new Promise((resolve, reject) => {
+            if (!this.running) {
+                reject(new Error('the shuttle service is not running'));
+                return;
+            }
+            this._proxy.call(method, params, Gio.DBusCallFlags.NONE, -1, this._cancellable, (proxy, result) => {
+                try {
+                    proxy.call_finish(result);
+                    resolve();
+                } catch (e) {
+                    Gio.DBusError.strip_remote_error(e);
+                    reject(e);
+                }
+            });
+        });
     }
 
     _ownerChanged() {

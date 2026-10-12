@@ -10,6 +10,7 @@ shuttle=$tmp/shuttle
 uuid=shuttle@fqazzazee.github.io
 log=$tmp/shell.log
 indicator="Main.panel.statusArea['$uuid']"
+toggle="Main.extensionManager.lookup('$uuid').stateObj._quickSettings.toggle"
 
 step() { printf '\n== %s\n' "$*"; }
 fail() {
@@ -41,16 +42,24 @@ shows() { is "$indicator?.shownState ?? null" "\"$1\""; }
 # row <name> <js on r>: wait until the dropdown's row for name satisfies it.
 row() { is "(r => !!r && ($2))($indicator.shownRows.find(r => r.name === '$1'))" true; }
 rows() { is "$indicator.shownRows.map(r => r.name).join(',')" "\"$1\""; }
-# snap <name>: with SHUTTLE_EXT_SCREENSHOTS set to a folder, a picture of
-# the open dropdown there, to look at.
+# item <name> <js on i>: the same for the Quick Settings toggle's menu.
+item() { is "(i => !!i && ($2))($toggle.shownItems.find(i => i.name === '$1'))" true; }
+# status <name> <state>: wait until `shuttle status` gives that shuttle that state.
+status() {
+	for _ in $(seq 50); do "$shuttle" status | grep -qE "^$1 +$2 " && return 0; sleep 0.2; done
+	fail "shuttle status never said $1 is $2: $("$shuttle" status)"
+}
+# snap <name> [<menus>]: with SHUTTLE_EXT_SCREENSHOTS set to a folder, a
+# picture there of the menus open (the dropdown unless named), to look at.
 snap() {
 	[ -n "${SHUTTLE_EXT_SCREENSHOTS:-}" ] || return 0
-	ev "$indicator.menu.open(false)" >/dev/null
+	local menus=${2:-$indicator.menu} m
+	for m in $menus; do ev "$m.open(false)" >/dev/null; done
 	sleep 0.5
 	gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell/Screenshot \
 		--method org.gnome.Shell.Screenshot.Screenshot false false "$SHUTTLE_EXT_SCREENSHOTS/$1.png" >/dev/null ||
 		fail "no screenshot"
-	ev "$indicator.menu.close(false)" >/dev/null
+	for m in $menus; do ev "$m.close(false)" >/dev/null; done
 }
 
 step "the extension, installed in this session's own data folder"
@@ -60,6 +69,15 @@ mkdir -p "$dest"
 cp -r "$root/extension/." "$dest/"
 rm -rf "${dest:?}/test"
 gsettings set org.gnome.shell enabled-extensions "['$uuid']"
+# "Open shuttle" opens this app: here, a stand-in that leaves a mark.
+mkdir -p "$XDG_DATA_HOME/applications"
+cat >"$XDG_DATA_HOME/applications/io.github.fqazzazee.Shuttle.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Shuttle
+Exec=touch $tmp/opened
+Terminal=false
+EOF
 
 mkdir -p "$HOME/Documents" "$HOME/Pictures" "$tmp/share/docs" "$tmp/share/pics" "$XDG_CONFIG_HOME/shuttle"
 echo "a" >"$HOME/Documents/a.txt"
@@ -101,6 +119,8 @@ gnome-extensions info "$uuid" | grep -q "State: ACTIVE" || fail "the extension i
 shows not-running
 is "$indicator.shownMessage" '"The shuttle service is not running"'
 rows ""
+is "$toggle.checked" false
+is "$toggle.subtitle" '"The shuttle service is not running"'
 
 step "the daemon starts: up to date, with the extension's own icon"
 "$shuttle" daemon 2>"$tmp/daemon.log" &
@@ -113,18 +133,55 @@ rows "docs,pics"
 is "$indicator.shownMessage" '""'
 row docs "r.title === 'docs  →' && r.when === 'never' && r.detail === ''"
 row pics "r.title === 'pics  ↔'"
-"$shuttle" sync docs >/dev/null
+
+step "Quick Settings: on, a switch per shuttle, and Sync now syncs"
+is "$toggle.checked" true
+is "$toggle.subtitle" '"Up to date"'
+is "$toggle.shownItems.map(i => i.name + ':' + i.on).join(',')" '"docs:true,pics:true"'
+item docs "i.label === 'docs  →'"
+ev "$toggle._items.get('docs')._button.emit('clicked', 1)" >/dev/null
 for _ in $(seq 50); do [ -f "$tmp/share/docs/a.txt" ] && break; sleep 0.1; done
 [ -f "$tmp/share/docs/a.txt" ] || fail "the sync did not push"
 shows idle
 row docs "r.when === 'just now'"
 is "(m => { m.open(false); m.close(false); return true; })($indicator.menu)" true
 
-step "paused, and resumed"
-"$shuttle" pause >/dev/null
+step "Quick Settings: the toggle pauses every shuttle, and resumes them"
+ev "$toggle.emit('clicked', 1)" >/dev/null
 shows paused
-"$shuttle" resume >/dev/null
+is "$toggle.checked" false
+is "$toggle.subtitle" '"Paused"'
+is "$toggle.shownItems.map(i => i.on).join(',')" '"false,false"'
+status docs paused
+ev "$toggle.emit('clicked', 1)" >/dev/null
 shows idle
+is "$toggle.checked" true
+status docs idle
+
+step "Quick Settings: a switch pauses one shuttle, and resumes it"
+ev "$toggle._items.get('docs').toggle()" >/dev/null
+status docs paused
+item docs "!i.on"
+item pics "i.on"
+status pics idle
+is "$toggle.checked" true
+is "$toggle.subtitle" '"1 of 2 paused"'
+snap quick-settings "Main.panel.statusArea.quickSettings.menu $toggle.menu"
+ev "$toggle._items.get('docs').toggle()" >/dev/null
+status docs idle
+item docs "i.on"
+
+step "Quick Settings: a shuttle turned off in the config has no switch"
+"$shuttle" disable pics >/dev/null
+item pics "i.off"
+"$shuttle" enable pics >/dev/null
+item pics "!i.off && i.on"
+
+step "Quick Settings: Open shuttle opens the app"
+is "$toggle.menu._getMenuItems().some(i => i.label?.text === 'Open shuttle')" true
+ev "$toggle._open()" >/dev/null
+for _ in $(seq 50); do [ -f "$tmp/opened" ] && break; sleep 0.1; done
+[ -f "$tmp/opened" ] || fail "Open shuttle did not open the app"
 
 step "syncing: the icon pulses, and the upload rate shows beside it"
 head -c 200000 /dev/urandom >"$HOME/Documents/big.bin"
@@ -163,6 +220,8 @@ daemon=
 shows not-running
 rows ""
 is "$indicator.shownMessage" '"The shuttle service is not running"'
+is "$toggle.checked" false
+is "$toggle.shownItems.length" 0
 
 step "disabled leaves nothing behind; enabled again, it is back"
 gnome-extensions disable "$uuid"
