@@ -37,6 +37,10 @@ type runner struct {
 	bg       sync.WaitGroup // the triggers: share probe, schedule, watcher
 	loopDone chan struct{}  // closed when the loop has returned
 
+	// notifyMu keeps changed's snapshot and its sending together, so
+	// status changes go out in the order they happened. Taken before mu.
+	notifyMu sync.Mutex
+
 	mu        sync.Mutex
 	stopping  bool // the run in progress finishes its file; no more start
 	st        Status
@@ -176,7 +180,13 @@ func (r *runner) share() string {
 	return r.st.Share
 }
 
+// changed sends the current status to the listeners. Several goroutines
+// report changes (the run, the share probe, triggers): without notifyMu, a
+// snapshot the probe took before a run started could go out after the
+// run's "running", and show the shuttle idle mid-run.
 func (r *runner) changed() {
+	r.notifyMu.Lock()
+	defer r.notifyMu.Unlock()
 	st := r.status()
 	r.d.notify(&st)
 }

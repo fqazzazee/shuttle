@@ -115,9 +115,7 @@ interval = "1m"`)
 	f.d.runners["s"].shuttle.Settings.Interval = 150 * time.Millisecond
 	f.run()
 
-	// Ends, not starts: a probe's snapshot from before the first run can
-	// arrive after its "running", and the run's next one then counts as a
-	// second start while it is still copying.
+	// Ends, not starts: the check below is about what a finished run did.
 	f.waitFor("s", "two scheduled runs", func(Status) bool {
 		f.mu.Lock()
 		defer f.mu.Unlock()

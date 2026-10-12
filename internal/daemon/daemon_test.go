@@ -132,8 +132,8 @@ func (f *fixture) onChange(st *Status) {
 	if st.State == StateRunning && st.Progress.Phase == "" && f.last[st.Name] != StateRunning {
 		f.runs++
 	}
-	// Not by state changes: the share probe publishes too, and a snapshot it
-	// took before a run can arrive after the run's "running".
+	// By LastRun, not by state changes: one run's end is one new LastRun,
+	// however many changes report it.
 	if st.Name == "s" && st.State != StateRunning && st.LastRun.After(f.lastEnd) {
 		f.lastEnd = st.LastRun
 		f.ended++
