@@ -56,6 +56,7 @@ path = "$tmp/share"
 mode = "push"
 local = "$HOME/Documents"
 remote = "disk:"
+bandwidth = { up = "64KiB/s" } # slow enough to watch a run
 EOF
 
 gnome-shell --headless --wayland --no-x11 --virtual-monitor 1280x800 --unsafe-mode >"$log" 2>&1 &
@@ -85,6 +86,20 @@ step "paused, and resumed"
 shows paused
 "$shuttle" resume >/dev/null
 shows idle
+
+step "syncing: the icon pulses, and the upload rate shows beside it"
+head -c 200000 /dev/urandom >"$HOME/Documents/big.bin"
+"$shuttle" sync docs >/dev/null
+shows running
+is "$indicator.pulsing" true
+is "$indicator._icon.get_transition('opacity') !== null" true
+is "$indicator.shownRates.startsWith('↑ ') && $indicator.shownRates.endsWith('/s')" true
+shows idle
+is "$indicator.pulsing" false
+is "$indicator.shownRates" '""'
+is "$indicator._icon.opacity" 255
+is "$indicator._icon.get_transition('opacity') === null" true
+[ -f "$tmp/share/big.bin" ] || fail "the sync did not push big.bin"
 
 step "a run that fails"
 rm -rf "$tmp/share"

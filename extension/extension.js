@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -8,6 +9,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 
+import {rates} from './lib/format.js';
 import {NOT_RUNNING, SHUTTLE_ICON, presentation} from './lib/state.js';
 
 // The daemon's D-Bus API: internal/bus/server.go.
@@ -15,8 +17,9 @@ const BUS_NAME = 'io.github.fqazzazee.Shuttle';
 const OBJECT_PATH = '/io/github/fqazzazee/Shuttle';
 const INTERFACE = 'io.github.fqazzazee.Shuttle1';
 
-// Indicator is the top-bar icon. It follows the daemon over D-Bus and
-// changes nothing: a client of the daemon, like the TUI.
+// Indicator is the top-bar icon, and the transfer rates beside it while
+// something moves. It follows the daemon over D-Bus and changes nothing: a
+// client of the daemon, like the TUI.
 class Indicator extends PanelMenu.Button {
     static {
         GObject.registerClass(this);
@@ -26,9 +29,15 @@ class Indicator extends PanelMenu.Button {
         super(0.5, 'Shuttle');
         this._shuttleIcon = new Gio.FileIcon({file: ext.dir.get_child('icons').get_child('shuttle-symbolic.svg')});
         this._icon = new St.Icon({style_class: 'system-status-icon'});
-        this.add_child(this._icon);
-        // shownState is the state on show, for the headless tests to read.
+        this._rates = new St.Label({y_align: Clutter.ActorAlign.CENTER, visible: false});
+        const box = new St.BoxLayout();
+        box.add_child(this._icon);
+        box.add_child(this._rates);
+        this.add_child(box);
+        // What is on show, for the headless tests to read.
         this.shownState = '';
+        this.shownRates = '';
+        this.pulsing = false;
         this._show(NOT_RUNNING);
 
         // No auto-start: the daemon is a systemd user service, and the
@@ -54,8 +63,10 @@ class Indicator extends PanelMenu.Button {
     }
 
     _update() {
-        const state = this._proxy.g_name_owner ? this._proxy.get_cached_property('State')?.unpack() : null;
-        this._show(state || NOT_RUNNING);
+        const owner = this._proxy.g_name_owner;
+        const get = name => owner ? this._proxy.get_cached_property(name)?.unpack() : null;
+        this._show(get('State') || NOT_RUNNING);
+        this._showRates(rates(get('RateUp') ?? 0, get('RateDown') ?? 0));
     }
 
     _show(state) {
@@ -65,6 +76,30 @@ class Indicator extends PanelMenu.Button {
         this._icon.gicon = icon === SHUTTLE_ICON ? this._shuttleIcon : new Gio.ThemedIcon({name: icon});
         this.accessible_name = `Shuttle: ${label}`;
         this.shownState = state;
+        this._pulse(state === 'running');
+    }
+
+    _showRates(text) {
+        this._rates.text = text;
+        this._rates.visible = text !== '';
+        this.shownRates = text;
+    }
+
+    // _pulse fades the icon in and out while shuttles sync. With animations
+    // turned off in the accessibility settings, ease() does nothing: the
+    // rates and the accessible name still say it.
+    _pulse(on) {
+        if (on === this.pulsing)
+            return;
+        this.pulsing = on;
+        this._icon.remove_transition('opacity');
+        this._icon.opacity = 255;
+        if (on) {
+            this._icon.ease({
+                opacity: 96, duration: 1000, mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
+                repeatCount: -1, autoReverse: true,
+            });
+        }
     }
 
     destroy() {
