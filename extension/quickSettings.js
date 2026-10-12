@@ -44,16 +44,27 @@ class ShuttleSwitch extends PopupMenu.PopupSwitchMenuItem {
             daemon.syncNow(name).catch(e => complain(`sync ${name}`, e));
         });
         // The switch says it was toggled when update() sets it too: only
-        // the user's toggles go to the daemon.
+        // the user's toggles go to the daemon. A request it takes, even one
+        // that changes nothing, comes back as a status change and resets the
+        // switch; a refused one does not, so the switch is reset here.
         this._updating = false;
         this.connect('toggled', (_item, on) => {
-            if (!this._updating)
-                daemon.setPaused(name, !on).catch(e => complain(on ? `resume ${name}` : `pause ${name}`, e));
+            if (this._updating)
+                return;
+            daemon.setPaused(name, !on).catch(e => {
+                complain(on ? `resume ${name}` : `pause ${name}`, e);
+                const st = daemon.shuttles.get(name);
+                if (st && !this._destroyed)
+                    this.update(st, daemon.paused);
+            });
         });
+        this.connect('destroy', () => (this._destroyed = true));
     }
 
-    // update shows st, the daemon's status for this shuttle.
-    update(st) {
+    // update shows st, the daemon's status for this shuttle, and whether
+    // every shuttle is paused.
+    update(st, allPaused) {
+        this.status = st;
         this.label.text = `${this._name}  ${modeArrow(st.Mode)}`;
         const off = st.State === 'disabled';
         // A shuttle turned off in the config has nothing to pause or sync:
@@ -63,11 +74,16 @@ class ShuttleSwitch extends PopupMenu.PopupSwitchMenuItem {
         this._updating = true;
         this.setToggleState(!st.Paused);
         this._updating = false;
+        // With every shuttle paused, a shuttle cannot be resumed by itself:
+        // the toggle resumes them.
+        this.setSensitive(!allPaused && !off);
+        this._button.reactive = !allPaused;
     }
 
     // shown is the item as on screen, for the headless tests to read.
     get shown() {
-        return {name: this._name, on: this.state, off: !this._button.visible, label: this.label.text};
+        return {name: this._name, on: this.state, off: !this._button.visible, label: this.label.text,
+            sensitive: this.sensitive};
     }
 }
 
@@ -123,6 +139,8 @@ class Toggle extends QuickSettings.QuickMenuToggle {
         if (state === 'paused' && !d.paused && paused > 0)
             this.subtitle = `${paused} of ${d.shuttles.size} paused`;
         this.menu.setHeader(this.gicon, 'Shuttle', this.subtitle);
+        // "Every shuttle paused" is the daemon's Paused, not in their status.
+        this._items.forEach(item => item.update(item.status, d.paused));
     }
 
     _set(name) {
@@ -133,7 +151,7 @@ class Toggle extends QuickSettings.QuickMenuToggle {
             const names = [...this._items.keys()].sort();
             this._section.addMenuItem(item, names.indexOf(name));
         }
-        item.update(this._daemon.shuttles.get(name));
+        item.update(this._daemon.shuttles.get(name), this._daemon.paused);
     }
 
     _remove(name) {

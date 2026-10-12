@@ -177,6 +177,19 @@ shows idle
 is "$toggle.checked" true
 status docs idle
 
+step "Quick Settings: with every shuttle paused, the switches show it and cannot undo it"
+ev "$toggle.emit('clicked', 1)" >/dev/null
+shows paused
+item docs "!i.on && !i.sensitive"
+# A click that gets through anyway asks the daemon to resume docs, which it
+# cannot while all are paused: the switch goes back to what the daemon has.
+ev "$toggle._items.get('docs').toggle()" >/dev/null
+item docs "!i.on"
+status docs paused
+ev "$toggle.emit('clicked', 1)" >/dev/null
+shows idle
+item docs "i.on && i.sensitive"
+
 step "Quick Settings: a switch pauses one shuttle, and resumes it"
 ev "$toggle._items.get('docs').toggle()" >/dev/null
 status docs paused
@@ -192,7 +205,12 @@ item docs "i.on"
 
 step "Quick Settings: a shuttle turned off in the config has no switch"
 "$shuttle" disable pics >/dev/null
-item pics "i.off"
+item pics "i.off && i.on"
+# The daemon refuses to pause a shuttle that is turned off: a request that
+# gets through anyway leaves the switch as the daemon has it.
+ev "$toggle._items.get('pics').toggle()" >/dev/null
+sleep 0.5
+item pics "i.off && i.on"
 "$shuttle" enable pics >/dev/null
 item pics "!i.off && i.on"
 
