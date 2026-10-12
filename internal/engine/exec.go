@@ -180,21 +180,26 @@ func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.File
 	}
 	e.res.Copied++
 
-	// If the source changed while it was being read, the copy may mix old and
-	// new content. Leave it unrecorded: the next run sees both sides changed
-	// and compares them, rather than trusting this copy.
-	after, err := e.unchanged(src, p, srcInfo)
-	if err != nil {
-		return fmt.Errorf("source %w", err)
-	}
 	written, err := dst.Stat(e.ctx, p)
 	if err != nil {
 		return err
+	}
+	// If the source changed while it was being read, the copy may mix old and
+	// new content. Record it against the source as scanned: the next run sees
+	// only the source changed, and copies it again. Unrecorded, the copy left
+	// here would look like an edit of its own, and a sync would call it a
+	// conflict.
+	after, changed := e.unchanged(src, p, srcInfo)
+	if changed != nil {
+		after = *srcInfo
 	}
 	if toRemote {
 		e.record(p, &after, &written, h.Sum(nil))
 	} else {
 		e.record(p, &written, &after, h.Sum(nil))
+	}
+	if changed != nil {
+		return fmt.Errorf("source %w", changed)
 	}
 	return nil
 }

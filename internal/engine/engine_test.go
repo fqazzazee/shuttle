@@ -5,6 +5,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -287,6 +288,80 @@ func TestFileChangedDuringRunIsSkipped(t *testing.T) {
 	h.run()
 	if got, _ := read(t, h.remoteDir, "d.txt"); got != "d, edited mid-run" {
 		t.Errorf("next run copied %q, want the edited version", got)
+	}
+}
+
+// editedWhileRead is a file system whose file at path is rewritten once it
+// has been opened, as if saved again while being copied; or deleted, when
+// content is "".
+type editedWhileRead struct {
+	fsys.FS
+	t         *testing.T
+	dir, path string
+	content   string
+	mtime     time.Time
+}
+
+func (e *editedWhileRead) Open(ctx context.Context, name string) (io.ReadCloser, error) {
+	r, err := e.FS.Open(ctx, name)
+	if err == nil && name == e.path && e.content == "" {
+		if err := os.Remove(filepath.Join(e.dir, e.path)); err != nil {
+			e.t.Fatal(err)
+		}
+		e.path = ""
+	}
+	if err == nil && name == e.path {
+		// Saved as editors do, as a new file renamed over the old one: the
+		// copy reads the old content to the end.
+		write(e.t, e.dir, e.path+".new", e.content, e.mtime)
+		if err := os.Rename(filepath.Join(e.dir, e.path+".new"), filepath.Join(e.dir, e.path)); err != nil {
+			e.t.Fatal(err)
+		}
+		e.path = "" // once
+	}
+	return r, err
+}
+
+// A file that changes while it is being copied leaves a copy that matches
+// neither version for sure. The next run copies it again; it must not take
+// the copy it left behind for an edit of its own, as a conflict.
+func TestFileChangedWhileCopiedIsCopiedAgain(t *testing.T) {
+	for _, mode := range []config.Mode{config.ModeSync, config.ModePush} {
+		t.Run(string(mode), func(t *testing.T) {
+			h := newHarness(t, mode, config.DeletionsAdditive)
+			write(t, h.localDir, "a.txt", "half", t0)
+			h.opts.Local = &editedWhileRead{FS: h.opts.Local, t: t, dir: h.localDir, path: "a.txt",
+				content: "the whole file", mtime: t1}
+			if res := h.run(); len(res.Skipped) != 1 {
+				t.Fatalf("skipped = %+v, want a.txt", res.Skipped)
+			}
+			res := h.run()
+			if len(res.Conflicts) != 0 || res.Copied != 1 {
+				t.Errorf("next run: conflicts %+v, copied %d; want a.txt copied again", res.Conflicts, res.Copied)
+			}
+			if got, _ := read(t, h.remoteDir, "a.txt"); got != "the whole file" {
+				t.Errorf("remote a.txt = %q", got)
+			}
+			if got := listing(t, h.localDir); got != "a.txt=the whole file" {
+				t.Errorf("local = %s", got)
+			}
+		})
+	}
+}
+
+// A file deleted while it is being copied stays deleted: the copy it left
+// is not brought back as a file of the other side's.
+func TestFileDeletedWhileCopiedStaysDeleted(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsMirror)
+	write(t, h.localDir, "a.txt", "a", t0)
+	h.opts.Local = &editedWhileRead{FS: h.opts.Local, t: t, dir: h.localDir, path: "a.txt"}
+	h.run()
+	h.run()
+	if got := listing(t, h.localDir); got != "" {
+		t.Errorf("local = %s, want a.txt still deleted", got)
+	}
+	if _, ok := read(t, h.remoteDir, "a.txt"); ok {
+		t.Error("the copy of a deleted file stayed on the share")
 	}
 }
 

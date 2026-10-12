@@ -169,8 +169,22 @@ files() { (cd "$1" && find . -type f ! -path './.shuttle-versions/*' ! -name '.s
 synced() { [ "$(files ~/rt)" = "$(files "$share/rt")" ]; }
 # A real-time shuttle runs at start: well within its 60 s poll interval.
 wait_for "the restarted daemon to finish the sync" 30 synced
-[ "$(tree ~/rt)" = "$before" ] || fail "the local folder changed"
-[ "$(tree "$share/rt")" = "$before" ] || fail "the share's copy differs from the local folder"
+# differs <what>: fail, showing each file that is not as before on either
+# side, with sizes and times, and what each side's versions folder holds.
+differs() {
+	local dir
+	for dir in ~/rt "$share/rt"; do
+		echo "in $dir, lines only before (-) or only now (+):"
+		comm -3 <(echo "$before" | sort) <(tree "$dir" | sort) | sed 's/^\t/+ /; t; s/^/- /'
+		comm -3 <(echo "$before" | sort) <(tree "$dir" | sort) | sed 's/.* //' | sort -u |
+			while read -r f; do stat -c '  %n: %s bytes, modified %y' "$dir/$f" 2>&1; done
+		echo "versions kept in $dir:"
+		find "$dir/.shuttle-versions" -type f -printf '  %P %s bytes\n' 2>/dev/null
+	done
+	fail "$1"
+}
+[ "$(tree ~/rt)" = "$before" ] || differs "the local folder changed"
+[ "$(tree "$share/rt")" = "$before" ] || differs "the share's copy differs from the local folder"
 [ -f ~/rt/hello ] && [ -f "$share/rt/hello" ] || fail "a file synced before the crash was deleted"
 echo "all $(echo "$before" | wc -l) files intact on both sides; leftover temp files from the kill: $(temps) (removed after an hour)"
 
