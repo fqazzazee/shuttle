@@ -38,6 +38,9 @@ coverage.html
 go.work
 go.work.sum
 
+# The extension's lint tooling: package.json and package-lock.json say what
+/node_modules/
+
 # Local scratch (.cache/ holds the Samba test share)
 tmp/
 .tmp/

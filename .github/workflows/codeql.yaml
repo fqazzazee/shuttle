@@ -28,18 +28,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Add javascript-typescript when the GNOME extension lands.
-        language:
-          - go
+        include:
+          - language: go
+            build-mode: autobuild
+          # The GNOME extension; nothing to build.
+          - language: javascript-typescript
+            build-mode: none
     steps:
       - uses: actions/checkout@v7
 
       - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
           queries: security-extended
-
-      - uses: github/codeql-action/autobuild@v4
 
       - uses: github/codeql-action/analyze@v4
         with:

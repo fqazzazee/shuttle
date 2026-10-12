@@ -13,6 +13,17 @@ updates:
     commit-message:
       prefix: ci
 
+  # eslint for the GNOME extension: development only.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      lint:
+        patterns: ['*']
+    commit-message:
+      prefix: deps
+
   - package-ecosystem: gomod
     directory: /
     schedule:

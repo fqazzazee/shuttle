@@ -109,6 +109,22 @@ jobs:
       # The engine suite against the in-process NFSv3 server.
       - run: make test-nfs
 
+  # The GNOME extension: eslint, and its unit tests in plain gjs. Its run in
+  # a headless GNOME Shell needs Shell 50, which the runner does not have:
+  # that is `make test-extension`, before a PR.
+  extension:
+    name: extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: make lint-extension
+      - name: install gjs
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gjs gir1.2-glib-2.0
+      - run: gjs -m extension/test/run.js
+
   # Phase 5's exit condition, against the Linux kernel server: shuttle's own
   # NFSv3 client straight to it, then, with NFSv3 turned off, the engine
   # suite through an NFSv4 mount (a share of type "path").
