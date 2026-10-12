@@ -93,7 +93,7 @@ func TestNewProfile(t *testing.T) {
 	m := profilesTab(t, profilesConfig, 30)
 	press(t, m, "n")
 	s := screen(m)
-	if !strings.Contains(s, "New profile") || !strings.Contains(s, "not set: 60s") || !strings.Contains(s, "not set: keep-both") {
+	if !strings.Contains(s, "New profile") || !strings.Contains(s, "only with the realtime trigger") || !strings.Contains(s, "not set: keep-both") {
 		t.Fatalf("form:\n%s", s)
 	}
 	typeIn(t, m, "nightly")
@@ -130,9 +130,7 @@ func TestEditProfile(t *testing.T) {
 	toRow(t, m, "conflicts")
 	send(t, m, tea.KeyPressMsg{Code: tea.KeyLeft}) // ask, from not set
 	toRow(t, m, "versioning.kind")
-	send(t, m, tea.KeyPressMsg{Code: tea.KeyRight}) // simple
-	toRow(t, m, "versioning.keep")
-	clearRow(t, m)
+	send(t, m, tea.KeyPressMsg{Code: tea.KeyRight}) // simple: keep no longer applies, and goes
 	toRow(t, m, "versioning.count")
 	typeIn(t, m, "5")
 	ctrl(t, m, 's')
@@ -186,10 +184,16 @@ func TestProfileFormRefuses(t *testing.T) {
 	toRow(t, m, "mode")
 	send(t, m, tea.KeyPressMsg{Code: tea.KeyBackspace}) // not set
 	check("nothing set", "set at least one setting")
+	toRow(t, m, "triggers")
+	typeIn(t, m, "schedule")
 	toRow(t, m, "interval")
 	typeIn(t, m, "soon")
 	check("a bad duration", `invalid duration "soon": use e.g. 90s`)
 	clearRow(t, m)
+	toRow(t, m, "mode")
+	send(t, m, tea.KeyPressMsg{Code: tea.KeyRight}) // push, so the guard applies with mirror
+	toRow(t, m, "deletions")
+	send(t, m, tea.KeyPressMsg{Code: tea.KeyLeft}) // mirror
 	toRow(t, m, "deletion_guard")
 	typeIn(t, m, "half")
 	check("a bad number", `guard must be a number, not "half"`)
