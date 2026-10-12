@@ -204,7 +204,7 @@ func message(e *daemon.Event) note {
 			body: "More files would be deleted at once than the deletion guard allows, so none were. " +
 				"Check that both folders are there and mounted before allowing them."}
 	case daemon.EventCompleted:
-		return note{key: "completed/" + e.Shuttle, icon: "emblem-synchronizing-symbolic", category: "transfer.complete",
+		return note{key: "completed/" + e.Shuttle, icon: "io.github.fqazzazee.Shuttle", category: "transfer.complete",
 			summary: e.Shuttle + ": synced", body: done(e.Copied, e.Deleted)}
 	case daemon.EventShareLost:
 		return note{key: "share/" + e.Share, icon: "network-offline-symbolic", category: "network.disconnected",
