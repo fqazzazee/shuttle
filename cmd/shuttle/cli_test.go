@@ -103,10 +103,9 @@ func TestStatusSyncPauseResume(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(mount, "x.txt")); err != nil {
 		t.Fatal("sync a did not push")
 	}
-	time.Sleep(50 * time.Millisecond)
-	if _, out, _ := cli(t, "status"); !strings.Contains(out, "just now") {
-		t.Errorf("status after a sync:\n%s", out)
-	}
+	// The file is there before the run is over: it still saves its state,
+	// which can take a while on a slow disk.
+	waitForStatus(t, "just now")
 
 	if code, out, _ := cli(t, "pause"); code != 0 || out != "paused all shuttles\n" {
 		t.Errorf("pause = %d %q", code, out)
