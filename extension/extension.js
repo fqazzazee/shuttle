@@ -10,14 +10,10 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
+import {Daemon} from './daemon.js';
 import {rates} from './lib/format.js';
 import {row} from './lib/shuttles.js';
 import {NOT_RUNNING, SHUTTLE_ICON, presentation} from './lib/state.js';
-
-// The daemon's D-Bus API: internal/bus/server.go.
-const BUS_NAME = 'io.github.fqazzazee.Shuttle';
-const OBJECT_PATH = '/io/github/fqazzazee/Shuttle';
-const INTERFACE = 'io.github.fqazzazee.Shuttle1';
 
 // ShuttleItem is one shuttle in the dropdown: its state, name and mode,
 // when it last ran, and what it is doing or what needs the user. It shows
@@ -73,14 +69,14 @@ class ShuttleItem extends PopupMenu.PopupBaseMenuItem {
 }
 
 // Indicator is the top-bar icon, the transfer rates beside it while
-// something moves, and a dropdown of the shuttles. It follows the daemon
-// over D-Bus and changes nothing: a client of the daemon, like the TUI.
+// something moves, and a dropdown of the shuttles: a view of the daemon,
+// which it changes nothing in.
 class Indicator extends PanelMenu.Button {
     static {
         GObject.registerClass(this);
     }
 
-    constructor(ext) {
+    constructor(ext, daemon) {
         super(0.5, 'Shuttle');
         const shuttleIcon = new Gio.FileIcon({file: ext.dir.get_child('icons').get_child('shuttle-symbolic.svg')});
         this._iconFor = name => name === SHUTTLE_ICON ? shuttleIcon : new Gio.ThemedIcon({name});
@@ -94,93 +90,38 @@ class Indicator extends PanelMenu.Button {
         this.shownState = '';
         this.shownRates = '';
         this.pulsing = false;
-        this._show(NOT_RUNNING);
 
         // The dropdown: a line for when there is no shuttle to show, then
         // one item per shuttle, by name.
         this._items = new Map();
         this._message = new PopupMenu.PopupMenuItem('', {reactive: false, can_focus: false});
         this.menu.addMenuItem(this._message);
-        this._listed = false;
-        this._showMessage();
         // "5m ago" moves on while the menu is closed.
         this.menu.connectObject('open-state-changed', (_menu, open) => {
             if (open)
                 this._items.forEach(item => item.update(item.status, Date.now()));
         }, this);
 
-        // No auto-start: the daemon is a systemd user service, and the
-        // indicator waits for it rather than starting it.
-        this._cancellable = new Gio.Cancellable();
-        Gio.DBusProxy.new_for_bus(Gio.BusType.SESSION, Gio.DBusProxyFlags.DO_NOT_AUTO_START, null,
-            BUS_NAME, OBJECT_PATH, INTERFACE, this._cancellable, (_source, result) => {
-                try {
-                    this._proxy = Gio.DBusProxy.new_for_bus_finish(result);
-                } catch (e) {
-                    if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                        console.error(`shuttle: cannot follow the daemon: ${e.message}`);
-                    return;
-                }
-                // The proxy loads the properties before it says the owner
-                // changed, so both come down to reading them again.
-                this._proxy.connectObject(
-                    'g-properties-changed', () => this._update(),
-                    'notify::g-name-owner', () => this._ownerChanged(),
-                    'g-signal', (_proxy, _sender, signal, params) => this._signal(signal, params),
-                    this);
-                this._ownerChanged();
-            });
-    }
-
-    _ownerChanged() {
+        this._daemon = daemon;
+        daemon.connectObject(
+            'changed', () => this._update(),
+            'shuttle-changed', (_daemon, name) => this._set(name),
+            'shuttle-removed', (_daemon, name) => this._remove(name),
+            'listed', () => this._showMessage(),
+            this);
+        for (const name of daemon.shuttles.keys())
+            this._set(name);
         this._update();
-        this._items.forEach((_item, name) => this._remove(name));
-        this._listed = false;
-        if (this._proxy.g_name_owner)
-            this._list();
+    }
+
+    _update() {
+        const d = this._daemon;
+        this._show(d.running ? d.state || NOT_RUNNING : NOT_RUNNING);
+        this._showRates(rates(d.rateUp, d.rateDown));
         this._showMessage();
     }
 
-    // _list fetches every shuttle's status. A change signalled while the
-    // answer is on its way may be overwritten by the older answer; the
-    // shuttle's next change puts it right.
-    _list() {
-        this._proxy.call('ListShuttles', null, Gio.DBusCallFlags.NONE, -1, this._cancellable, (proxy, result) => {
-            let all;
-            try {
-                [all] = proxy.call_finish(result).recursiveUnpack();
-            } catch (e) {
-                if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                    console.warn(`shuttle: cannot list the shuttles: ${e.message}`);
-                return;
-            }
-            if (!this._proxy?.g_name_owner)
-                return;
-            for (const [name, st] of Object.entries(all))
-                this._set(name, st);
-            for (const name of [...this._items.keys()]) {
-                if (!Object.hasOwn(all, name))
-                    this._remove(name);
-            }
-            this._listed = true;
-            this._showMessage();
-        });
-    }
-
-    _signal(signal, params) {
-        if (signal === 'ShuttleChanged') {
-            const [name, st] = params.recursiveUnpack();
-            this._set(name, st);
-        } else if (signal === 'ShuttleRemoved') {
-            const [name] = params.recursiveUnpack();
-            this._remove(name);
-        } else {
-            return;
-        }
-        this._showMessage();
-    }
-
-    _set(name, st) {
+    _set(name) {
         let item = this._items.get(name);
         if (!item) {
             item = new ShuttleItem(name, this._iconFor);
@@ -188,19 +129,21 @@ class Indicator extends PanelMenu.Button {
             const names = [...this._items.keys()].sort();
             this.menu.addMenuItem(item, 1 + names.indexOf(name)); // after the message line
         }
-        item.update(st, Date.now());
+        item.update(this._daemon.shuttles.get(name), Date.now());
+        this._showMessage();
     }
 
     _remove(name) {
         this._items.get(name)?.destroy();
         this._items.delete(name);
+        this._showMessage();
     }
 
     _showMessage() {
         let text = '';
-        if (!this._proxy?.g_name_owner)
+        if (!this._daemon.running)
             text = presentation(NOT_RUNNING).label;
-        else if (this._listed && this._items.size === 0)
+        else if (this._daemon.listed && this._items.size === 0)
             text = 'No shuttles yet: run shuttle in a terminal to add one';
         this._message.label.text = text;
         this._message.visible = text !== '';
@@ -214,13 +157,6 @@ class Indicator extends PanelMenu.Button {
 
     get shownMessage() {
         return this._message.visible ? this._message.label.text : '';
-    }
-
-    _update() {
-        const owner = this._proxy.g_name_owner;
-        const get = name => owner ? this._proxy.get_cached_property(name)?.unpack() : null;
-        this._show(get('State') || NOT_RUNNING);
-        this._showRates(rates(get('RateUp') ?? 0, get('RateDown') ?? 0));
     }
 
     _show(state) {
@@ -257,9 +193,7 @@ class Indicator extends PanelMenu.Button {
     }
 
     destroy() {
-        this._cancellable.cancel();
-        this._proxy?.disconnectObject(this);
-        this._proxy = null;
+        this._daemon.disconnectObject(this);
         this.menu.disconnectObject(this);
         super.destroy();
     }
@@ -267,12 +201,15 @@ class Indicator extends PanelMenu.Button {
 
 export default class ShuttleExtension extends Extension {
     enable() {
-        this._indicator = new Indicator(this);
+        this._daemon = new Daemon();
+        this._indicator = new Indicator(this, this._daemon);
         Main.panel.addToStatusArea(this.uuid, this._indicator);
     }
 
     disable() {
         this._indicator?.destroy();
         this._indicator = null;
+        this._daemon?.destroy();
+        this._daemon = null;
     }
 }

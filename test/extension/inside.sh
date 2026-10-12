@@ -56,8 +56,9 @@ snap() {
 step "the extension, installed in this session's own data folder"
 dest=$XDG_DATA_HOME/gnome-shell/extensions/$uuid
 mkdir -p "$dest"
-cp -r "$root/extension/metadata.json" "$root/extension/extension.js" "$root/extension/stylesheet.css" \
-	"$root/extension/lib" "$root/extension/icons" "$dest/"
+# Everything the extension is made of, without its unit tests.
+cp -r "$root/extension/." "$dest/"
+rm -rf "${dest:?}/test"
 gsettings set org.gnome.shell enabled-extensions "['$uuid']"
 
 mkdir -p "$HOME/Documents" "$HOME/Pictures" "$tmp/share/docs" "$tmp/share/pics" "$XDG_CONFIG_HOME/shuttle"
