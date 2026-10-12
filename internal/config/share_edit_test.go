@@ -39,6 +39,28 @@ func TestSetShare(t *testing.T) {
 	}
 }
 
+// uid = 0 is root, and is written; an unset uid is not.
+func TestSetShareNFS(t *testing.T) {
+	root, users := uint32(0), uint32(100)
+	sh := &Share{Name: "nas", Type: ShareNFS3, Host: "nas.example", Export: "/e", MountPort: 892, UID: &root, GID: &users}
+	got := edit(t, "", setShare(sh))
+	want := "[shares.nas]\ntype = \"nfs3\"\nhost = \"nas.example\"\nmount_port = 892\nexport = \"/e\"\nuid = 0\ngid = 100\n"
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+	cfg, err := Parse([]byte(got), "/home/u")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back := cfg.Shares["nas"]; back.UID == nil || *back.UID != 0 || *back.GID != 100 || back.MountPort != 892 {
+		t.Errorf("read back as %+v", back)
+	}
+	sh.UID, sh.GID, sh.MountPort = nil, nil, 0
+	if got := edit(t, got, setShare(sh)); got != "[shares.nas]\ntype = \"nfs3\"\nhost = \"nas.example\"\nexport = \"/e\"\n" {
+		t.Errorf("unset again:\n%s", got)
+	}
+}
+
 func TestDeleteShare(t *testing.T) {
 	doc := "[shares.a]\ntype = \"path\"\npath = \"/a\"\n\n# The USB disk.\n[shares.b]\ntype = \"path\"\npath = \"/b\"\n"
 	if got := edit(t, doc, func(d *Doc) error { return d.DeleteShare("b") }); got != "[shares.a]\ntype = \"path\"\npath = \"/a\"\n" {

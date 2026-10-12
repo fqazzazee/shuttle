@@ -159,6 +159,12 @@ type Share struct {
 	Path   string // path: absolute mount point
 	User   string // smb
 	Domain string // smb
+	// MountPort is where an nfs3 server's mount service listens; 0 asks
+	// its portmapper.
+	MountPort int
+	// UID and GID are who an nfs3 server takes shuttle to be (AUTH_SYS);
+	// nil means the user running shuttle.
+	UID, GID *uint32
 }
 
 // Shuttle is one folder pair with its resolved settings.

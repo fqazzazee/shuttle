@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -44,6 +45,10 @@ type rawShare struct {
 	Path   string `toml:"path"`
 	User   string `toml:"user"`
 	Domain string `toml:"domain"`
+	// nfs3
+	MountPort int    `toml:"mount_port"`
+	UID       *int64 `toml:"uid"`
+	GID       *int64 `toml:"gid"`
 	// Decoded only to reject it with a useful message instead of "unknown key".
 	Password *string `toml:"password"`
 }
@@ -205,7 +210,7 @@ func (p *parser) share(name string, r *rawShare) Share {
 		p.errorf("%s.password: passwords are not stored in the config file; shuttle keeps them in the keyring", at)
 	}
 	s := Share{Name: name, Type: ShareType(r.Type), Host: r.Host, Port: r.Port, Share: r.Share,
-		Export: r.Export, Path: r.Path, User: r.User, Domain: r.Domain}
+		Export: r.Export, Path: r.Path, User: r.User, Domain: r.Domain, MountPort: r.MountPort}
 	need := func(key, val string) {
 		if val == "" {
 			p.errorf("%s: %s is required for type %q", at, key, r.Type)
@@ -229,10 +234,30 @@ func (p *parser) share(name string, r *rawShare) Share {
 	default:
 		p.errorf("%s.type: %q must be one of smb, nfs3, path", at, r.Type)
 	}
-	if r.Port < 0 || r.Port > 65535 {
-		p.errorf("%s.port: %d is not a valid port", at, r.Port)
+	for _, port := range []struct {
+		key string
+		n   int
+	}{{"port", r.Port}, {"mount_port", r.MountPort}} {
+		if port.n < 0 || port.n > 65535 {
+			p.errorf("%s.%s: %d is not a valid port", at, port.key, port.n)
+		}
 	}
+	s.UID = p.id(at+".uid", r.UID)
+	s.GID = p.id(at+".gid", r.GID)
 	return s
+}
+
+// id checks a user or group ID: AUTH_SYS sends it as 32 bits.
+func (p *parser) id(at string, v *int64) *uint32 {
+	if v == nil {
+		return nil
+	}
+	if *v < 0 || *v > math.MaxUint32 {
+		p.errorf("%s: %d is not a valid ID", at, *v)
+		return nil
+	}
+	id := uint32(*v)
+	return &id
 }
 
 func (p *parser) shuttle(name string, r *rawShuttle, profiles map[string]rawSettings, shares map[string]Share) (Shuttle, bool) {

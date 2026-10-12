@@ -352,6 +352,28 @@ remote = "nas:"`, "name must start with"},
 [shares.nas]
 type = "smb"
 share = "s"`, `host is required for type "smb"`},
+		{"nfs without export", `
+[shares.nas]
+type = "nfs3"
+host = "nas.example"`, `export is required for type "nfs3"`},
+		{"bad mount port", `
+[shares.nas]
+type = "nfs3"
+host = "nas.example"
+export = "/e"
+mount_port = 70000`, "shares.nas.mount_port: 70000 is not a valid port"},
+		{"negative uid", `
+[shares.nas]
+type = "nfs3"
+host = "nas.example"
+export = "/e"
+uid = -1`, "shares.nas.uid: -1 is not a valid ID"},
+		{"gid too large", `
+[shares.nas]
+type = "nfs3"
+host = "nas.example"
+export = "/e"
+gid = 4294967296`, "shares.nas.gid: 4294967296 is not a valid ID"},
 		{"bad share type", `
 [shares.nas]
 type = "ftp"`, `type: "ftp" must be one of`},
@@ -412,6 +434,32 @@ remote = "nas:/photos-old"
 `)
 }
 
+// An NFS share's user and group default to the user running shuttle, so
+// unset must stay apart from 0, which is root.
+func TestNFSShare(t *testing.T) {
+	cfg := parse(t, `
+[shares.a]
+type = "nfs3"
+host = "nas.example"
+export = "/volume1/home"
+mount_port = 892
+uid = 0
+gid = 100
+
+[shares.b]
+type = "nfs3"
+host = "nas.example"
+export = "/volume1/home"
+`)
+	a, b := cfg.Shares["a"], cfg.Shares["b"]
+	if a.MountPort != 892 || a.UID == nil || *a.UID != 0 || a.GID == nil || *a.GID != 100 {
+		t.Errorf("a = %+v", a)
+	}
+	if b.MountPort != 0 || b.UID != nil || b.GID != nil {
+		t.Errorf("b = %+v", b)
+	}
+}
+
 func TestAllErrorsReportedOnce(t *testing.T) {
 	_, err := Parse([]byte(minimalShare+`
 [profiles.p]
@@ -455,15 +503,26 @@ func TestReadmeExampleParses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, body, found := bytes.Cut(readme, []byte("```toml\n"))
-	if !found {
+	// Every block, each on its own; the first is the whole example.
+	var blocks []string
+	for rest := readme; ; {
+		var body []byte
+		var found bool
+		if _, rest, found = bytes.Cut(rest, []byte("```toml\n")); !found {
+			break
+		}
+		if body, rest, found = bytes.Cut(rest, []byte("```")); !found {
+			t.Fatal("a ```toml block in README.md is not closed")
+		}
+		blocks = append(blocks, string(body))
+	}
+	if len(blocks) == 0 {
 		t.Fatal("no ```toml block in README.md")
 	}
-	body, _, found = bytes.Cut(body, []byte("```"))
-	if !found {
-		t.Fatal("the ```toml block in README.md is not closed")
+	for _, b := range blocks {
+		parse(t, b)
 	}
-	cfg := parse(t, string(body))
+	cfg := parse(t, blocks[0])
 	if s, ok := cfg.Shuttle("documents"); !ok || s.Local != home+"/Documents" || s.Settings.Mode != ModeSync {
 		t.Errorf("README example resolves to %+v", s)
 	}

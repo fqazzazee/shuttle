@@ -12,19 +12,20 @@ shuttle keeps folders on your machine and folders on a NAS or file server in ste
 folder pair (a *shuttle*) is a one-way push, a one-way pull, or a two-way sync, and runs in
 real time, on a schedule, when the share comes online, or only when you ask. Settings such
 as conflict handling, deletions and file versioning come from reusable *profiles*, which a
-shuttle can override one setting at a time. It talks SMB directly (NFSv3 is planned), so it needs
-no root, fstab entries or mounts.
+shuttle can override one setting at a time. It talks SMB and NFSv3 directly, so it needs no
+root, fstab entries or mounts.
 
 It is not a cloud sync client, a backup tool with deduplication, or a peer-to-peer system
 like Syncthing.
 
 ## Status
 
-Early, but usable from the command line: the sync engine, SMB shares, the keyring and the
-background service work and are tested against a real Samba server. Still to come:
+Early, but usable from the command line: the sync engine, SMB and NFSv3 shares, the keyring and
+the background service work. SMB is tested against a real Samba server, NFS so far against an
+in-process test server. Still to come:
 
 1. Terminal UI (until then: edit the config file, use the commands below)
-2. NFSv3 backend, plus already-mounted paths for NFSv4-only servers
+2. NFS tested against the Linux kernel server: NFSv3 directly, NFSv4 through a mount
 3. GNOME Shell 50 extension: indicator and Quick Settings toggle
 4. Packages: RPM (Fedora COPR), DEB, extensions.gnome.org
 
@@ -80,6 +81,28 @@ keeps their passwords in the keyring. For a share written by hand, store its pas
 secret-tool store --label "shuttle: smb://you@nas.example/home" \
     service shuttle username "smb://you@nas.example/home"
 ```
+
+An NFSv3 export needs no password:
+
+```toml
+[shares.media]
+type = "nfs3"
+host = "nas.example"
+export = "/volume1/media"
+# uid = 1000    # who the server takes you to be: your own user and group IDs if left out
+# gid = 1000
+```
+
+NFSv3 trusts the network. The server believes whatever user and group IDs a client sends, so
+any machine that can reach the export can read and write as anyone. Export only to the machines
+that should have it.
+
+shuttle runs as you, not as root, so it connects from a port above 1024. Linux servers refuse
+that unless the export has `insecure` in `/etc/exports`; on a Synology, tick "Allow connections
+from non-privileged ports". shuttle finds the server's NFS and mount services through its
+portmapper (port 111); for a server whose firewall opens only those, set `port` and `mount_port`.
+A server that speaks only NFSv4 has no mount service: mount it the usual way and add the mount
+point as a share with `type = "path"` and `path = "/mnt/media"`.
 
 Then start the service with your desktop session:
 

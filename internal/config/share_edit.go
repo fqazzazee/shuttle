@@ -10,7 +10,7 @@ import (
 // shareKeys are the keys each type of share uses, besides type.
 var shareKeys = map[ShareType][]string{
 	ShareSMB:  {"host", "port", "share", "user", "domain"},
-	ShareNFS3: {"host", "port", "export"},
+	ShareNFS3: {"host", "port", "mount_port", "export", "uid", "gid"},
 	SharePath: {"path"},
 }
 
@@ -24,17 +24,31 @@ func (d *Doc) SetShare(sh *Share) error {
 	if !ok {
 		return fmt.Errorf("share %s: unknown type %q", sh.Name, sh.Type)
 	}
-	values := map[string]any{
-		"host": sh.Host, "share": sh.Share, "export": sh.Export, "path": sh.Path,
-		"user": sh.User, "domain": sh.Domain, "port": sh.Port,
+	// Only the keys that are set: uid = 0 is root, not "unset".
+	values := map[string]any{}
+	for key, v := range map[string]string{"host": sh.Host, "share": sh.Share, "export": sh.Export,
+		"path": sh.Path, "user": sh.User, "domain": sh.Domain} {
+		if v != "" {
+			values[key] = v
+		}
+	}
+	for key, v := range map[string]int{"port": sh.Port, "mount_port": sh.MountPort} {
+		if v != 0 {
+			values[key] = v
+		}
+	}
+	for key, v := range map[string]*uint32{"uid": sh.UID, "gid": sh.GID} {
+		if v != nil {
+			values[key] = int64(*v)
+		}
 	}
 	table := []string{"shares", sh.Name}
 	if err := d.Set(table, "type", string(sh.Type)); err != nil {
 		return err
 	}
-	for _, key := range []string{"host", "port", "share", "export", "path", "user", "domain"} {
-		v := values[key]
-		if v == "" || v == 0 || !slices.Contains(uses, key) {
+	for _, key := range []string{"host", "port", "mount_port", "share", "export", "uid", "gid", "path", "user", "domain"} {
+		v, ok := values[key]
+		if !ok || !slices.Contains(uses, key) {
 			if err := d.Delete(table, key); err != nil {
 				return err
 			}

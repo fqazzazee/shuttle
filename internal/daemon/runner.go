@@ -321,7 +321,10 @@ func pairOf(cfg *config.Config, s *config.Shuttle) string {
 		// SMB names are case-insensitive: host, share, user and domain.
 		server = strings.ToLower(fmt.Sprintf("smb://%s;%s@%s:%d/%s", sh.Domain, sh.User, sh.Host, cmp.Or(sh.Port, 445), sh.Share))
 	case config.ShareNFS3:
-		server = fmt.Sprintf("nfs://%s:%d%s", strings.ToLower(sh.Host), cmp.Or(sh.Port, 2049), sh.Export)
+		// The IDs as sent: a uid spelled out that is the user's own is the
+		// same user.
+		uid, gid, _ := shares.NFSUser(&sh)
+		server = fmt.Sprintf("nfs://%d:%d@%s:%d%s", uid, gid, strings.ToLower(sh.Host), cmp.Or(sh.Port, 2049), sh.Export)
 	default:
 		server = "path:" + sh.Path
 	}

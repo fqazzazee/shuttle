@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -42,7 +43,10 @@ var (
 			nameField, typeField,
 			{"host", "Host", "the server's name or address"},
 			{"export", "Export", "the exported path on the server, e.g. /volume1/home"},
-			{"port", "Port", "optional"},
+			{"uid", "User ID", fmt.Sprintf("optional: yours (%d) if empty; the server believes it as sent", os.Getuid())},
+			{"gid", "Group ID", fmt.Sprintf("optional: yours (%d) if empty", os.Getgid())},
+			{"port", "Port", "optional: found through the server's portmapper, else 2049"},
+			{"mount_port", "Mount port", "optional: found through the server's portmapper"},
 		},
 		config.SharePath: {
 			nameField, typeField,
@@ -70,11 +74,19 @@ func (m *model) openForm(sh *config.Share) tea.Cmd {
 		f.typ = sh.Type
 		values = map[string]string{"name": sh.Name, "host": sh.Host, "share": sh.Share, "user": sh.User,
 			"domain": sh.Domain, "export": sh.Export, "path": sh.Path}
-		if sh.Port != 0 {
-			values["port"] = strconv.Itoa(sh.Port)
+		for key, n := range map[string]int{"port": sh.Port, "mount_port": sh.MountPort} {
+			if n != 0 {
+				values[key] = strconv.Itoa(n)
+			}
+		}
+		for key, id := range map[string]*uint32{"uid": sh.UID, "gid": sh.GID} {
+			if id != nil {
+				values[key] = strconv.FormatUint(uint64(*id), 10)
+			}
 		}
 	}
-	for _, key := range []string{"name", "host", "share", "user", "password", "domain", "port", "export", "path"} {
+	for _, key := range []string{"name", "host", "share", "user", "password", "domain", "port", "mount_port",
+		"export", "uid", "gid", "path"} {
 		in := textinput.New()
 		in.Prompt = ""
 		in.SetWidth(40)
@@ -189,18 +201,50 @@ func (f *shareForm) share() (config.Share, error) {
 		if p, ok := set[fl.key]; ok {
 			*p = v(fl.key)
 		}
-		if fl.key == "port" && v("port") != "" {
-			port, err := strconv.Atoi(v("port"))
-			if err != nil {
-				return sh, fmt.Errorf("the port must be a number, not %q", v("port"))
-			}
-			sh.Port = port
+		var err error
+		switch fl.key {
+		case "port":
+			sh.Port, err = number(fl, v(fl.key))
+		case "mount_port":
+			sh.MountPort, err = number(fl, v(fl.key))
+		case "uid":
+			sh.UID, err = id(fl, v(fl.key))
+		case "gid":
+			sh.GID, err = id(fl, v(fl.key))
+		}
+		if err != nil {
+			return sh, err
 		}
 	}
 	if sh.Name == "" {
 		return sh, errors.New("the share needs a name")
 	}
 	return sh, nil
+}
+
+// number reads an optional port; empty is 0.
+func number(fl field, s string) (int, error) {
+	if s == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, fmt.Errorf("the %s must be a number, not %q", strings.ToLower(fl.label), s)
+	}
+	return n, nil
+}
+
+// id reads an optional user or group ID; empty is nil, as 0 is root.
+func id(fl field, s string) (*uint32, error) {
+	if s == "" {
+		return nil, nil
+	}
+	n, err := strconv.ParseUint(s, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("the %s must be a number from 0 to 4294967295, not %q", strings.ToLower(fl.label), s)
+	}
+	v := uint32(n)
+	return &v, nil
 }
 
 // saveForm checks the share against the whole config, stores its password,
@@ -295,9 +339,9 @@ func (f *shareForm) lines(width int) []string {
 		default:
 			value = f.inputs[fl.key].View()
 		}
-		label := "  " + pad(fl.label, 10)
+		label := "  " + pad(fl.label, 12)
 		if fl.key == f.focus {
-			label = "› " + pad(fl.label, 10)
+			label = "› " + pad(fl.label, 12)
 		}
 		hint := ""
 		if fl.key == f.focus {
