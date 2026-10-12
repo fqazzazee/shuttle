@@ -14,6 +14,19 @@ import (
 	"github.com/fqazzazee/shuttle/internal/engine"
 )
 
+// Bus is shuttle's icon in text, for the terminal: the front of a shuttle
+// bus with the sync arrows on its destination sign, as the app icon has
+// them. One character per column, so it lines up in any monospace font.
+var Bus = []string{
+	"  .----------.",
+	"  |  [ ⇄  ]  |",
+	" =| .------. |=",
+	"  | |      | |",
+	"  | '------' |",
+	"  | o  ==  o |",
+	"  '-[]----[]-'",
+}
+
 // ModeArrow is a mode as an arrow: → push, ← pull, ↔ sync.
 func ModeArrow(m config.Mode) string {
 	switch m {

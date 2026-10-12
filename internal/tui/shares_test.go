@@ -15,6 +15,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
@@ -395,8 +396,8 @@ func TestTestAndDeleteShares(t *testing.T) {
 
 func TestSharesWithoutAConfig(t *testing.T) {
 	m, _, _ := sharesTab(t, "")
-	if !strings.Contains(screen(m), "No shares yet: n adds one.") {
-		t.Errorf("no config:\n%s", screen(m))
+	if s := screen(m); !strings.Contains(s, "No shares yet: n adds one.") || !strings.Contains(s, present.Bus[1]) {
+		t.Errorf("no config:\n%s", s)
 	}
 	press(t, m, "n")
 	typeIn(t, m, "usb")

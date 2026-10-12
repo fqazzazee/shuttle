@@ -25,6 +25,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/notify"
+	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 	"github.com/fqazzazee/shuttle/internal/terminal"
 )
@@ -155,6 +156,7 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 }
 
 func usage(w io.Writer) {
+	fmt.Fprintln(w, strings.Join(present.Bus, "\n")+"\n")
 	fmt.Fprint(w, `Usage: shuttle [<command>]
 
 Without a command, in a terminal: the TUI.

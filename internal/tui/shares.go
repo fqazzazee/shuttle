@@ -220,7 +220,7 @@ func (m *model) sharesLines(room int) []string {
 	}
 	names := m.shareNames()
 	if len(names) == 0 {
-		return []string{"No shares yet: n adds one."}
+		return withBus("No shares yet: n adds one.")
 	}
 	nameWidth, whereWidth := len("NAME"), len("WHERE")
 	for _, n := range names {
