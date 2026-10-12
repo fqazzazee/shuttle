@@ -5,6 +5,8 @@ package fsys_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -44,6 +46,11 @@ func newSMB(t *testing.T) *fsys.SMB {
 		t.Fatal(err)
 	}
 	root.Close()
+	// Removed through the share's folder on this machine, when the test
+	// knows it (make test-integration does): fsys removes only empty folders.
+	if dir := os.Getenv("SHUTTLE_TEST_SMB_DIR"); dir != "" {
+		t.Cleanup(func() { os.RemoveAll(filepath.Join(dir, folder)) })
+	}
 
 	o := smbOptions(t)
 	o.Folder = folder
