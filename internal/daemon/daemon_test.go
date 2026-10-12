@@ -39,8 +39,8 @@ type fixture struct {
 	runs         int // how many times a shuttle entered StateRunning
 	ended        int // how many runs of s ended, by their LastRun
 	lastEnd      time.Time
-	last         State   // the state of the last change seen
-	events       []Event // what the daemon would notify, in order
+	last         map[string]State // each shuttle's state in the last change seen
+	events       []Event          // what the daemon would notify, in order
 }
 
 // newFixture writes a config with one shuttle, s, between local and the
@@ -127,7 +127,9 @@ func (f *fixture) stop() {
 func (f *fixture) onChange(st *Status) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if st.State == StateRunning && f.last != StateRunning {
+	// Per shuttle, as other shuttles' changes come in between. A run
+	// publishes its progress as it goes: only its first "running" has none.
+	if st.State == StateRunning && st.Progress.Phase == "" && f.last[st.Name] != StateRunning {
 		f.runs++
 	}
 	// Not by state changes: the share probe publishes too, and a snapshot it
@@ -136,7 +138,10 @@ func (f *fixture) onChange(st *Status) {
 		f.lastEnd = st.LastRun
 		f.ended++
 	}
-	f.last = st.State
+	if f.last == nil {
+		f.last = map[string]State{}
+	}
+	f.last[st.Name] = st.State
 }
 
 func (f *fixture) runCount() int {

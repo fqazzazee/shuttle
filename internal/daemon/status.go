@@ -39,6 +39,8 @@ type Status struct {
 	Conflicts       []engine.Issue // as settled or held by the conflict policy
 	HeldDeletions   int            // deletions the guard is holding back
 	Errors          []engine.Issue // paths the last run could not handle
+
+	Progress Progress // of the run in progress
 }
 
 // held reports whether something waits for the user's decision.

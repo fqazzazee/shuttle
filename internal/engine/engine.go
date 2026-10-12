@@ -67,6 +67,8 @@ type Options struct {
 	// progress (a whole file copy, say) always finishes; the run then returns
 	// ErrStopped. Pausing and shutting down use this.
 	Stop func() bool
+	// Tracker, if set, follows the run's progress as it goes.
+	Tracker *Tracker
 	// OnAction, if set, is called after each action with its outcome: nil when
 	// it was carried out, an error wrapping ErrChanged when it was skipped.
 	OnAction func(a *Action, err error)
@@ -170,7 +172,7 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	local, remote, err := scanBoth(ctx, o.Local, o.Remote, ignored)
+	local, remote, err := scanBoth(ctx, o.Local, o.Remote, ignored, o.Tracker)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +192,7 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	if err != nil {
 		return res, err
 	}
-	local, remote, err := scanBoth(ctx, o.Local, o.Remote, ignored)
+	local, remote, err := scanBoth(ctx, o.Local, o.Remote, ignored, o.Tracker)
 	if err != nil {
 		return res, err
 	}
@@ -208,6 +210,7 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	e := newExecutor(ctx, o, res)
 	e.removeStaleTemps(o.Local, local.temps)
 	e.removeStaleTemps(o.Remote, remote.temps)
+	o.Tracker.phase(PhaseComparing, countOps(actions, func(a *Action) bool { return a.Op == OpCompare }), 0)
 	if err := e.compareAll(actions); err != nil {
 		return res, err
 	}
@@ -221,6 +224,7 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 			return res, e.flush() // records of identical files found by compares
 		}
 	}
+	o.Tracker.phase(PhaseSyncing, countOps(actions, counts), copyBytes(actions))
 	if err := e.run(actions); err != nil {
 		return res, err
 	}

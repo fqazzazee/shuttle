@@ -48,7 +48,14 @@ func (e *executor) run(actions []Action) error {
 		if e.o.Stop != nil && e.o.Stop() {
 			return errors.Join(ErrStopped, e.flush())
 		}
+		track := counts(a)
+		if track {
+			e.o.Tracker.update(func(p *Progress) { p.Path = a.Path })
+		}
 		err := e.do(a)
+		if track {
+			e.o.Tracker.update(func(p *Progress) { p.Done, p.Path = p.Done+1, "" })
+		}
 		e.report(a, err)
 		if len(e.pending) >= flushEvery || e.now().Sub(e.lastFlush) >= flushInterval {
 			if err := e.flush(); err != nil {
@@ -125,13 +132,14 @@ func (e *executor) mkdir(a *Action, toRemote bool) error {
 
 func (e *executor) copy(a *Action, toRemote bool) error {
 	_, srcInfo, dstInfo := e.sides(a, toRemote)
-	return e.copyFile(a.Path, toRemote, srcInfo, dstInfo)
+	return e.copyFile(a.Path, toRemote, srcInfo, dstInfo, true)
 }
 
 // copyFile copies p from one side to the other. srcInfo and dstInfo are what
 // the two sides are expected to hold (dstInfo nil: nothing); if either side
-// no longer matches, nothing is written.
-func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.FileInfo) error {
+// no longer matches, nothing is written. A planned copy counts towards the
+// run's progress; a conflict's copies do not.
+func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.FileInfo, planned bool) error {
 	src, dst := e.o.Remote, e.o.Local
 	if toRemote {
 		src, dst = e.o.Local, e.o.Remote
@@ -162,7 +170,7 @@ func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.File
 		}
 	}
 	h := sha256.New()
-	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(e.limit(r, toRemote), h), srcInfo.ModTime)
+	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(e.limit(r, toRemote, planned), h), srcInfo.ModTime)
 	r.Close()
 	if err != nil {
 		if kept != "" {
@@ -242,7 +250,9 @@ func (e *executor) compareAll(actions []Action) error {
 		if err := e.ctx.Err(); err != nil {
 			return err
 		}
+		e.o.Tracker.update(func(p *Progress) { p.Path = a.Path })
 		err := e.compare(a)
+		e.o.Tracker.update(func(p *Progress) { p.Done, p.Path = p.Done+1, "" })
 		if err != nil {
 			// Unreadable or changed since the scan: leave it for the next run.
 			e.report(a, err)
@@ -306,7 +316,7 @@ func (e *executor) hash(f fsys.FS, p string) ([]byte, error) {
 	h := sha256.New()
 	var src io.Reader = r
 	if f == e.o.Remote {
-		src = e.limit(r, false) // reading the share counts as download
+		src = e.limit(r, false, false) // reading the share counts as download
 	}
 	if _, err := io.Copy(h, src); err != nil {
 		return nil, err

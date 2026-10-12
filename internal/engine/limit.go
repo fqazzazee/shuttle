@@ -76,8 +76,12 @@ func (c *Cap) Limits() Limits {
 }
 
 // limit paces r by this shuttle's limit and the shared cap, for a transfer
-// towards the share when up is set.
-func (e *executor) limit(r io.Reader, up bool) io.Reader {
+// towards the share when up is set. It also counts the transfer towards the
+// run's progress, and as copied contents when copied is set.
+func (e *executor) limit(r io.Reader, up, copied bool) io.Reader {
+	if e.o.Tracker != nil {
+		r = &counted{r: r, t: e.o.Tracker, up: up, copied: copied}
+	}
 	var ls []*Limiter
 	for _, l := range []Limits{e.own, e.o.Cap.Limits()} {
 		x := l.Down

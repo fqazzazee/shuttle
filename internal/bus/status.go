@@ -47,12 +47,26 @@ func encode(st *daemon.Status) map[string]dbus.Variant {
 		"HeldDeletions": dbus.MakeVariant(u32(st.HeldDeletions)),
 		"Conflicts":     dbus.MakeVariant(issues(st.Conflicts)),
 		"Errors":        dbus.MakeVariant(issues(st.Errors)),
+		// The run in progress; zero when not running.
+		"Phase":      dbus.MakeVariant(string(st.Progress.Phase)),
+		"Done":       dbus.MakeVariant(u32(st.Progress.Done)),
+		"Total":      dbus.MakeVariant(u32(st.Progress.Total)),
+		"Bytes":      dbus.MakeVariant(u64(st.Progress.Bytes)),
+		"TotalBytes": dbus.MakeVariant(u64(st.Progress.TotalBytes)),
+		"Path":       dbus.MakeVariant(st.Progress.Path),
+		"RateUp":     dbus.MakeVariant(u64(st.Progress.RateUp)),
+		"RateDown":   dbus.MakeVariant(u64(st.Progress.RateDown)),
 	}
 }
 
 // u32 clamps a count into the bus's unsigned 32-bit integers.
 func u32(n int) uint32 {
 	return uint32(min(max(n, 0), math.MaxUint32)) //nolint:gosec // clamped on this line
+}
+
+// u64 clamps a byte count or rate into the bus's unsigned 64-bit integers.
+func u64(n int64) uint64 {
+	return uint64(max(n, 0)) //nolint:gosec // clamped on this line
 }
 
 // decode is encode's inverse. Missing or mistyped keys stay zero, so a
@@ -81,6 +95,21 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	get("HeldDeletions", &held)
 	get("Conflicts", &conflicts)
 	get("Errors", &errs)
+	var phase string
+	var done, total uint32
+	var bytes, totalBytes, rateUp, rateDown uint64
+	get("Phase", &phase)
+	get("Done", &done)
+	get("Total", &total)
+	get("Bytes", &bytes)
+	get("TotalBytes", &totalBytes)
+	get("Path", &st.Progress.Path)
+	get("RateUp", &rateUp)
+	get("RateDown", &rateDown)
+	st.Progress.Phase = engine.Phase(phase)
+	st.Progress.Done, st.Progress.Total = int(done), int(total)
+	st.Progress.Bytes, st.Progress.TotalBytes = s64(bytes), s64(totalBytes)
+	st.Progress.RateUp, st.Progress.RateDown = s64(rateUp), s64(rateDown)
 	st.State = daemon.State(state)
 	if lastRun != 0 {
 		st.LastRun = time.Unix(lastRun, 0)
@@ -96,4 +125,8 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 		st.Errors = append(st.Errors, engine.Issue{Path: i.Path, Reason: i.Reason, Outcome: i.Outcome})
 	}
 	return st
+}
+
+func s64(n uint64) int64 {
+	return int64(min(n, math.MaxInt64)) //nolint:gosec // clamped on this line
 }

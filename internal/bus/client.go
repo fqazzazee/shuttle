@@ -112,6 +112,19 @@ func (c *Client) State(ctx context.Context) (daemon.State, bool, error) {
 	return daemon.State(state), paused, nil
 }
 
+// Rates returns every shuttle's transfer rates together, to and from their
+// shares, in bytes per second.
+func (c *Client) Rates(ctx context.Context) (up, down int64, err error) {
+	var u, d uint64
+	if err := c.obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, Interface, "RateUp").Store(&u); err != nil {
+		return 0, 0, clientErr(err)
+	}
+	if err := c.obj.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, Interface, "RateDown").Store(&d); err != nil {
+		return 0, 0, clientErr(err)
+	}
+	return s64(u), s64(d), nil
+}
+
 // Changes streams status changes until ctx is done.
 func (c *Client) Changes(ctx context.Context) (<-chan daemon.Status, error) {
 	if err := c.conn.AddMatchSignalContext(ctx,

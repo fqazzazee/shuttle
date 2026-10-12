@@ -30,7 +30,7 @@ type scanned struct {
 // left out and returned separately so the run can report them.
 // Paths the ignore patterns match are left out too, and an ignored folder is
 // not descended into.
-func scan(ctx context.Context, f fsys.FS, side string, ignored *ignore.Matcher) (scanned, error) {
+func scan(ctx context.Context, f fsys.FS, side string, ignored *ignore.Matcher, t *Tracker) (scanned, error) {
 	out := scanned{entries: map[string]fsys.FileInfo{}}
 	err := fsys.ScanTree(ctx, f, ".", scanWorkers, func(info fsys.FileInfo) error {
 		switch {
@@ -48,6 +48,7 @@ func scan(ctx context.Context, f fsys.FS, side string, ignored *ignore.Matcher) 
 			out.unsupported = append(out.unsupported, side+": "+info.Name)
 		default:
 			out.entries[info.Name] = info
+			t.update(func(p *Progress) { p.Done++ })
 		}
 		return nil
 	})
@@ -56,13 +57,14 @@ func scan(ctx context.Context, f fsys.FS, side string, ignored *ignore.Matcher) 
 }
 
 // scanBoth scans both sides at once; the remote side is usually the slow one.
-func scanBoth(ctx context.Context, local, remote fsys.FS, ignored *ignore.Matcher) (l, r scanned, err error) {
+func scanBoth(ctx context.Context, local, remote fsys.FS, ignored *ignore.Matcher, t *Tracker) (l, r scanned, err error) {
 	var (
 		wg         sync.WaitGroup
 		lErr, rErr error
 	)
-	wg.Go(func() { l, lErr = scan(ctx, local, "local", ignored) })
-	wg.Go(func() { r, rErr = scan(ctx, remote, "remote", ignored) })
+	t.phase(PhaseScanning, 0, 0)
+	wg.Go(func() { l, lErr = scan(ctx, local, "local", ignored, t) })
+	wg.Go(func() { r, rErr = scan(ctx, remote, "remote", ignored, t) })
 	wg.Wait()
 	if lErr != nil {
 		return l, r, fmt.Errorf("scanning local folder: %w", lErr)
