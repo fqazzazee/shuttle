@@ -32,6 +32,7 @@ type rawFile struct {
 
 type rawGlobal struct {
 	Bandwidth *rawBandwidth `toml:"bandwidth"`
+	Terminal  *string       `toml:"terminal"`
 }
 
 type rawShare struct {
@@ -124,6 +125,12 @@ func Parse(data []byte, home string) (*Config, error) {
 		Profiles: slices.Sorted(maps.Keys(raw.Profiles)),
 	}
 	cfg.Bandwidth = layerBandwidth(Bandwidth{}, raw.Global.Bandwidth, nil, SourceDefault)
+	if t := raw.Global.Terminal; t != nil {
+		cfg.Terminal = strings.Fields(*t)
+		if len(cfg.Terminal) == 0 {
+			p.errorf("global.terminal: empty; leave it out to use the first terminal found")
+		}
+	}
 
 	for _, name := range slices.Sorted(maps.Keys(raw.Shares)) {
 		// Kept even when invalid (its errors are already recorded), so shuttles

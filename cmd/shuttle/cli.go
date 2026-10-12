@@ -3,6 +3,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -185,8 +186,14 @@ func details(st *daemon.Status) string {
 	return strings.Join(parts, "; ")
 }
 
-// runTUI runs the TUI against the daemon on the session bus.
-func runTUI(ctx context.Context, stderr io.Writer) int {
+// runTUI runs the TUI against the daemon on the session bus, on the named
+// tab ("" for the first).
+func runTUI(ctx context.Context, tab string, stderr io.Writer) int {
+	first, ok := tui.Tab(cmp.Or(tab, "shuttles"))
+	if !ok {
+		fmt.Fprintf(stderr, "shuttle open: no tab %q: shuttles, conflicts, activity, profiles or shares\n", tab)
+		return 2
+	}
 	c, err := bus.Connect()
 	if err != nil {
 		fmt.Fprintf(stderr, "shuttle: connecting to the session bus: %v\n", err)
@@ -203,7 +210,7 @@ func runTUI(ctx context.Context, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "shuttle: %v\n", err)
 		return 1
 	}
-	o := tui.Options{Config: paths.Config, Home: home, Store: secrets.SecretService(), Test: shares.Test,
+	o := tui.Options{Config: paths.Config, Home: home, Store: secrets.SecretService(), Test: shares.Test, Tab: first,
 		Browse: func(ctx context.Context, share *config.Share, store secrets.Store) (fsys.FS, error) {
 			return shares.OpenShare(ctx, share, ".", store)
 		}}

@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Shuttle
+GenericName=Folder Sync
+Comment=Push, pull and sync folders with network shares
+Exec=@BINDIR@/shuttle open
+Terminal=true
+Icon=emblem-synchronizing-symbolic
+Categories=Network;FileTransfer;
+Keywords=sync;smb;nfs;nas;share;backup;
+StartupNotify=false
+Actions=conflicts;activity;
+
+[Desktop Action conflicts]
+Name=Conflicts
+Exec=@BINDIR@/shuttle open conflicts
+
+[Desktop Action activity]
+Name=Activity
+Exec=@BINDIR@/shuttle open activity

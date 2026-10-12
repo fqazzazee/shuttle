@@ -192,3 +192,61 @@ func TestSendNeverBlocks(t *testing.T) {
 		t.Fatal("Send blocked")
 	}
 }
+
+// Notifications that wait for the user have an "Open shuttle" button,
+// which opens the TUI on the Conflicts tab.
+func TestOpenShuttleButton(t *testing.T) {
+	connect := dbustest.Bus(t)
+	opened := make(chan string, 4)
+	n := New(nil)
+	n.Open = func(tab string) { opened <- tab }
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { n.Run(ctx, connect()); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	srv, err := notifytest.Serve(connect(), false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	n.Send(&daemon.Event{Kind: daemon.EventConflicts, Shuttle: "docs", Conflicts: []engine.Issue{{Path: "a", Outcome: "held"}}})
+	n.Send(&daemon.Event{Kind: daemon.EventConflicts, Shuttle: "docs", Conflicts: []engine.Issue{{Path: "b", Outcome: "kept both: ..."}}})
+	n.Send(&daemon.Event{Kind: daemon.EventDeletionsHeld, Shuttle: "docs", HeldDeletions: 12})
+	n.Send(&daemon.Event{Kind: daemon.EventError, Shuttle: "docs", Error: "boom"})
+	notes := waitNotes(t, srv, 4)
+	button := []string{"open", "Open shuttle"}
+	for i, want := range [][]string{button, {}, button, {}} {
+		if got := notes[i].Actions; strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("%s: actions %q, want %q", notes[i].Summary, got, want)
+		}
+	}
+
+	click := func(id uint32, action string) {
+		t.Helper()
+		if err := srv.Invoke(id, action); err != nil {
+			t.Fatal(err)
+		}
+	}
+	click(notes[1].ID, "open")    // no button: nothing
+	click(notes[0].ID, "default") // the notification itself: nothing
+	click(notes[0].ID, "open")
+	select {
+	case tab := <-opened:
+		if tab != "conflicts" {
+			t.Errorf("opened %q", tab)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the button opened nothing")
+	}
+	click(notes[2].ID, "open")
+	select {
+	case <-opened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("held deletions' button opened nothing")
+	}
+	select {
+	case tab := <-opened:
+		t.Errorf("opened %q for a click that should open nothing", tab)
+	case <-time.After(100 * time.Millisecond):
+	}
+}

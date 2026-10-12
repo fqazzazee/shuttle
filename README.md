@@ -89,7 +89,11 @@ systemctl --user enable --now shuttle
 ```
 
 The service shows desktop notifications when a run fails, meets conflicts or holds back
-deletions, when a run completes, and when a share is lost or comes back. Each has a switch
+deletions, when a run completes, and when a share is lost or comes back. Those that wait for
+you have an "Open shuttle" button, which opens the terminal interface on its Conflicts tab. It
+uses the first terminal it finds (`xdg-terminal-exec`, Ptyxis, GNOME Console, GNOME Terminal,
+Konsole, …); to choose one, add `[global] terminal = "ptyxis --new-window --"` to the config:
+the command that runs another in a new window. Each has a switch
 under `notify`, all on by default except "completed" for real-time shuttles. A run you
 did not ask for is only announced when it changed something.
 

@@ -46,7 +46,12 @@ mkdir -p ~/.local/share/systemd/user ~/.config/shuttle
 sed 's|@BINDIR@|/opt/shuttle|g' /opt/shuttle/shuttle.service.in >~/.local/share/systemd/user/shuttle.service
 mkdir -p ~/m ~/rt ~/sch ~/sa "$share/m" "$share/rt" "$share/sch" # not "$share/sa": it comes online later
 mkdir -p ~/c ~/u "$share/c" "$share/e" "$share/q" ~/usb/u          # not ~/e or ~/q: their runs fail
+# Stands in for a terminal for "Open shuttle": notes what it was asked to run.
+printf '#!/bin/sh\necho "$@" >>"$HOME/terminal"\n' >~/fake-term && chmod +x ~/fake-term
 cat >~/.config/shuttle/config.toml <<EOF
+[global]
+terminal = "$HOME/fake-term"
+
 [shares.disk]
 type = "path"
 path = "$share"
@@ -240,6 +245,16 @@ grep -q '^enabled' ~/.config/shuttle/config.toml && fail "enable left the enable
 wait_for "n enabled in shuttle status" 10 sh -c "\"$shuttle\" status | grep -q '^n  *idle'"
 [ "$(prop MainPID)" = "$pid" ] || fail "the daemon restarted for enable or disable"
 echo "disabled and enabled n, config back byte for byte"
+
+step "Open shuttle: a conflict waiting for you opens the TUI on it, in a terminal"
+mkdir -p ~/k "$share/k"
+echo mine >~/k/a; echo theirs >"$share/k/a"
+printf '\n[shuttles.k]\nmode = "sync"\nlocal = "~/k"\nremote = "disk:/k"\nconflicts = "ask"\n' >>~/.config/shuttle/config.toml
+wait_for "k in shuttle status" 10 sh -c "\"$shuttle\" status | grep -q '^k '"
+"$shuttle" sync k
+wait_for "the conflict's notification, clicked" 10 note '^clicked\|k: 1 conflict\|open$'
+wait_for "the terminal asked to open shuttle" 10 grep -qx '/opt/shuttle/shuttle open conflicts' ~/terminal
+echo "the button ran: $(cat ~/terminal)"
 
 step "a broken config: exit 78, and no restarts"
 sed -i 's/mode = "push"/mode = "both"/' ~/.config/shuttle/config.toml

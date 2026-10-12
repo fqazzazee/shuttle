@@ -30,6 +30,8 @@ func TestRun(t *testing.T) {
 		{"version flag", []string{"--version"}, 0, "shuttle dev\n", ""},
 		{"help", []string{"help"}, 0, "Usage: shuttle", ""},
 		{"no args", nil, 2, "", "Usage: shuttle"},
+		{"open, not in a terminal", []string{"open", "conflicts"}, 2, "", "the TUI needs a terminal"},
+		{"open, too many", []string{"open", "a", "b"}, 2, "", "wrong arguments"},
 		{"unknown", []string{"bogus"}, 2, "", `unknown command "bogus"`},
 	}
 	for _, tt := range tests {
