@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 )
 
@@ -45,10 +46,15 @@ type model struct {
 	failed    bool
 	messageAt time.Time
 
-	conflictSel string               // the selected row of the Conflicts tab, by item key
-	resolving   map[string]bool      // rows resolved, until they are gone from the list
-	question    string               // a question waiting for y or n
-	then        func() tea.Cmd       // what y does
+	conflictSel string          // the selected row of the Conflicts tab, by item key
+	resolving   map[string]bool // rows resolved, until they are gone from the list
+	question    string          // a question waiting for y or n
+	then        func() tea.Cmd  // what y does
+
+	filter      string           // the Activity tab's shuttle; "" for all
+	entries     []activity.Entry // newest first; nil until the daemon answers
+	scroll      int              // the first entry shown
+	activityErr error
 	changes     <-chan daemon.Status // nil until subscribed
 }
 
@@ -164,10 +170,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, next(m.changes)
 	case tickMsg:
 		cmds := []tea.Cmd{m.refresh(), m.tick()}
+		if m.tab == tabActivity {
+			cmds = append(cmds, m.loadActivity())
+		}
 		if m.changes == nil {
 			cmds = append(cmds, m.subscribe())
 		}
 		return m, tea.Batch(cmds...)
+	case activityMsg:
+		m.gotActivity(msg)
 	case resolvedMsg:
 		m.say(msg.text, msg.err != nil)
 		if msg.err != nil {
@@ -243,14 +254,11 @@ func (m *model) key(k string) tea.Cmd {
 		m.help = false
 		return nil
 	case "1", "2", "3", "4", "5":
-		m.tab, m.help = int(k[0]-'1'), false
-		return nil
+		return m.toTab(int(k[0] - '1'))
 	case "tab":
-		m.tab = (m.tab + 1) % len(tabNames)
-		return nil
+		return m.toTab((m.tab + 1) % len(tabNames))
 	case "shift+tab":
-		m.tab = (m.tab + len(tabNames) - 1) % len(tabNames)
-		return nil
+		return m.toTab((m.tab + len(tabNames) - 1) % len(tabNames))
 	case "P":
 		paused := !m.pausedAll
 		return m.do(map[bool]string{true: "paused all shuttles", false: "resumed all shuttles"}[paused],
@@ -262,6 +270,17 @@ func (m *model) key(k string) tea.Cmd {
 		return m.shuttlesKey(k)
 	case m.tab == tabConflicts:
 		return m.conflictsKey(k)
+	case m.tab == tabActivity:
+		return m.activityKey(k)
+	}
+	return nil
+}
+
+// toTab shows tab t, and asks for what it shows if it is not kept current.
+func (m *model) toTab(t int) tea.Cmd {
+	m.tab, m.help = t, false
+	if t == tabActivity {
+		return m.loadActivity()
 	}
 	return nil
 }

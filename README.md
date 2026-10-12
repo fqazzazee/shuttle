@@ -108,7 +108,9 @@ Run `shuttle` on its own for the terminal interface: every shuttle live, with it
 transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it. The
 Conflicts tab lists what waits for you, with both copies' size and time: keep this computer's
 copy (`l`), the share's (`r`) or both (`b`), and let deletions the guard held back go ahead
-(`a`). `?` lists the keys. The other tabs (activity, profiles, shares) are still to come.
+(`a`). The Activity tab shows what the shuttles did lately, newest first, as it happens; `f`
+shows one shuttle at a time. `?` lists the keys. The other tabs (profiles, shares) are still to
+come.
 
 ```bash
 shuttle status            # one line per shuttle

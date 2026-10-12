@@ -15,6 +15,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
@@ -30,7 +31,9 @@ type fake struct {
 	shuttles  []daemon.Status
 	pausedAll bool
 	configErr string
-	resolve   error // what Resolve returns
+	resolve   error            // what Resolve returns
+	entries   []activity.Entry // the activity log, newest first
+	asked     []string         // whose activity was asked for
 	calls     []string
 	changes   chan daemon.Status
 }
@@ -94,6 +97,24 @@ func (f *fake) Resolve(_ context.Context, name, path string, c engine.Choice) er
 func (f *fake) AllowDeletions(_ context.Context, name string) error {
 	return f.record("allow %s", name)
 }
+func (f *fake) Activity(_ context.Context, name string, limit int) ([]activity.Entry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.asked = append(f.asked, name)
+	if f.down != nil {
+		return nil, f.down
+	}
+	if name == "nope" {
+		return nil, fmt.Errorf("%q: %w", name, daemon.ErrUnknownShuttle)
+	}
+	out := []activity.Entry{}
+	for _, e := range f.entries {
+		if (name == "" || e.Shuttle == name) && len(out) < limit {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
 
 func (f *fake) took() []string {
 	f.mu.Lock()
@@ -133,6 +154,10 @@ func press(t *testing.T, m *model, keys ...string) {
 			key = tea.KeyPressMsg{Code: tea.KeyTab}
 		case "esc":
 			key = tea.KeyPressMsg{Code: tea.KeyEscape}
+		case "pgup":
+			key = tea.KeyPressMsg{Code: tea.KeyPgUp}
+		case "pgdown":
+			key = tea.KeyPressMsg{Code: tea.KeyPgDown}
 		default:
 			key = tea.KeyPressMsg{Code: rune(strings.ToLower(k)[0]), Text: k}
 		}

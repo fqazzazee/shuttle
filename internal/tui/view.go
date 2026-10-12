@@ -102,7 +102,7 @@ func (m *model) content(room int) []string {
 	case tabConflicts:
 		return m.conflictsTable(room)
 	case tabActivity:
-		return []string{"Not built yet: what each shuttle did lately, file by file.", "", "Until then: shuttle activity"}
+		return m.activityLines(room)
 	case tabProfiles:
 		return []string{"Not built yet: profiles to create, edit and duplicate, and the shuttles using each."}
 	default:
@@ -310,6 +310,9 @@ func (m *model) keysLine() string {
 			}
 		}
 	}
+	if m.tab == tabActivity && !m.help {
+		keys = append(keys, [2]string{"↑↓", "scroll"}, [2]string{"f", "filter"})
+	}
 	if m.tab == tabShuttles && !m.help {
 		pause, enable := "pause", "disable"
 		if st := m.current(); st != nil {
@@ -351,6 +354,10 @@ func helpLines() []string {
 		"  l, r                  keep this computer's copy, or the share's, replacing the other",
 		"  b                     keep both: the older is saved beside the newer under a conflict name",
 		"  a                     let the deletions the deletion guard held back go ahead",
+		"",
+		"  On the Activity tab:",
+		"  up/down, pgup/pgdown  scroll; home/end, g/G: the newest, the oldest",
+		"  f                     show one shuttle, then the next, then every shuttle again",
 		"  ?, esc                show or hide this help",
 		"  q, ctrl+c             quit; the daemon carries on",
 	}

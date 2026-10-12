@@ -14,6 +14,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
 )
@@ -28,6 +29,7 @@ type Client interface {
 	SetEnabled(ctx context.Context, name string, on bool) error
 	Resolve(ctx context.Context, name, path string, choice engine.Choice) error
 	AllowDeletions(ctx context.Context, name string) error
+	Activity(ctx context.Context, name string, limit int) ([]activity.Entry, error)
 	Changes(ctx context.Context) (<-chan daemon.Status, error)
 }
 
