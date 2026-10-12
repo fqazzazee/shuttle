@@ -106,7 +106,7 @@ func (m *model) content(room int) []string {
 	case tabProfiles:
 		return []string{"Not built yet: profiles to create, edit and duplicate, and the shuttles using each."}
 	default:
-		return []string{"Not built yet: shares to add and edit, test, and store passwords for."}
+		return m.sharesLines(room)
 	}
 }
 
@@ -310,6 +310,17 @@ func (m *model) keysLine() string {
 			}
 		}
 	}
+	if m.tab == tabShares && !m.help && m.form != nil {
+		keys = [][2]string{{"tab", "next"}, {"←→", "type"}, {"ctrl+t", "test"}, {"ctrl+s", "save"}, {"esc", "cancel"}}
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			parts = append(parts, keyStyle.Render(k[0])+" "+faint.Render(k[1]))
+		}
+		return strings.Join(parts, "  ")
+	}
+	if m.tab == tabShares && !m.help {
+		keys = append(keys, [2]string{"n", "new"}, [2]string{"e", "edit"}, [2]string{"t", "test"}, [2]string{"x", "delete"})
+	}
 	if m.tab == tabActivity && !m.help {
 		keys = append(keys, [2]string{"↑↓", "scroll"}, [2]string{"f", "filter"})
 	}
@@ -358,6 +369,12 @@ func helpLines() []string {
 		"  On the Activity tab:",
 		"  up/down, pgup/pgdown  scroll; home/end, g/G: the newest, the oldest",
 		"  f                     show one shuttle, then the next, then every shuttle again",
+		"",
+		"  On the Shares tab:",
+		"  n, e or enter, x      add a share, edit it, delete it (only when no shuttle uses it)",
+		"  t                     test the share: log in with the stored password and read it",
+		"  in the form: tab, shift+tab to move; ←/→ change the type; ctrl+t tests what is typed;",
+		"  ctrl+s or enter on the last field saves; esc leaves it unsaved",
 		"  ?, esc                show or hide this help",
 		"  q, ctrl+c             quit; the daemon carries on",
 	}

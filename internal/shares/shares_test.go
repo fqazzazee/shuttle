@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -251,3 +252,49 @@ func TestPasswordComesOnlyFromTheKeyring(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestTestAPathShare(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	if err := Test(ctx, &config.Share{Name: "usb", Type: config.SharePath, Path: dir}, "", memStore{t: t}); err != nil {
+		t.Errorf("a mounted folder: %v", err)
+	}
+	err := Test(ctx, &config.Share{Name: "usb", Type: config.SharePath, Path: filepath.Join(dir, "gone")}, "", memStore{t: t})
+	if err == nil || !strings.Contains(err.Error(), "is the share mounted?") {
+		t.Errorf("a folder that is not there: %v", err)
+	}
+	if err := Test(ctx, &config.Share{Name: "n", Type: config.ShareNFS3, Host: "nas.example"}, "", memStore{t: t}); !errors.Is(err, ErrNotSupported) {
+		t.Errorf("NFS: %v", err)
+	}
+}
+
+// A password typed in the form is tried as it is: the keyring is not asked.
+func TestTestWithATypedPassword(t *testing.T) {
+	share := &config.Share{Name: "nas", Type: config.ShareSMB, Host: "127.0.0.1", Port: 1, Share: "test", User: "user"}
+	if err := Test(context.Background(), share, "typed", memStore{t: t}); err == nil {
+		t.Error("a closed port answered")
+	}
+}
+
+func TestTestAnSMBShare(t *testing.T) {
+	addr, _ := smbFolder(t)
+	host, port, _ := net.SplitHostPort(addr)
+	p, _ := strconv.Atoi(port)
+	share := &config.Share{Name: "nas", Type: config.ShareSMB, Host: host, Port: p, Share: "test", User: "shuttle"}
+	k, _ := Key(share)
+	ctx := context.Background()
+
+	if err := Test(ctx, share, fsystest.SambaPassword, memStore{t: t}); err != nil {
+		t.Errorf("the right password, typed: %v", err)
+	}
+	if err := Test(ctx, share, "wr0ng-s3cret", memStore{t: t}); err == nil {
+		t.Error("a wrong password, typed, passed")
+	}
+	stored := memStore{t: t, pw: map[string]string{k.Account(): fsystest.SambaPassword}}
+	if err := Test(ctx, share, "", stored); err != nil {
+		t.Errorf("the stored password: %v", err)
+	}
+	if err := Test(ctx, share, "", memStore{t: t, pw: map[string]string{}}); !errors.Is(err, secrets.ErrNotFound) {
+		t.Errorf("no password stored: %v", err)
+	}
+}

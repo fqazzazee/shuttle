@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/fqazzazee/shuttle/internal/activity"
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 )
 
@@ -29,6 +30,7 @@ var tabNames = []string{"Shuttles", "Conflicts", "Activity", "Profiles", "Shares
 type model struct {
 	ctx   context.Context
 	c     Client
+	o     Options
 	now   func() time.Time
 	every time.Duration // between refreshes; 0 in tests, which refresh by hand
 
@@ -55,12 +57,21 @@ type model struct {
 	entries     []activity.Entry // newest first; nil until the daemon answers
 	scroll      int              // the first entry shown
 	activityErr error
-	changes     <-chan daemon.Status // nil until subscribed
+
+	// The Shares tab: the config file as read, and the form when open.
+	cfgLoaded bool
+	cfgData   []byte
+	cfg       *config.Config
+	cfgErr    error
+	shareSel  string
+	form      *shareForm
+	tested    map[string]testResult // each share's last test
+	changes   <-chan daemon.Status  // nil until subscribed
 }
 
-func newModel(ctx context.Context, c Client) *model {
-	return &model{ctx: ctx, c: c, now: time.Now, every: refreshEvery, width: 80, height: 24,
-		resolving: map[string]bool{}}
+func newModel(ctx context.Context, c Client, o Options) *model {
+	return &model{ctx: ctx, c: c, o: o, now: time.Now, every: refreshEvery, width: 80, height: 24,
+		resolving: map[string]bool{}, tested: map[string]testResult{}}
 }
 
 // Messages.
@@ -173,12 +184,30 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tab == tabActivity {
 			cmds = append(cmds, m.loadActivity())
 		}
+		if m.tab == tabShares && m.form == nil {
+			cmds = append(cmds, m.loadConfig())
+		}
 		if m.changes == nil {
 			cmds = append(cmds, m.subscribe())
 		}
 		return m, tea.Batch(cmds...)
 	case activityMsg:
 		m.gotActivity(msg)
+	case configMsg:
+		m.gotConfig(msg)
+	case testedMsg:
+		m.gotTest(msg)
+	case savedMsg:
+		cmd := m.gotSave(msg)
+		return m, cmd
+	case tea.PasteMsg:
+		if m.form != nil && m.tab == tabShares {
+			if in, ok := m.form.inputs[m.form.focus]; ok && m.form.busy == "" {
+				updated, cmd := in.Update(msg)
+				*in = updated
+				return m, cmd
+			}
+		}
 	case resolvedMsg:
 		m.say(msg.text, msg.err != nil)
 		if msg.err != nil {
@@ -195,6 +224,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := m.refresh()
 		return m, cmd
 	case tea.KeyPressMsg:
+		if m.form != nil && m.tab == tabShares && !m.help && m.question == "" && msg.String() != "ctrl+c" {
+			cmd := m.formKey(msg)
+			return m, cmd
+		}
 		cmd := m.key(msg.String())
 		return m, cmd
 	}
@@ -272,6 +305,8 @@ func (m *model) key(k string) tea.Cmd {
 		return m.conflictsKey(k)
 	case m.tab == tabActivity:
 		return m.activityKey(k)
+	case m.tab == tabShares:
+		return m.sharesKey(k)
 	}
 	return nil
 }
@@ -279,8 +314,11 @@ func (m *model) key(k string) tea.Cmd {
 // toTab shows tab t, and asks for what it shows if it is not kept current.
 func (m *model) toTab(t int) tea.Cmd {
 	m.tab, m.help = t, false
-	if t == tabActivity {
+	switch t {
+	case tabActivity:
 		return m.loadActivity()
+	case tabShares:
+		return m.loadConfig()
 	}
 	return nil
 }

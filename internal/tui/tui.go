@@ -15,8 +15,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/fqazzazee/shuttle/internal/activity"
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
 // Client is what the TUI asks of the daemon. *bus.Client has it.
@@ -33,17 +35,29 @@ type Client interface {
 	Changes(ctx context.Context) (<-chan daemon.Status, error)
 }
 
+// Options are what the TUI does itself rather than through the daemon:
+// share setup works with the daemon stopped.
+type Options struct {
+	Config string        // the config file
+	Home   string        // the user's home, for "~" in the config
+	Store  secrets.Store // where share passwords are kept
+	// Test tries a share, with password if given (shares.Test).
+	Test func(ctx context.Context, share *config.Share, password string, store secrets.Store) error
+}
+
 // Run shows the TUI until the user quits or ctx is done.
-func Run(ctx context.Context, c Client) error {
+func Run(ctx context.Context, c Client, o Options) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	_, err := tea.NewProgram(newModel(ctx, c), tea.WithContext(ctx)).Run()
+	_, err := tea.NewProgram(newModel(ctx, c, o), tea.WithContext(ctx)).Run()
 	return err
 }
 
 // callTimeout bounds one request to the daemon, refreshEvery how often the
-// whole picture is asked for again.
+// whole picture is asked for again. keyringTimeout bounds what may wait for
+// the user to unlock the keyring, or for a share's server.
 const (
-	callTimeout  = 5 * time.Second
-	refreshEvery = 2 * time.Second
+	callTimeout    = 5 * time.Second
+	refreshEvery   = 2 * time.Second
+	keyringTimeout = 2 * time.Minute
 )
