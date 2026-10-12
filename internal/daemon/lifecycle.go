@@ -298,6 +298,7 @@ func (d *Daemon) apply() {
 	d.mu.Lock()
 	d.configErr, d.errShown = "", ""
 	d.mu.Unlock()
+	d.global.Set(cfg.Bandwidth.Up, cfg.Bandwidth.Down)
 
 	d.runnersMu.RLock()
 	oldCfg, old := d.cfg, maps.Clone(d.runners)

@@ -262,7 +262,7 @@ func (r *runner) open(ctx context.Context) (local, remote fsys.FS, err error) {
 func (r *runner) options(local, remote fsys.FS) *engine.Options {
 	return &engine.Options{
 		Local: local, Remote: remote, State: r.db, Settings: &r.shuttle.Settings,
-		LocalName: r.d.hostname, RemoteName: r.shuttle.Share,
+		LocalName: r.d.hostname, RemoteName: r.shuttle.Share, Cap: r.d.global,
 		Stop: r.shouldStop, Now: r.d.o.Now, OnAction: r.noteOwnWrite,
 	}
 }

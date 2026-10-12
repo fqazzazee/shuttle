@@ -69,6 +69,10 @@ local = "~/Documents"
 remote = "nas:/docs"
 ```
 
+Bandwidth limits go in a profile or a shuttle: `bandwidth = { up = "20MB/s", down = "50MB/s" }`.
+The same key under `[global]` caps all shuttles together. A change to the global cap applies
+from the next file, without restarting anything.
+
 Store the share's password in the keyring (until the TUI does it for you):
 
 ```bash
