@@ -54,7 +54,7 @@ type runner struct {
 
 func newRunner(d *Daemon, cfg *config.Config, s *config.Shuttle) *runner {
 	r := &runner{d: d, cfg: cfg, shuttle: s, kick: make(chan struct{}, 1), quit: make(chan struct{})}
-	r.st = Status{Name: s.Name, State: StateIdle}
+	r.st = Status{Name: s.Name, Mode: s.Settings.Mode, State: StateIdle}
 	if !s.Enabled {
 		r.st.State = StateDisabled
 	}

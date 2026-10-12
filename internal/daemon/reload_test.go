@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
 
@@ -337,4 +338,16 @@ func TestTheGlobalCapIsShared(t *testing.T) {
 	if took, want := time.Since(start), 800*time.Millisecond; took < want {
 		t.Errorf("two 256 KiB pushes under a shared 512 KiB/s cap took %v, want at least %v", took, want)
 	}
+}
+
+// The status names the shuttle's mode, and follows a reload that changes it.
+func TestStatusHasTheMode(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", "")
+	f.start()
+	if st := f.d.Statuses()[0]; st.Mode != config.ModePush {
+		t.Errorf("mode = %q, want push", st.Mode)
+	}
+	f.writeConfig(f.shuttleDoc("sync", ""))
+	f.waitFor("s", "the new mode", func(st Status) bool { return st.Mode == config.ModeSync })
 }

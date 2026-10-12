@@ -15,7 +15,8 @@ import (
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
-	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/present"
+	"github.com/fqazzazee/shuttle/internal/tui"
 )
 
 // callTimeout bounds one CLI request to the daemon.
@@ -158,7 +159,7 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 	now := time.Now()
 	for i := range all {
 		st := &all[i]
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", st.Name, st.State, orElse(st.Share, "-"), ago(st.LastRun, now), details(st))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", st.Name, st.State, orElse(st.Share, "-"), present.Ago(st.LastRun, now), details(st))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
@@ -169,102 +170,29 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 	return nil
 }
 
-// details is what a status line adds after the columns: whatever needs the
-// user's attention first.
+// details is what a status line adds after the columns: the run in
+// progress, then whatever needs the user's attention.
 func details(st *daemon.Status) string {
 	var parts []string
-	if p := progress(&st.Progress); p != "" {
-		parts = append(parts, p)
-	}
-	if st.Error != "" {
-		parts = append(parts, st.Error)
-	}
-	held := 0
-	for _, c := range st.Conflicts {
-		if c.Outcome == "held" {
-			held++
+	for _, p := range []string{present.Progress(&st.Progress), present.Attention(st)} {
+		if p != "" {
+			parts = append(parts, p)
 		}
-	}
-	if held > 0 {
-		parts = append(parts, plural(held, "conflict")+" waiting for you")
-	}
-	if st.HeldDeletions > 0 {
-		parts = append(parts, plural(st.HeldDeletions, "deletion")+" held by the guard")
-	}
-	if st.Pending {
-		parts = append(parts, "a run is waiting")
-	}
-	if st.Note != "" {
-		parts = append(parts, st.Note)
 	}
 	return strings.Join(parts, "; ")
 }
 
-// progress describes a run in progress, e.g. "syncing 12 of 30, 45.0 MB of
-// 120.0 MB, ↑ 2.1 MB/s: docs/a.pdf"; "" when not running.
-func progress(p *daemon.Progress) string {
-	var s string
-	switch p.Phase {
-	case "":
-		return ""
-	case engine.PhaseScanning:
-		s = fmt.Sprintf("scanning, %d found", p.Done)
-	case engine.PhaseComparing:
-		s = fmt.Sprintf("comparing %d of %d", p.Done, p.Total)
-	default:
-		s = fmt.Sprintf("%s %d of %d", p.Phase, p.Done, p.Total)
-		if p.TotalBytes > 0 {
-			s += fmt.Sprintf(", %s of %s", size(p.Bytes), size(p.TotalBytes))
-		}
+// runTUI runs the TUI against the daemon on the session bus.
+func runTUI(ctx context.Context, stderr io.Writer) int {
+	c, err := bus.Connect()
+	if err != nil {
+		fmt.Fprintf(stderr, "shuttle: connecting to the session bus: %v\n", err)
+		return 1
 	}
-	if p.RateUp > 0 {
-		s += ", ↑ " + size(p.RateUp) + "/s"
+	defer c.Close()
+	if err := tui.Run(ctx, c); err != nil {
+		fmt.Fprintf(stderr, "shuttle: %v\n", err)
+		return 1
 	}
-	if p.RateDown > 0 {
-		s += ", ↓ " + size(p.RateDown) + "/s"
-	}
-	if p.Path != "" {
-		s += ": " + p.Path
-	}
-	return s
-}
-
-// size is a byte count in decimal units, as GNOME shows them.
-func size(n int64) string {
-	if n < 1000 {
-		return fmt.Sprintf("%d B", n)
-	}
-	f, unit := float64(n)/1000, "kB"
-	for _, u := range []string{"MB", "GB", "TB"} {
-		if f < 1000 {
-			break
-		}
-		f, unit = f/1000, u
-	}
-	return fmt.Sprintf("%.1f %s", f, unit)
-}
-
-func plural(n int, thing string) string {
-	if n == 1 {
-		return "1 " + thing
-	}
-	return fmt.Sprintf("%d %ss", n, thing)
-}
-
-// ago is a short "how long ago": "just now", "5m ago", "3h ago", "2d ago".
-func ago(t, now time.Time) string {
-	if t.IsZero() {
-		return "never"
-	}
-	d := now.Sub(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d/time.Minute))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d/time.Hour))
-	default:
-		return fmt.Sprintf("%dd ago", int(d/(24*time.Hour)))
-	}
+	return 0
 }

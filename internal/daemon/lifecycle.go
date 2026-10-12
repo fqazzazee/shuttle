@@ -125,7 +125,7 @@ func (r *runner) inherit(old *runner) {
 	if st.State == StateDisabled || st.State == StateRunning {
 		st.State = StateIdle // a stopped run is pending again
 	}
-	st.Name, st.Note = r.shuttle.Name, ""
+	st.Name, st.Mode, st.Note = r.shuttle.Name, r.shuttle.Settings.Mode, ""
 	r.st = st
 	r.paused, r.pending, r.requested, r.allowDeletions = paused, pending, requested, allow
 	r.attempted = attempted
