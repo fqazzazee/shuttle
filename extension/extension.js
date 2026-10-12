@@ -12,6 +12,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {Daemon} from './daemon.js';
 import {rates} from './lib/format.js';
+import {QuickSettingsIndicator} from './quickSettings.js';
 import {row} from './lib/shuttles.js';
 import {NOT_RUNNING, SHUTTLE_ICON, presentation} from './lib/state.js';
 
@@ -204,9 +205,14 @@ export default class ShuttleExtension extends Extension {
         this._daemon = new Daemon();
         this._indicator = new Indicator(this, this._daemon);
         Main.panel.addToStatusArea(this.uuid, this._indicator);
+        const icon = new Gio.FileIcon({file: this.dir.get_child('icons').get_child('shuttle-symbolic.svg')});
+        this._quickSettings = new QuickSettingsIndicator(icon, this._daemon);
+        Main.panel.statusArea.quickSettings.addExternalIndicator(this._quickSettings);
     }
 
     disable() {
+        this._quickSettings?.destroy();
+        this._quickSettings = null;
         this._indicator?.destroy();
         this._indicator = null;
         this._daemon?.destroy();
