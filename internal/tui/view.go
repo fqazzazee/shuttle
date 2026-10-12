@@ -104,7 +104,7 @@ func (m *model) content(room int) []string {
 	case tabActivity:
 		return m.activityLines(room)
 	case tabProfiles:
-		return []string{"Not built yet: profiles to create, edit and duplicate, and the shuttles using each."}
+		return m.profilesLines(room)
 	default:
 		return m.sharesLines(room)
 	}
@@ -310,13 +310,23 @@ func (m *model) keysLine() string {
 			}
 		}
 	}
+	// A form's keys are all there is while it is open.
+	var form [][2]string
+	if m.tab == tabProfiles && !m.help && m.settings != nil {
+		form = [][2]string{{"tab", "next"}, {"←→", "choose"}, {"ctrl+s", "save"}, {"esc", "cancel"}}
+	}
 	if m.tab == tabShares && !m.help && m.form != nil {
-		keys = [][2]string{{"tab", "next"}, {"←→", "type"}, {"ctrl+t", "test"}, {"ctrl+s", "save"}, {"esc", "cancel"}}
-		parts := make([]string, 0, len(keys))
-		for _, k := range keys {
+		form = [][2]string{{"tab", "next"}, {"←→", "type"}, {"ctrl+t", "test"}, {"ctrl+s", "save"}, {"esc", "cancel"}}
+	}
+	if form != nil {
+		parts := make([]string, 0, len(form))
+		for _, k := range form {
 			parts = append(parts, keyStyle.Render(k[0])+" "+faint.Render(k[1]))
 		}
 		return strings.Join(parts, "  ")
+	}
+	if m.tab == tabProfiles && !m.help {
+		keys = append(keys, [2]string{"n", "new"}, [2]string{"e", "edit"}, [2]string{"c", "copy"}, [2]string{"x", "delete"})
 	}
 	if m.tab == tabShares && !m.help {
 		keys = append(keys, [2]string{"n", "new"}, [2]string{"e", "edit"}, [2]string{"t", "test"}, [2]string{"x", "delete"})
@@ -369,6 +379,11 @@ func helpLines() []string {
 		"  On the Activity tab:",
 		"  up/down, pgup/pgdown  scroll; home/end, g/G: the newest, the oldest",
 		"  f                     show one shuttle, then the next, then every shuttle again",
+		"",
+		"  On the Profiles tab:",
+		"  n, e or enter, c, x   add a profile, edit it, copy it, delete it (only when no shuttle uses it)",
+		"  in the form: tab, shift+tab to move; ←/→ choose; a setting left empty is not set,",
+		"  and its default applies; ctrl+s saves; esc leaves it unsaved",
 		"",
 		"  On the Shares tab:",
 		"  n, e or enter, x      add a share, edit it, delete it (only when no shuttle uses it)",

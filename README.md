@@ -112,7 +112,9 @@ copy (`l`), the share's (`r`) or both (`b`), and let deletions the guard held ba
 (`a`). The Activity tab shows what the shuttles did lately, newest first, as it happens; `f`
 shows one shuttle at a time. The Shares tab adds (`n`), edits (`e`), tests (`t`) and deletes
 (`x`) shares, works with the daemon stopped, and keeps passwords in the keyring, never in the
-config file. `?` lists the keys. The Profiles tab and the shuttle editor are still to come.
+config file. The Profiles tab adds (`n`), edits (`e`), copies (`c`) and deletes (`x`) profiles: a
+setting left empty is not written, and its default applies. `?` lists the keys. The shuttle
+editor is still to come.
 
 ```bash
 shuttle status            # one line per shuttle
