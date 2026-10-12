@@ -3,13 +3,10 @@
 package engine
 
 import (
-	"cmp"
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -25,19 +22,21 @@ import (
 //
 //   - SMB: the test Samba server (`make samba-up`, `make test-integration`).
 //   - NFS: SHUTTLE_TEST_NFS=inprocess serves a temp folder from inside the
-//     test (`make test-nfs`); SHUTTLE_TEST_NFS=host or host:port uses that
-//     server's export SHUTTLE_TEST_NFS_EXPORT, whose folder on this machine
-//     is SHUTTLE_TEST_NFS_DIR. A port means both services listen on it;
-//     without one, the server's portmapper says where.
+//     test (`make test-nfs`); otherwise it names a server, as in nfs3test:
+//     the Linux kernel server in CI.
+//   - A mounted share: SHUTTLE_TEST_MOUNT_DIR is where one is mounted (an
+//     NFSv4 mount in CI), opened as a local folder, as a share of type
+//     "path" is.
 //
 // The share is a folder on this machine too, so the tests set up and
 // inspect the remote side directly either way.
 const (
 	envSMBAddr   = "SHUTTLE_TEST_SMB_ADDR"
 	envSMBDir    = "SHUTTLE_TEST_SMB_DIR" // the share's folder on this machine
-	envNFS       = "SHUTTLE_TEST_NFS"
-	envNFSExport = "SHUTTLE_TEST_NFS_EXPORT"
-	envNFSDir    = "SHUTTLE_TEST_NFS_DIR"
+	envNFS       = nfs3test.EnvServer
+	envNFSExport = nfs3test.EnvExport
+	envNFSDir    = nfs3test.EnvDir
+	envMountDir  = "SHUTTLE_TEST_MOUNT_DIR"
 )
 
 func overSMB() bool {
@@ -46,12 +45,22 @@ func overSMB() bool {
 
 func overNFS() bool { return os.Getenv(envNFS) != "" }
 
+func overMount() bool { return os.Getenv(envMountDir) != "" }
+
 // remoteRoot is the folder on this machine the remote side's share serves,
 // or "" when the tests run locally.
 func remoteRoot() (string, error) {
+	set := 0
+	for _, on := range []bool{overSMB(), overNFS(), overMount()} {
+		if on {
+			set++
+		}
+	}
 	switch {
-	case overSMB() && overNFS():
-		return "", fmt.Errorf("both %s and %s are set: pick one", envSMBAddr, envNFS)
+	case set > 1:
+		return "", fmt.Errorf("more than one of %s, %s and %s is set: pick one", envSMBAddr, envNFS, envMountDir)
+	case overMount():
+		return os.Getenv(envMountDir), nil
 	case overSMB():
 		return os.Getenv(envSMBDir), nil
 	case overNFS():
@@ -109,25 +118,11 @@ func nfsServer() (nfsTarget, error) {
 			return nfsTarget{}, inprocess.err
 		}
 	}
-	addr := os.Getenv(envNFS)
-	host, port := addr, 0
-	if h, p, err := net.SplitHostPort(addr); err == nil {
-		host = h
-		if port, err = strconv.Atoi(p); err != nil {
-			return nfsTarget{}, fmt.Errorf("%s=%q: %w", envNFS, addr, err)
-		}
+	opts, dir, ok, err := nfs3test.Outside()
+	if err == nil && !ok {
+		err = fmt.Errorf("%s=%q names no server", envNFS, os.Getenv(envNFS))
 	}
-	dir := os.Getenv(envNFSDir)
-	if dir == "" {
-		return nfsTarget{}, fmt.Errorf("%s is set but %s is not", envNFS, envNFSDir)
-	}
-	return nfsTarget{
-		opts: nfs3.Options{
-			Host: host, Port: port, MountPort: port, Export: cmp.Or(os.Getenv(envNFSExport), "/"),
-			UID: uint32(os.Getuid()), GID: uint32(os.Getgid()), //nolint:gosec // this user's IDs
-		},
-		dir: dir,
-	}, nil
+	return nfsTarget{opts: opts, dir: dir}, err
 }
 
 // newRemoteDir returns the folder for a test's remote side.
@@ -150,15 +145,15 @@ func newRemoteDir(t *testing.T) string {
 
 // openRemote opens a folder from newRemoteDir the way the run should reach
 // it: over SMB or NFS when the tests run against a server, directly
-// otherwise.
+// otherwise, mounted share or not.
 func openRemote(dir string) (fsys.FS, error) {
 	root, err := remoteRoot()
 	if err != nil {
 		return nil, err
 	}
 	folder, err := filepath.Rel(root, dir)
-	if root == "" || err != nil || strings.HasPrefix(folder, "..") {
-		return fsys.OpenLocal(dir) // a folder outside the share: a local test
+	if root == "" || overMount() || err != nil || strings.HasPrefix(folder, "..") {
+		return fsys.OpenLocal(dir) // a mounted share, or a folder outside the share: a local test
 	}
 	if overNFS() {
 		target, err := nfsServer()
@@ -188,5 +183,8 @@ func TestRemoteSide(t *testing.T) {
 	}
 	if _, ok := f.(*fsys.NFS); overNFS() && !ok {
 		t.Errorf("NFS is configured but the remote side is %T", f)
+	}
+	if mount := os.Getenv(envMountDir); overMount() && !strings.HasPrefix(dir, mount+string(filepath.Separator)) {
+		t.Errorf("a mounted share is configured but the remote side is %s, outside %s", dir, mount)
 	}
 }
