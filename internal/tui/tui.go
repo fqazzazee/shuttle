@@ -18,6 +18,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
@@ -43,6 +44,8 @@ type Options struct {
 	Store  secrets.Store // where share passwords are kept
 	// Test tries a share, with password if given (shares.Test).
 	Test func(ctx context.Context, share *config.Share, password string, store secrets.Store) error
+	// Browse opens a share's top folder to look for folders in.
+	Browse func(ctx context.Context, share *config.Share, store secrets.Store) (fsys.FS, error)
 }
 
 // Run shows the TUI until the user quits or ctx is done.

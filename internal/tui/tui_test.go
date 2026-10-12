@@ -206,7 +206,7 @@ func TestShuttlesTab(t *testing.T) {
 		"docs    ↔ sync  idle      5m ago",
 		"music   ← pull  disabled  never",
 		"photos  → push  held      3h ago                            2 conflicts waiting for you",
-		"s sync  p pause  d disable  P pause all  1-5 tabs  ? help  q quit",
+		"s sync  p pause  d disable  n new  e edit  x delete  P pause all  1-5 tabs  ? help  q quit",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("screen lacks %q:\n%s", want, s)
