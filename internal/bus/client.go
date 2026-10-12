@@ -74,6 +74,12 @@ func (c *Client) Resolve(ctx context.Context, name, path string, choice engine.C
 	return clientErr(c.call(ctx, "ResolveConflict", name, path, string(choice)).Err)
 }
 
+// SetEnabled turns the named shuttle on or off in the config file. The
+// daemon applies it shortly after.
+func (c *Client) SetEnabled(ctx context.Context, name string, on bool) error {
+	return clientErr(c.call(ctx, "SetEnabled", name, on).Err)
+}
+
 // AllowDeletions lets the next run pass the deletion guard.
 func (c *Client) AllowDeletions(ctx context.Context, name string) error {
 	return clientErr(c.call(ctx, "AllowDeletions", name).Err)

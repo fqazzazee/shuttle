@@ -151,6 +151,8 @@ func TestCLIErrors(t *testing.T) {
 		{[]string{"sync"}, 2, "wrong arguments"},
 		{[]string{"status", "extra"}, 2, "wrong arguments"},
 		{[]string{"pause", "a", "b"}, 2, "wrong arguments"},
+		{[]string{"disable", "nope"}, 1, "no shuttle by that name"},
+		{[]string{"enable"}, 2, "wrong arguments"},
 	} {
 		code, _, stderr := cli(t, tt.args...)
 		if code != tt.code || !strings.Contains(stderr, tt.msg) {
@@ -165,4 +167,65 @@ func TestCLIWithoutADaemon(t *testing.T) {
 	if code != 1 || !strings.Contains(stderr, "not running") || !strings.Contains(stderr, "systemctl --user start shuttle") {
 		t.Errorf("status without a daemon = %d, %q", code, stderr)
 	}
+}
+
+func TestEnableDisable(t *testing.T) {
+	startDaemon(t)
+	if code, out, stderr := cli(t, "disable", "b"); code != 0 || out != "disabled b\n" {
+		t.Errorf("disable b = %d %q %q", code, out, stderr)
+	}
+	waitForStatus(t, "b     disabled")
+	if code, out, stderr := cli(t, "enable", "b"); code != 0 || out != "enabled b\n" {
+		t.Errorf("enable b = %d %q %q", code, out, stderr)
+	}
+	waitForStatus(t, "b     idle")
+}
+
+// Without a daemon, enable and disable edit the config file themselves.
+func TestEnableDisableWithoutADaemon(t *testing.T) {
+	privateSessionBus(t)
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	path := filepath.Join(dir, "shuttle", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	doc := "[shares.m]\ntype = \"path\"\npath = \"/mnt\"\n[shuttles.a]\nmode = \"push\"\nlocal = \"/l\"\nremote = \"m:\"\n"
+	if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, stderr := cli(t, "disable", "a")
+	if code != 0 || !strings.HasPrefix(out, "disabled a (the daemon is not running") {
+		t.Errorf("disable a = %d %q %q", code, out, stderr)
+	}
+	if b, _ := os.ReadFile(path); string(b) != doc+"enabled = false\n" {
+		t.Errorf("config after disabling:\n%s", b)
+	}
+	if code, _, _ := cli(t, "enable", "a"); code != 0 {
+		t.Errorf("enable a = %d", code)
+	}
+	if b, _ := os.ReadFile(path); string(b) != doc {
+		t.Errorf("config after enabling:\n%s", b)
+	}
+	if code, _, stderr := cli(t, "enable", "nope"); code != 1 || !strings.Contains(stderr, "no shuttle by that name") {
+		t.Errorf("enable nope = %d %q", code, stderr)
+	}
+
+	// No session bus at all, as over ssh.
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path="+filepath.Join(dir, "no-bus"))
+	if code, out, stderr := cli(t, "disable", "a"); code != 0 || !strings.HasPrefix(out, "disabled a (") {
+		t.Errorf("disable a without a bus = %d %q %q", code, out, stderr)
+	}
+}
+
+func waitForStatus(t *testing.T, want string) {
+	t.Helper()
+	var out string
+	for range 300 {
+		if _, out, _ = cli(t, "status"); strings.Contains(out, want) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Errorf("status never showed %q:\n%s", want, out)
 }

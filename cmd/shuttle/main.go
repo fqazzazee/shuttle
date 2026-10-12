@@ -61,7 +61,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		return 0
-	case "status", "sync", "pause", "resume":
+	case "status", "sync", "pause", "resume", "enable", "disable":
 		return runClient(ctx, args[0], args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "shuttle: unknown command %q\n\n", args[0])
@@ -138,6 +138,8 @@ Commands:
   sync <name>       Sync a shuttle now
   pause [<name>]    Pause a shuttle, or all of them
   resume [<name>]   Resume a shuttle, or all of them
+  enable <name>     Turn a shuttle on (saved in the config file)
+  disable <name>    Turn a shuttle off (saved in the config file)
   daemon            Run the background service (normally started by systemd)
   version           Print the version
   help              Show this help

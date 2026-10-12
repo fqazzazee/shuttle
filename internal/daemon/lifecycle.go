@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -237,11 +238,39 @@ func (d *Daemon) Reload() error {
 	if _, err := config.Load(d.o.Paths.Config); err != nil {
 		return fmt.Errorf("%w: %w", ErrConfig, err)
 	}
+	d.askReload()
+	return nil
+}
+
+// SetEnabled turns a shuttle on or off in the config file, changing only
+// its enabled key, and applies it in the background as a reload: a run in
+// progress on a shuttle turned off finishes the file it is on. A broken
+// config file is left alone.
+func (d *Daemon) SetEnabled(name string, on bool) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	d.editMu.Lock()
+	_, err = config.SetEnabled(d.o.Paths.Config, home, name, on)
+	d.editMu.Unlock()
+	switch {
+	case errors.Is(err, config.ErrNoShuttle):
+		return fmt.Errorf("%q: %w", name, ErrUnknownShuttle)
+	case err != nil:
+		return fmt.Errorf("%w: %w", ErrConfig, err)
+	}
+	// Even when the file already said so: the daemon may not have
+	// caught up with it yet.
+	d.askReload()
+	return nil
+}
+
+func (d *Daemon) askReload() {
 	select {
 	case d.reload <- struct{}{}:
 	default: // one is already asked for
 	}
-	return nil
 }
 
 // ConfigError is why the config file was last not loaded, or "": the

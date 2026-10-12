@@ -92,6 +92,7 @@ type Daemon struct {
 	runners   map[string]*runner
 
 	reloadMu  sync.Mutex // one reload at a time, and none during shutdown
+	editMu    sync.Mutex // one write to the config file at a time
 	configErr string     // why the config on disk was not loaded; "" when it was
 	errShown  string     // the config error last announced
 

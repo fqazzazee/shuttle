@@ -164,6 +164,63 @@ func TestDisablingAndEnablingByEditing(t *testing.T) {
 	}
 }
 
+// SetEnabled writes the config file, keeping the rest of it, and applies
+// it without waiting for the file watcher.
+func TestSetEnabled(t *testing.T) {
+	old := configDebounce
+	configDebounce = time.Hour // only SetEnabled's own reload can apply it
+	t.Cleanup(func() { configDebounce = old })
+	f := newFixture(t, "push", "")
+	doc := "# mine\n" + f.shuttleDoc("push", "")
+	f.writeConfig(doc)
+	write(t, f.local, "a.txt", "a")
+	f.start()
+
+	if err := f.d.SetEnabled("s", false); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("s", "disabled", func(st Status) bool { return st.State == StateDisabled })
+	want := strings.Replace(doc, "remote = \"mnt:\"\n", "remote = \"mnt:\"\nenabled = false\n", 1)
+	if got, _ := os.ReadFile(f.paths.Config); string(got) != want {
+		t.Errorf("config after disabling:\n%s\nwant:\n%s", got, want)
+	}
+	if err := f.d.SyncNow("s"); !errors.Is(err, ErrDisabled) {
+		t.Errorf("SyncNow on a disabled shuttle = %v", err)
+	}
+
+	if err := f.d.SetEnabled("s", true); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("s", "enabled again", func(st Status) bool { return st.State == StateIdle })
+	if got, _ := os.ReadFile(f.paths.Config); string(got) != doc {
+		t.Errorf("config after enabling:\n%s\nwant it as it was", got)
+	}
+	f.syncNow()
+	if !exists(f.mount, "a.txt") {
+		t.Error("the re-enabled shuttle did not sync")
+	}
+
+	if err := f.d.SetEnabled("nope", false); !errors.Is(err, ErrUnknownShuttle) {
+		t.Errorf("SetEnabled(nope) = %v, want ErrUnknownShuttle", err)
+	}
+}
+
+// While the config file is broken, SetEnabled leaves it alone.
+func TestSetEnabledWithABrokenConfig(t *testing.T) {
+	quickReloads(t)
+	f := newFixture(t, "push", "")
+	f.start()
+	broken := f.shuttleDoc("both", "")
+	f.writeConfig(broken)
+	f.waitFor("s", "the config error", func(Status) bool { return f.d.ConfigError() != "" })
+	if err := f.d.SetEnabled("s", false); !errors.Is(err, ErrConfig) || !strings.Contains(err.Error(), `"both"`) {
+		t.Errorf("SetEnabled with a broken config = %v, want ErrConfig and why", err)
+	}
+	if got, _ := os.ReadFile(f.paths.Config); string(got) != broken {
+		t.Error("SetEnabled changed a broken config file")
+	}
+}
+
 // A broken edit keeps the running config, says why once, and clears once
 // fixed.
 func TestABrokenEditKeepsTheOldConfig(t *testing.T) {
