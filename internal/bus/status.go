@@ -10,11 +10,42 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
 // issue is an engine.Issue on the bus: (path, reason, outcome).
 type issue struct {
 	Path, Reason, Outcome string
+}
+
+// conflict is a conflict on the bus: (path, reason, outcome, local copy,
+// remote copy).
+type conflict struct {
+	Path, Reason, Outcome string
+	Local, Remote         side
+}
+
+// side is one copy of a conflict: (kind, size, modified in unix seconds).
+// Kind is "file" or "dir", or "" when that side has no copy.
+type side struct {
+	Kind    string
+	Size    uint64
+	ModTime int64
+}
+
+func toSide(f *fsys.FileInfo) side {
+	if f == nil {
+		return side{}
+	}
+	return side{f.Kind.String(), u64(f.Size), f.ModTime.Unix()}
+}
+
+func fromSide(path string, s side) *fsys.FileInfo {
+	kind, ok := map[string]fsys.Kind{"file": fsys.KindFile, "dir": fsys.KindDir}[s.Kind]
+	if !ok {
+		return nil
+	}
+	return &fsys.FileInfo{Name: path, Kind: kind, Size: s64(s.Size), ModTime: time.Unix(s.ModTime, 0)}
 }
 
 // encode turns a status into the a{sv} the bus carries. Keys are stable:
@@ -24,6 +55,13 @@ func encode(st *daemon.Status) map[string]dbus.Variant {
 		out := make([]issue, 0, len(in))
 		for _, i := range in {
 			out = append(out, issue{i.Path, i.Reason, i.Outcome})
+		}
+		return out
+	}
+	conflicts := func(in []engine.Issue) []conflict {
+		out := make([]conflict, 0, len(in))
+		for _, c := range in {
+			out = append(out, conflict{c.Path, c.Reason, c.Outcome, toSide(c.Local), toSide(c.Remote)})
 		}
 		return out
 	}
@@ -45,7 +83,7 @@ func encode(st *daemon.Status) map[string]dbus.Variant {
 		"Copied":        dbus.MakeVariant(u32(st.Copied)),
 		"Deleted":       dbus.MakeVariant(u32(st.Deleted)),
 		"HeldDeletions": dbus.MakeVariant(u32(st.HeldDeletions)),
-		"Conflicts":     dbus.MakeVariant(issues(st.Conflicts)),
+		"Conflicts":     dbus.MakeVariant(conflicts(st.Conflicts)),
 		"Errors":        dbus.MakeVariant(issues(st.Errors)),
 		// The run in progress; zero when not running.
 		"Phase":      dbus.MakeVariant(string(st.Progress.Phase)),
@@ -81,7 +119,8 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	var state string
 	var lastRun, lastOK int64
 	var copied, deleted, held uint32
-	var conflicts, errs []issue
+	var conflicts []conflict
+	var errs []issue
 	get("State", &state)
 	get("Paused", &st.Paused)
 	get("Pending", &st.Pending)
@@ -119,7 +158,8 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	}
 	st.Copied, st.Deleted, st.HeldDeletions = int(copied), int(deleted), int(held)
 	for _, i := range conflicts {
-		st.Conflicts = append(st.Conflicts, engine.Issue{Path: i.Path, Reason: i.Reason, Outcome: i.Outcome, Op: engine.OpConflict})
+		st.Conflicts = append(st.Conflicts, engine.Issue{Path: i.Path, Reason: i.Reason, Outcome: i.Outcome, Op: engine.OpConflict,
+			Local: fromSide(i.Path, i.Local), Remote: fromSide(i.Path, i.Remote)})
 	}
 	for _, i := range errs {
 		st.Errors = append(st.Errors, engine.Issue{Path: i.Path, Reason: i.Reason, Outcome: i.Outcome})
