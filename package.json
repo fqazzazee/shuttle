@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "description": "Lint tooling for the GNOME extension in extension/: development only, never shipped.",
+  "license": "GPL-2.0-or-later",
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.11.0"
+  }
+}

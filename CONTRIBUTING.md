@@ -23,7 +23,9 @@ report it.
 - One concern per PR. Two unrelated fixes are two PRs.
 - Tests come with the change. Sync tests run against temporary directories and in-process
   test servers, never against a real share or your home directory.
-- Run `make lint` and `make test` before pushing.
+- Run `make lint` and `make test` before pushing. For the GNOME extension (`extension/`),
+  also `make lint-extension` (needs node and npm) and `make test-extension` (needs GNOME
+  Shell 50 and gjs; it runs a headless shell on a private session bus, never yours).
 - Describe what changes for a user, not what changed in the code — the diff already says
   that.
 - Match the existing style. Do not reformat files you did not otherwise touch.
