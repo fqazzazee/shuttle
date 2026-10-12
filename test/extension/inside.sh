@@ -79,9 +79,10 @@ Exec=touch $tmp/opened
 Terminal=false
 EOF
 
-mkdir -p "$HOME/Documents" "$HOME/Pictures" "$tmp/share/docs" "$tmp/share/pics" "$XDG_CONFIG_HOME/shuttle"
+mkdir -p "$HOME/Documents" "$HOME/Pictures" "$HOME/Music" "$tmp/share/docs" "$tmp/share/pics" "$XDG_CONFIG_HOME/shuttle"
 echo "a" >"$HOME/Documents/a.txt"
-# config [pics]: two shuttles, or only docs.
+# config [pics] [far]: docs, and the shuttles named: pics, which syncs and
+# holds conflicts for the user, and far, on an NFS server that is not there.
 config() {
 	cat >"$XDG_CONFIG_HOME/shuttle/config.toml" <<-EOF
 		[shares.disk]
@@ -94,13 +95,31 @@ config() {
 		remote = "disk:docs"
 		bandwidth = { up = "64KiB/s" } # slow enough to watch a run
 	EOF
-	if [ "${1:-}" = pics ]; then
+	if [[ " $* " == *" pics "* ]]; then
 		cat >>"$XDG_CONFIG_HOME/shuttle/config.toml" <<-EOF
 
 			[shuttles.pics]
 			mode = "sync"
 			local = "$HOME/Pictures"
 			remote = "disk:pics"
+			conflicts = "ask"
+		EOF
+	fi
+	if [[ " $* " == *" far "* ]]; then
+		# Port 1: nothing listens, so the connection is refused.
+		cat >>"$XDG_CONFIG_HOME/shuttle/config.toml" <<-EOF
+
+			[shares.gone]
+			type = "nfs3"
+			host = "127.0.0.1"
+			port = 1
+			mount_port = 1
+			export = "/export"
+
+			[shuttles.far]
+			mode = "push"
+			local = "$HOME/Music"
+			remote = "gone:"
 		EOF
 	fi
 }
@@ -205,6 +224,37 @@ config
 rows docs
 config pics
 rows "docs,pics"
+
+step "a conflict waits for the user: held, until it is resolved"
+echo "one" >"$HOME/Pictures/x.txt"
+"$shuttle" sync pics >/dev/null
+for _ in $(seq 50); do [ -f "$tmp/share/pics/x.txt" ] && break; sleep 0.1; done
+[ -f "$tmp/share/pics/x.txt" ] || fail "the sync did not carry x.txt"
+shows idle
+echo "changed here" >"$HOME/Pictures/x.txt"
+echo "changed there" >"$tmp/share/pics/x.txt"
+touch -d '+2 seconds' "$HOME/Pictures/x.txt" "$tmp/share/pics/x.txt"
+"$shuttle" sync pics >/dev/null
+shows held
+row pics "r.state === 'held' && r.detail.includes('1 conflict waiting for you')"
+is "$toggle.subtitle" '"Waiting for you"'
+snap held
+gdbus call --session --dest io.github.fqazzazee.Shuttle --object-path /io/github/fqazzazee/Shuttle \
+	--method io.github.fqazzazee.Shuttle1.ResolveConflict pics x.txt keep-local >/dev/null
+shows idle
+row pics "r.state === 'idle' && r.detail === ''"
+
+step "a share that cannot be reached: offline"
+config pics far
+rows "docs,far,pics"
+"$shuttle" sync far >/dev/null || true
+shows offline
+row far "r.state === 'offline'"
+is "$toggle.subtitle" '"A share is offline"'
+snap offline
+config pics
+rows "docs,pics"
+shows idle
 
 step "a run that fails"
 rm -rf "$tmp/share"

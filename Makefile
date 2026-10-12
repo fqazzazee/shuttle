@@ -12,7 +12,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Pinned to match CI. `go run` builds it on first use, so no separate install.
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui test-extension lint-extension
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui test-extension lint-extension install-extension uninstall-extension
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -112,6 +112,25 @@ test-systemd:
 # private session bus. Needs tmux and dbus-run-session.
 test-tui:
 	test/tui/run.sh
+
+# The GNOME extension, for the user running make: GNOME Shell finds it in
+# ~/.local/share/gnome-shell/extensions. On Wayland the shell picks up a newly
+# installed extension at the next login; then `gnome-extensions enable`.
+EXT_UUID := shuttle@fqazzazee.github.io
+EXTDIR   ?= $(HOME)/.local/share/gnome-shell/extensions
+
+install-extension:
+	@test -n "$(EXTDIR)" || { echo "EXTDIR is empty"; exit 1; }
+	rm -rf "$(DESTDIR)$(EXTDIR)/$(EXT_UUID)"
+	install -d "$(DESTDIR)$(EXTDIR)/$(EXT_UUID)"
+	cp -r extension/. "$(DESTDIR)$(EXTDIR)/$(EXT_UUID)/"
+	rm -rf "$(DESTDIR)$(EXTDIR)/$(EXT_UUID)/test"
+	@echo "Installed. Log out and back in (Wayland), then:"
+	@echo "  gnome-extensions enable $(EXT_UUID)"
+
+uninstall-extension:
+	@test -n "$(EXTDIR)" || { echo "EXTDIR is empty"; exit 1; }
+	rm -rf "$(DESTDIR)$(EXTDIR)/$(EXT_UUID)"
 
 # The GNOME extension's lint: eslint from package-lock.json, installed with
 # no package's install scripts run. Needs node 20.19+ and npm.
