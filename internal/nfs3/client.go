@@ -179,8 +179,7 @@ func getPort(ctx context.Context, pm *conn, p program) (int, error) {
 		return 0, d.err
 	}
 	if port == 0 || port > 65535 {
-		return 0, fmt.Errorf("nfs: the server runs no NFSv3 %s over TCP "+
-			"(an NFSv4-only server: mount it and use a mounted folder)", p.name)
+		return 0, fmt.Errorf("nfs: the server runs no NFSv3 %s over TCP (%s)", p.name, v4Only)
 	}
 	return int(port), nil
 }

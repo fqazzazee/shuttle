@@ -160,30 +160,42 @@ func TestServerHangsUp(t *testing.T) {
 }
 
 func TestRefusals(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		reply func(*encoder)
-		check func(error) bool
-		want  string
-	}{
-		{"auth too weak", func(e *encoder) { e.u32(replyDenied); e.u32(rejectAuthError); e.u32(5) },
-			func(err error) bool { return errors.Is(err, os.ErrPermission) }, "Kerberos"},
-		{"bad credentials", func(e *encoder) { e.u32(replyDenied); e.u32(rejectAuthError); e.u32(1) },
-			func(err error) bool { return errors.Is(err, os.ErrPermission) }, "user and group IDs"},
-		{"version", func(e *encoder) {
+	mismatch := func(lo, hi uint32) func(*encoder) {
+		return func(e *encoder) {
 			e.u32(replyAccepted)
 			e.u32(authNone)
 			e.opaque(nil)
 			e.u32(acceptProgMismatch)
-			e.u32(4)
-			e.u32(4)
-		}, func(err error) bool { return err != nil }, "versions 4 to 4, not 3"},
-		{"no such program", func(e *encoder) {
-			e.u32(replyAccepted)
-			e.u32(authNone)
-			e.opaque(nil)
-			e.u32(acceptProgUnavail)
-		}, func(err error) bool { return err != nil }, "runs no NFS service"},
+			e.u32(lo)
+			e.u32(hi)
+		}
+	}
+	unavail := func(e *encoder) {
+		e.u32(replyAccepted)
+		e.u32(authNone)
+		e.opaque(nil)
+		e.u32(acceptProgUnavail)
+	}
+	failed := func(err error) bool { return err != nil }
+	for _, tc := range []struct {
+		name   string
+		prog   program
+		reply  func(*encoder)
+		check  func(error) bool
+		want   string
+		v4Only bool // the error says to mount an NFSv4-only server
+	}{
+		{"auth too weak", nfsProg, func(e *encoder) { e.u32(replyDenied); e.u32(rejectAuthError); e.u32(5) },
+			func(err error) bool { return errors.Is(err, os.ErrPermission) }, "Kerberos", false},
+		{"bad credentials", nfsProg, func(e *encoder) { e.u32(replyDenied); e.u32(rejectAuthError); e.u32(1) },
+			func(err error) bool { return errors.Is(err, os.ErrPermission) }, "user and group IDs", false},
+		{"NFS v4 alone", nfsProg, mismatch(4, 4), failed, "versions 4 to 4, not 3", true},
+		{"NFS v2 alone", nfsProg, mismatch(2, 2), failed, "versions 2 to 2, not 3", false},
+		// What the Linux kernel server answers with NFSv3 turned off.
+		{"mount v1 and v2", mountProg, mismatch(1, 2), failed, "mount service speaks versions 1 to 2, not 3", true},
+		{"mount v4", mountProg, mismatch(4, 4), failed, "versions 4 to 4, not 3", false},
+		{"no NFS service", nfsProg, unavail, failed, "runs no NFS service", false},
+		{"no mount service", mountProg, unavail, failed, "runs no mount service", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, _ := fakeConn(t, func(fakeCall) []byte {
@@ -191,9 +203,12 @@ func TestRefusals(t *testing.T) {
 				tc.reply(e)
 				return e.b
 			})
-			_, err := c.call(t.Context(), nfsProg, 1, func(*encoder) {})
+			_, err := c.call(t.Context(), tc.prog, 1, func(*encoder) {})
 			if !tc.check(err) || !strings.Contains(err.Error(), tc.want) {
-				t.Errorf("err = %v, want one saying %q", err, tc.want)
+				t.Fatalf("err = %v, want one saying %q", err, tc.want)
+			}
+			if got := strings.Contains(err.Error(), "NFSv4-only server: mount it"); got != tc.v4Only {
+				t.Errorf("err = %v; says to mount an NFSv4-only server: %v, want %v", err, got, tc.v4Only)
 			}
 		})
 	}

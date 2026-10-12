@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -176,5 +177,24 @@ func TestMountErrors(t *testing.T) {
 	o := &nfs3.Options{Host: "127.0.0.1", Port: port, MountPort: 1, Export: "/"}
 	if _, err := nfs3.Dial(ctx, o); err == nil {
 		t.Error("Dial to a closed mount port worked")
+	}
+}
+
+// A server that speaks only NFSv4 has no NFSv3 mount service. Dial says
+// so, and what to do instead: the README promises it.
+func TestNFSv4OnlyServer(t *testing.T) {
+	host := os.Getenv(nfs3test.EnvV4Only)
+	if host == "" {
+		t.Skipf("%s not set: CI's kernel server job sets it", nfs3test.EnvV4Only)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	c, err := nfs3.Dial(ctx, &nfs3.Options{Host: host, Export: "/"})
+	if err == nil {
+		c.Close()
+		t.Fatal("an NFSv4-only server mounted over NFSv3")
+	}
+	if !strings.Contains(err.Error(), "NFSv4-only") || !strings.Contains(err.Error(), "mount it") {
+		t.Errorf("Dial = %v; want it to say the server is NFSv4-only and to mount it", err)
 	}
 }

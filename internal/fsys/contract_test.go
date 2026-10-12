@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -116,29 +117,55 @@ func TestSMBDialErrors(t *testing.T) {
 	}
 }
 
-// newNFS returns an NFS FS on a fresh folder served by the in-process
-// server, and that folder's path on this machine.
+// nfsTarget is the folder an NFS test works in: a temp folder served by
+// the in-process server, or, when the environment names a server (the
+// Linux kernel server in CI; see nfs3test.Outside), a fresh folder of its
+// export. It returns how to reach the folder and its path on this machine.
+func nfsTarget(t *testing.T) (*fsys.NFSOptions, string) {
+	t.Helper()
+	o, root, ok, err := nfs3test.Outside()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		dir := t.TempDir()
+		host, port := nfs3test.Serve(t, dir)
+		return &fsys.NFSOptions{
+			Options: nfs3.Options{Host: host, Port: port, MountPort: port, Export: "/",
+				UID: uint32(os.Getuid()), GID: uint32(os.Getgid())}, //nolint:gosec // test IDs
+			Folder: ".",
+		}, dir
+	}
+	folder := fsystest.UniqueName("contract")
+	dir := filepath.Join(root, folder)
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return &fsys.NFSOptions{Options: o, Folder: folder}, dir
+}
+
+// sub is o for name, a path inside o's folder.
+func sub(o *fsys.NFSOptions, name string) *fsys.NFSOptions {
+	c := *o
+	c.Folder = path.Join(o.Folder, name)
+	return &c
+}
+
+// newNFS returns an NFS FS on a fresh folder, and that folder's path on
+// this machine.
 func newNFS(t *testing.T) (*fsys.NFS, string) {
 	t.Helper()
-	dir := t.TempDir()
-	host, port := nfs3test.Serve(t, dir)
+	o, dir := nfsTarget(t)
 	if err := os.Mkdir(filepath.Join(dir, "folder"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	n, err := fsys.DialNFS(context.Background(), nfsOptions(host, port, "folder"))
+	n, err := fsys.DialNFS(context.Background(), sub(o, "folder"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { n.Close() })
 	return n, filepath.Join(dir, "folder")
-}
-
-func nfsOptions(host string, port int, folder string) *fsys.NFSOptions {
-	return &fsys.NFSOptions{
-		Options: nfs3.Options{Host: host, Port: port, MountPort: port, Export: "/",
-			UID: uint32(os.Getuid()), GID: uint32(os.Getgid())}, //nolint:gosec // test IDs
-		Folder: folder,
-	}
 }
 
 func TestNFSContract(t *testing.T) {
@@ -149,16 +176,17 @@ func TestNFSContract(t *testing.T) {
 }
 
 func TestNFSFolder(t *testing.T) {
-	dir := t.TempDir()
-	host, port := nfs3test.Serve(t, dir)
+	o, dir := nfsTarget(t)
 	if err := os.WriteFile(filepath.Join(dir, "file"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	for _, folder := range []string{"missing", "file", "../up"} {
-		if n, err := fsys.DialNFS(ctx, nfsOptions(host, port, folder)); err == nil {
+	up := *o
+	up.Folder = "../up"
+	for _, o := range []*fsys.NFSOptions{sub(o, "missing"), sub(o, "file"), &up} {
+		if n, err := fsys.DialNFS(ctx, o); err == nil {
 			n.Close()
-			t.Errorf("DialNFS(%q) worked", folder)
+			t.Errorf("DialNFS(%q) worked", o.Folder)
 		}
 	}
 }
@@ -250,12 +278,11 @@ func TestNFSSymlinks(t *testing.T) {
 // Two clients making the same folders at once: the one that loses the race
 // takes the other's folder.
 func TestNFSMkdirAllRace(t *testing.T) {
-	dir := t.TempDir()
-	host, port := nfs3test.Serve(t, dir)
+	o, _ := nfsTarget(t)
 	ctx := context.Background()
 	var clients [2]*fsys.NFS
 	for i := range clients {
-		n, err := fsys.DialNFS(ctx, nfsOptions(host, port, "."))
+		n, err := fsys.DialNFS(ctx, o)
 		if err != nil {
 			t.Fatal(err)
 		}

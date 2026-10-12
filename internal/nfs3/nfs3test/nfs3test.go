@@ -2,13 +2,17 @@
 
 // Package nfs3test serves a folder over NFSv3, in-process, for tests: the
 // willscott/go-nfs server, which answers MOUNT and NFS on one port and runs
-// no portmapper.
+// no portmapper. It also finds an outside server, when the environment
+// names one.
 package nfs3test
 
 import (
+	"cmp"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -16,7 +20,45 @@ import (
 	"github.com/go-git/go-billy/v5/osfs"
 	nfs "github.com/willscott/go-nfs"
 	"github.com/willscott/go-nfs/helpers"
+
+	"github.com/fqazzazee/shuttle/internal/nfs3"
 )
+
+// The environment that names an outside NFSv3 server, such as the Linux
+// kernel server in CI.
+const (
+	// EnvServer is the server: a host, whose portmapper says where its
+	// services are, or host:port, where both listen. The engine tests also
+	// take "inprocess", which is theirs to handle.
+	EnvServer = "SHUTTLE_TEST_NFS"
+	EnvExport = "SHUTTLE_TEST_NFS_EXPORT" // the export; "/" if unset
+	EnvDir    = "SHUTTLE_TEST_NFS_DIR"    // the export's folder on this machine
+	// EnvV4Only is the host of a server that speaks only NFSv4.
+	EnvV4Only = "SHUTTLE_TEST_NFS4_ONLY"
+)
+
+// Outside returns the server the environment names, reached as this user,
+// and the export's folder on this machine. ok is false if it names none.
+func Outside() (o nfs3.Options, dir string, ok bool, err error) {
+	addr := os.Getenv(EnvServer)
+	if addr == "" || addr == "inprocess" {
+		return o, "", false, nil
+	}
+	host, port := addr, 0
+	if h, p, err := net.SplitHostPort(addr); err == nil {
+		host = h
+		if port, err = strconv.Atoi(p); err != nil {
+			return o, "", false, fmt.Errorf("%s=%q: %w", EnvServer, addr, err)
+		}
+	}
+	if dir = os.Getenv(EnvDir); dir == "" {
+		return o, "", false, fmt.Errorf("%s is set but %s is not", EnvServer, EnvDir)
+	}
+	return nfs3.Options{
+		Host: host, Port: port, MountPort: port, Export: cmp.Or(os.Getenv(EnvExport), "/"),
+		UID: uint32(os.Getuid()), GID: uint32(os.Getgid()), //nolint:gosec // this user's IDs
+	}, dir, true, nil
+}
 
 func init() {
 	nfs.Log.SetLevel(nfs.PanicLevel) // its "connection closed" noise would fill test logs

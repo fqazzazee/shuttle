@@ -109,6 +109,47 @@ jobs:
       # The engine suite against the in-process NFSv3 server.
       - run: make test-nfs
 
+  # Phase 5's exit condition, against the Linux kernel server: shuttle's own
+  # NFSv3 client straight to it, then, with NFSv3 turned off, the engine
+  # suite through an NFSv4 mount (a share of type "path").
+  nfs-kernel:
+    name: nfs (kernel server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      - name: start the kernel NFS server
+        run: test/nfs/kernel-server.sh v3
+      # No port: the client asks the server's portmapper, as it does a NAS's.
+      - name: NFSv3, directly
+        env:
+          SHUTTLE_TEST_NFS: 127.0.0.1
+          SHUTTLE_TEST_NFS_EXPORT: /srv/nfs/v3
+          SHUTTLE_TEST_NFS_DIR: /srv/nfs/v3
+        run: |
+          go test -race -count=1 -run NFS ./internal/fsys/
+          go test -count=1 -run TestRemoteSide -v ./internal/engine/
+          go test -race -count=1 ./internal/engine/
+      - name: turn NFSv3 off, and mount the server over NFSv4
+        run: test/nfs/kernel-server.sh v4-only
+      # After the mount: the server is up, so a refusal is the server's.
+      - name: NFSv4, through the mount
+        env:
+          SHUTTLE_TEST_MOUNT_DIR: /mnt/nfs4
+          SHUTTLE_TEST_NFS4_ONLY: 127.0.0.1
+        run: |
+          go test -count=1 -run TestNFSv4OnlyServer -v ./internal/nfs3/
+          go test -count=1 -run TestRemoteSide -v ./internal/engine/
+          go test -race -count=1 ./internal/engine/
+      - name: server log
+        if: failure()
+        run: sudo journalctl -u nfs-server -u nfs-mountd -u rpcbind --no-pager | tail -100
+
   systemd:
     name: systemd
     runs-on: ubuntu-latest
