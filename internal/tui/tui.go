@@ -15,6 +15,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/engine"
 )
 
 // Client is what the TUI asks of the daemon. *bus.Client has it.
@@ -25,6 +26,8 @@ type Client interface {
 	SyncNow(ctx context.Context, name string) error
 	SetPaused(ctx context.Context, name string, paused bool) error
 	SetEnabled(ctx context.Context, name string, on bool) error
+	Resolve(ctx context.Context, name, path string, choice engine.Choice) error
+	AllowDeletions(ctx context.Context, name string) error
 	Changes(ctx context.Context) (<-chan daemon.Status, error)
 }
 

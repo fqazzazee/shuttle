@@ -105,8 +105,10 @@ than restarting it over and over.
 ## Use
 
 Run `shuttle` on its own for the terminal interface: every shuttle live, with its progress and
-transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it. `?`
-lists the keys. The other tabs (conflicts, activity, profiles, shares) are still to come.
+transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it. The
+Conflicts tab lists what waits for you, with both copies' size and time: keep this computer's
+copy (`l`), the share's (`r`) or both (`b`), and let deletions the guard held back go ahead
+(`a`). `?` lists the keys. The other tabs (activity, profiles, shares) are still to come.
 
 ```bash
 shuttle status            # one line per shuttle
