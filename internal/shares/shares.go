@@ -60,6 +60,44 @@ func OpenRemote(ctx context.Context, cfg *config.Config, s *config.Shuttle, stor
 	return nil, fmt.Errorf("share %s: unknown type %q", share.Name, share.Type)
 }
 
+// Test checks that share can be reached and read: an SMB share is logged
+// in to, with password if one is given and otherwise the one stored in the
+// keyring; a mounted folder must be there. It reads the share's top folder
+// and changes nothing.
+func Test(ctx context.Context, share *config.Share, password string, store secrets.Store) error {
+	var f fsys.FS
+	var err error
+	switch share.Type {
+	case config.SharePath:
+		f, err = fsys.OpenLocal(share.Path)
+		if err != nil {
+			return fmt.Errorf("folder %s: %w (is the share mounted?)", share.Path, err)
+		}
+	case config.ShareSMB:
+		if password != "" {
+			store = given(password)
+		}
+		f, err = openSMB(ctx, share, ".", store)
+		if err != nil {
+			return err
+		}
+	case config.ShareNFS3:
+		return fmt.Errorf("NFS: %w (planned)", ErrNotSupported)
+	default:
+		return fmt.Errorf("unknown type %q", share.Type)
+	}
+	defer f.Close()
+	_, err = f.ReadDir(ctx, ".")
+	return err
+}
+
+// given is a store that holds one password, the one typed in.
+type given string
+
+func (g given) Get(context.Context, secrets.Key) (string, error) { return string(g), nil }
+func (given) Set(context.Context, secrets.Key, string) error     { return errors.ErrUnsupported }
+func (given) Delete(context.Context, secrets.Key) error          { return errors.ErrUnsupported }
+
 func openSMB(ctx context.Context, share *config.Share, folder string, store secrets.Store) (fsys.FS, error) {
 	o := &fsys.SMBOptions{
 		Addr:   net.JoinHostPort(share.Host, strconv.Itoa(cmp.Or(share.Port, smbPort))),

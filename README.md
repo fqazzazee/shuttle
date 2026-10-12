@@ -73,7 +73,8 @@ Bandwidth limits go in a profile or a shuttle: `bandwidth = { up = "20MB/s", dow
 The same key under `[global]` caps all shuttles together. A change to the global cap applies
 from the next file, without restarting anything.
 
-Store the share's password in the keyring (until the TUI does it for you):
+Shares can also be added in the terminal interface (`shuttle`, then `5`), which tests them and
+keeps their passwords in the keyring. For a share written by hand, store its password with:
 
 ```bash
 secret-tool store --label "shuttle: smb://you@nas.example/home" \
@@ -109,8 +110,9 @@ transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable 
 Conflicts tab lists what waits for you, with both copies' size and time: keep this computer's
 copy (`l`), the share's (`r`) or both (`b`), and let deletions the guard held back go ahead
 (`a`). The Activity tab shows what the shuttles did lately, newest first, as it happens; `f`
-shows one shuttle at a time. `?` lists the keys. The other tabs (profiles, shares) are still to
-come.
+shows one shuttle at a time. The Shares tab adds (`n`), edits (`e`), tests (`t`) and deletes
+(`x`) shares, works with the daemon stopped, and keeps passwords in the keyring, never in the
+config file. `?` lists the keys. The Profiles tab and the shuttle editor are still to come.
 
 ```bash
 shuttle status            # one line per shuttle

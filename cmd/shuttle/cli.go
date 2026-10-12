@@ -16,6 +16,8 @@ import (
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/present"
+	"github.com/fqazzazee/shuttle/internal/secrets"
+	"github.com/fqazzazee/shuttle/internal/shares"
 	"github.com/fqazzazee/shuttle/internal/tui"
 )
 
@@ -190,7 +192,18 @@ func runTUI(ctx context.Context, stderr io.Writer) int {
 		return 1
 	}
 	defer c.Close()
-	if err := tui.Run(ctx, c); err != nil {
+	paths, err := daemon.DefaultPaths()
+	if err != nil {
+		fmt.Fprintf(stderr, "shuttle: %v\n", err)
+		return 1
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintf(stderr, "shuttle: %v\n", err)
+		return 1
+	}
+	o := tui.Options{Config: paths.Config, Home: home, Store: secrets.SecretService(), Test: shares.Test}
+	if err := tui.Run(ctx, c, o); err != nil {
 		fmt.Fprintf(stderr, "shuttle: %v\n", err)
 		return 1
 	}

@@ -127,7 +127,7 @@ var _ Client = (*bus.Client)(nil) // the real client fits
 // start makes a model on f, sized w×h, and runs its first commands.
 func start(t *testing.T, f *fake, w, h int) *model {
 	t.Helper()
-	m := newModel(context.Background(), f)
+	m := newModel(context.Background(), f, testOptions(t))
 	m.every, m.now = 0, func() time.Time { return now }
 	send(t, m, tea.WindowSizeMsg{Width: w, Height: h})
 	run(t, m, m.Init())
@@ -154,6 +154,8 @@ func press(t *testing.T, m *model, keys ...string) {
 			key = tea.KeyPressMsg{Code: tea.KeyTab}
 		case "esc":
 			key = tea.KeyPressMsg{Code: tea.KeyEscape}
+		case "shift+tab":
+			key = tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 		case "pgup":
 			key = tea.KeyPressMsg{Code: tea.KeyPgUp}
 		case "pgdown":
