@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -50,16 +51,26 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func TestDaemonWithoutConfig(t *testing.T) {
+// A config file that does not load stops the daemon with EX_CONFIG: the
+// unit does not restart on it. (No config file at all is no shuttles yet:
+// see internal/daemon's TestNoConfigYet.)
+func TestDaemonWithABrokenConfig(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("XDG_STATE_HOME", dir)
+	path := filepath.Join(dir, "shuttle", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("[shuttles.s]\nmode = \"sideways\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	var stdout, stderr bytes.Buffer
 	if code := run(context.Background(), []string{"daemon"}, &stdout, &stderr); code != exitConfig {
 		t.Errorf("exit code = %d, want %d (EX_CONFIG: the unit does not restart on it)", code, exitConfig)
 	}
-	if !strings.Contains(stderr.String(), dir+"/shuttle/config.toml") {
-		t.Errorf("stderr = %q, want it to name the missing config file", stderr.String())
+	if !strings.Contains(stderr.String(), path) {
+		t.Errorf("stderr = %q, want it to name the config file", stderr.String())
 	}
 }
 

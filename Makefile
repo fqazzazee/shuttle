@@ -39,6 +39,7 @@ install: build
 	sed 's|@BINDIR@|$(BINDIR)|g' packaging/desktop/$(DESKTOP).in > $(DESTDIR)$(APPDIR)/$(DESKTOP)
 	@echo "Installed. To run it with your desktop session:"
 	@echo "  systemctl --user daemon-reload && systemctl --user enable --now shuttle"
+	@echo "Then run shuttle to add a share and a shuttle; the service picks them up."
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(BINARY) $(DESTDIR)$(USERUNITDIR)/shuttle.service $(DESTDIR)$(APPDIR)/$(DESKTOP)

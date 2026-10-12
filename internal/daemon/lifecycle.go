@@ -155,6 +155,11 @@ func (d *Daemon) watchConfig() (loop func()) {
 		// file and renaming it over the old one. A symlinked config (from
 		// a dotfiles repo) is followed to the file it points to.
 		dirs := map[string]bool{filepath.Dir(d.o.Paths.Config): true}
+		// Before the first config there may be no folder to watch: the
+		// TUI would make it, but only once the watch had failed.
+		if err = os.MkdirAll(filepath.Dir(d.o.Paths.Config), 0o700); err != nil {
+			dirs = nil
+		}
 		if target, err := filepath.EvalSymlinks(d.o.Paths.Config); err == nil {
 			names[target] = true
 			dirs[filepath.Dir(target)] = true
@@ -240,7 +245,7 @@ func (d *Daemon) WatchReloads(fn func(*Reloaded)) (stop func()) {
 // background, as a change to the file would. It returns the config error,
 // if any; the running config stays in use then.
 func (d *Daemon) Reload() error {
-	if _, err := config.Load(d.o.Paths.Config); err != nil {
+	if _, err := loadConfig(d.o.Paths.Config); err != nil {
 		return fmt.Errorf("%w: %w", ErrConfig, err)
 	}
 	d.askReload()
@@ -302,7 +307,7 @@ func (d *Daemon) apply() {
 	d.reloadMu.Lock()
 	defer d.reloadMu.Unlock()
 	log := d.o.Log
-	cfg, err := config.Load(d.o.Paths.Config)
+	cfg, err := loadConfig(d.o.Paths.Config)
 	if err != nil {
 		log.Warn("config not reloaded; the previous one stays in use", "err", err)
 		d.configFailed(err.Error())
