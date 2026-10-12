@@ -50,7 +50,7 @@ func (e *executor) newestWins(a *Action) error {
 		src, dst = a.Local, a.Remote
 		winner = e.o.LocalName
 	}
-	if err := e.copyFile(a.Path, toRemote, src, dst); err != nil {
+	if err := e.copyFile(a.Path, toRemote, src, dst, false); err != nil {
 		return err
 	}
 	e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: OpConflict, Reason: a.Reason,
@@ -95,14 +95,14 @@ func (e *executor) keepBoth(a *Action) error {
 		return nil // the folder and the renamed file sync on the next run
 	}
 	// Give the loser side the winning file, and the winner side the saved one.
-	if err := e.copyFile(a.Path, loserRemote, winnerInfo, nil); err != nil {
+	if err := e.copyFile(a.Path, loserRemote, winnerInfo, nil, false); err != nil {
 		return err
 	}
 	savedInfo, err := loserFS.Stat(e.ctx, saved)
 	if err != nil {
 		return err
 	}
-	return e.copyFile(saved, !loserRemote, &savedInfo, nil)
+	return e.copyFile(saved, !loserRemote, &savedInfo, nil, false)
 }
 
 // freeConflictName returns a conflict name for p that exists on neither side.
@@ -206,7 +206,7 @@ func (e *executor) overwrite(a *Action, toRemote bool) error {
 		return fmt.Errorf("resolve %s: a file and a folder can only be kept both", a.Path)
 	}
 	if toRemote {
-		return e.copyFile(a.Path, true, a.Local, a.Remote)
+		return e.copyFile(a.Path, true, a.Local, a.Remote, false)
 	}
-	return e.copyFile(a.Path, false, a.Remote, a.Local)
+	return e.copyFile(a.Path, false, a.Remote, a.Local, false)
 }

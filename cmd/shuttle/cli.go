@@ -15,6 +15,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/engine"
 )
 
 // callTimeout bounds one CLI request to the daemon.
@@ -144,6 +145,9 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 // user's attention first.
 func details(st *daemon.Status) string {
 	var parts []string
+	if p := progress(&st.Progress); p != "" {
+		parts = append(parts, p)
+	}
 	if st.Error != "" {
 		parts = append(parts, st.Error)
 	}
@@ -166,6 +170,50 @@ func details(st *daemon.Status) string {
 		parts = append(parts, st.Note)
 	}
 	return strings.Join(parts, "; ")
+}
+
+// progress describes a run in progress, e.g. "syncing 12 of 30, 45.0 MB of
+// 120.0 MB, ↑ 2.1 MB/s: docs/a.pdf"; "" when not running.
+func progress(p *daemon.Progress) string {
+	var s string
+	switch p.Phase {
+	case "":
+		return ""
+	case engine.PhaseScanning:
+		s = fmt.Sprintf("scanning, %d found", p.Done)
+	case engine.PhaseComparing:
+		s = fmt.Sprintf("comparing %d of %d", p.Done, p.Total)
+	default:
+		s = fmt.Sprintf("%s %d of %d", p.Phase, p.Done, p.Total)
+		if p.TotalBytes > 0 {
+			s += fmt.Sprintf(", %s of %s", size(p.Bytes), size(p.TotalBytes))
+		}
+	}
+	if p.RateUp > 0 {
+		s += ", ↑ " + size(p.RateUp) + "/s"
+	}
+	if p.RateDown > 0 {
+		s += ", ↓ " + size(p.RateDown) + "/s"
+	}
+	if p.Path != "" {
+		s += ": " + p.Path
+	}
+	return s
+}
+
+// size is a byte count in decimal units, as GNOME shows them.
+func size(n int64) string {
+	if n < 1000 {
+		return fmt.Sprintf("%d B", n)
+	}
+	f, unit := float64(n)/1000, "kB"
+	for _, u := range []string{"MB", "GB", "TB"} {
+		if f < 1000 {
+			break
+		}
+		f, unit = f/1000, u
+	}
+	return fmt.Sprintf("%.1f %s", f, unit)
 }
 
 func plural(n int, thing string) string {

@@ -184,7 +184,10 @@ func (r *runner) runOnce(requested bool) {
 	r.changed() // the loop has set StateRunning
 	log.Info("run started")
 
-	res, err := r.sync()
+	t := &engine.Tracker{}
+	stopFollowing := r.followProgress(t)
+	res, err := r.sync(t)
+	stopFollowing()
 	now := r.d.o.Now()
 
 	r.mu.Lock()
@@ -268,7 +271,7 @@ func (r *runner) options(local, remote fsys.FS) *engine.Options {
 }
 
 // sync opens both sides and runs the engine once.
-func (r *runner) sync() (*engine.Result, error) {
+func (r *runner) sync(t *engine.Tracker) (*engine.Result, error) {
 	// Runs are not cancelled by shutdown: Stop ends them after the current
 	// file instead. Only waiting for the keyring and the share is bounded.
 	ctx := context.Background()
@@ -287,7 +290,7 @@ func (r *runner) sync() (*engine.Result, error) {
 	r.startOwnWrites()
 	defer r.endOwnWrites()
 	o := r.options(local, remote)
-	o.AllowDeletions = allow
+	o.AllowDeletions, o.Tracker = allow, t
 	return engine.Run(ctx, o)
 }
 

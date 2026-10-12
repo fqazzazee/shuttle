@@ -63,6 +63,9 @@ func Serve(ctx context.Context, conn *dbus.Conn, d *daemon.Daemon) error {
 		// Why the config file did not load ("" when it did); the daemon then
 		// runs the config it last loaded.
 		"ConfigError": {Value: d.ConfigError(), Emit: prop.EmitTrue},
+		// Every shuttle's transfer rates together, in bytes per second.
+		"RateUp":   {Value: uint64(0), Emit: prop.EmitTrue},
+		"RateDown": {Value: uint64(0), Emit: prop.EmitTrue},
 	}})
 	if err != nil {
 		return err
@@ -117,6 +120,9 @@ func Serve(ctx context.Context, conn *dbus.Conn, d *daemon.Daemon) error {
 func (s *server) changed(st *daemon.Status) {
 	s.setProp("State", string(s.d.State()))
 	s.setProp("Paused", s.d.Paused())
+	up, down := s.d.Rates()
+	s.setProp("RateUp", u64(up))
+	s.setProp("RateDown", u64(down))
 	_ = s.conn.Emit(Path, Interface+".ShuttleChanged", st.Name, encode(st))
 	for _, c := range s.newlyHeld(st) {
 		_ = s.conn.Emit(Path, Interface+".ConflictRaised", st.Name, c.Path, c.Reason)
@@ -136,13 +142,17 @@ func (s *server) reloaded(r *daemon.Reloaded) {
 	}
 }
 
-// setProp updates a read-only property and emits PropertiesChanged. prop's
+// setProp updates a read-only property and emits PropertiesChanged, if its
+// value changed: progress updates come several times a second. prop's
 // only setter for read-only properties, SetMust, panics if emitting fails
 // (the bus connection closed); that must never take the sync daemon down,
 // so the panic stops here. (Properties.Set is the clients' setter: it
 // refuses read-only properties.)
 func (s *server) setProp(name string, v any) {
 	defer func() { _ = recover() }()
+	if s.props.GetMust(Interface, name) == v {
+		return
+	}
 	s.props.SetMust(Interface, name, v)
 }
 

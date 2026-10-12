@@ -30,6 +30,31 @@ func TestAgo(t *testing.T) {
 	}
 }
 
+func TestProgressDetails(t *testing.T) {
+	for _, tc := range []struct {
+		p    daemon.Progress
+		want string
+	}{
+		{daemon.Progress{}, ""},
+		{daemon.Progress{Phase: engine.PhaseScanning, Done: 1234}, "scanning, 1234 found"},
+		{daemon.Progress{Phase: engine.PhaseComparing, Done: 3, Total: 10, RateDown: 999, Path: "a.txt"},
+			"comparing 3 of 10, ↓ 999 B/s: a.txt"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 12, Total: 30, Bytes: 45_000_000, TotalBytes: 120_000_000,
+			RateUp: 2_100_000, Path: "docs/a.pdf"}, "syncing 12 of 30, 45.0 MB of 120.0 MB, ↑ 2.1 MB/s: docs/a.pdf"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 2}, "syncing 1 of 2"},
+	} {
+		if got := progress(&tc.p); got != tc.want {
+			t.Errorf("progress(%+v) = %q, want %q", tc.p, got, tc.want)
+		}
+	}
+	for n, want := range map[int64]string{0: "0 B", 999: "999 B", 1000: "1.0 kB", 2_100_000: "2.1 MB",
+		7_300_000_000: "7.3 GB", 5_000_000_000_000_000: "5000.0 TB"} {
+		if got := size(n); got != want {
+			t.Errorf("size(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
+
 func TestDetails(t *testing.T) {
 	st := &daemon.Status{
 		Error:         "share nas: connection refused",

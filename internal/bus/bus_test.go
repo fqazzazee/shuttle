@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -277,7 +278,7 @@ func TestIntrospection(t *testing.T) {
 	}
 	for _, want := range []string{Interface, "ListShuttles", "SyncNow", "SetPaused", "ResolveConflict",
 		"AllowDeletions", "SetEnabled", "ReloadConfig", "ShuttleChanged", "ConflictRaised", "ShuttleRemoved",
-		`name="State"`, `name="Paused"`, `name="ConfigError"`} {
+		`name="State"`, `name="Paused"`, `name="ConfigError"`, `name="RateUp"`, `name="RateDown"`} {
 		if !strings.Contains(xml, want) {
 			t.Errorf("introspection lacks %s", want)
 		}
@@ -402,4 +403,47 @@ func TestSetEnabledOverTheBus(t *testing.T) {
 	if err := f.c.SetEnabled(ctx(t), "nope", true); !errors.Is(err, daemon.ErrUnknownShuttle) {
 		t.Errorf("SetEnabled(nope) = %v, want ErrUnknownShuttle", err)
 	}
+}
+
+func TestStatusRoundTrip(t *testing.T) {
+	st := daemon.Status{
+		Name: "s", State: daemon.StateRunning, Paused: true, Pending: true, Share: daemon.ShareOnline,
+		Note: "n", Error: "e", LastRun: time.Unix(1000, 0), LastOK: time.Unix(900, 0),
+		Copied: 3, Deleted: 2, HeldDeletions: 1,
+		Conflicts: []engine.Issue{{Path: "c", Reason: "r", Outcome: "held", Op: engine.OpConflict}},
+		Errors:    []engine.Issue{{Path: "x", Reason: "denied"}},
+		Progress: daemon.Progress{Phase: engine.PhaseSyncing, Done: 4, Total: 9, Bytes: 5 << 30,
+			TotalBytes: 7 << 30, Path: "big.iso", RateUp: 2_100_000, RateDown: 1},
+	}
+	if got := decode("s", encode(&st)); !reflect.DeepEqual(got, st) {
+		t.Errorf("round trip:\n got %+v\nwant %+v", got, st)
+	}
+}
+
+// While a shuttle copies, its progress and the overall rates are on the
+// bus; once it is done, they are back to zero.
+func TestProgressOverTheBus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("timed")
+	}
+	f := newFixture(t, "push", `bandwidth = { up = "256KiB/s" }`)
+	write(t, f.local, "big.bin", strings.Repeat("x", 768<<10))
+	changes, _ := f.c.Changes(ctx(t))
+	if err := f.c.SyncNow(ctx(t), "s"); err != nil {
+		t.Fatal(err)
+	}
+	st := f.waitFor(changes, "progress", func(st *daemon.Status) bool {
+		return st.Progress.Path == "big.bin" && st.Progress.RateUp > 0
+	})
+	if st.Progress.Phase != engine.PhaseSyncing || st.Progress.TotalBytes != 768<<10 {
+		t.Errorf("progress = %+v", st.Progress)
+	}
+	if up, down, err := f.c.Rates(ctx(t)); err != nil || up <= 0 || down != 0 {
+		t.Errorf("Rates while copying = %d, %d, %v", up, down, err)
+	}
+	f.waitFor(changes, "the run's end", ran)
+	waitUntil(t, "the rates back to zero", func() bool {
+		up, down, err := f.c.Rates(ctx(t))
+		return err == nil && up == 0 && down == 0
+	})
 }
