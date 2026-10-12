@@ -80,15 +80,21 @@ func (r *runner) shareChanged(up bool) {
 	if up {
 		now = ShareOnline
 	}
+	// The shuttle's view and the share's, together: otherwise a change
+	// could be seen before the one before it was counted, and go untold.
+	r.d.shareMu.Lock()
 	r.mu.Lock()
 	was := r.st.Share
 	r.st.Share = now
 	r.mu.Unlock()
+	if was != now {
+		r.d.shareChanged(r.shuttle.Share)
+	}
+	r.d.shareMu.Unlock()
 	if was == now {
 		return
 	}
 	r.d.o.Log.Info("share "+now, "shuttle", r.shuttle.Name, "share", r.shuttle.Share)
-	r.d.shareChanged(r.shuttle.Share)
 	if up && r.shuttle.Settings.Has(config.TriggerShareAvailable) {
 		r.trigger()
 		return
