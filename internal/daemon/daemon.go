@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"os"
@@ -127,9 +128,12 @@ func New(opts *Options) (*Daemon, error) {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
-	cfg, err := config.Load(o.Paths.Config)
+	cfg, err := loadConfig(o.Paths.Config)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrConfig, err)
+	}
+	if _, err := os.Stat(o.Paths.Config); errors.Is(err, fs.ErrNotExist) {
+		o.Log.Info("no config file yet: run shuttle to add a share and a shuttle", "config", o.Paths.Config)
 	}
 	host, err := os.Hostname()
 	if err != nil {
@@ -257,6 +261,21 @@ func (d *Daemon) notify(st *Status) {
 		cp := *st
 		fn(&cp)
 	}
+}
+
+// loadConfig reads the config file. One that is not there yet is a config
+// with nothing in it: after `make install` the service starts before the
+// TUI has written one, and picks it up when it does.
+func loadConfig(path string) (*config.Config, error) {
+	cfg, err := config.Load(path)
+	if !errors.Is(err, fs.ErrNotExist) {
+		return cfg, err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	return config.Parse(nil, home)
 }
 
 // Paused reports whether every shuttle is paused (SetPaused("", true)).
