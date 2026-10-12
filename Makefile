@@ -11,8 +11,10 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Pinned to match CI. `go run` builds it on first use, so no separate install.
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+# Keep in step with the release workflow. Not newer: from v2.18 it needs Go 1.27.
+GORELEASER    ?= go run github.com/goreleaser/goreleaser/v2@v2.17.1
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui test-extension lint-extension install-extension uninstall-extension
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -58,6 +60,27 @@ smoke:
 	cd / && "$(DESTDIR)$(BINDIR)/$(BINARY)" version
 	cd / && "$(DESTDIR)$(BINDIR)/$(BINARY)" help >/dev/null
 	grep -qx 'ExecStart=$(BINDIR)/$(BINARY) daemon' "$(DESTDIR)$(USERUNITDIR)/shuttle.service"
+
+# The packages: RPM, DEB and tarballs for amd64 and arm64 in dist/, as a tagged
+# release would make them, but with a snapshot version and nothing published.
+packages:
+	$(GORELEASER) release --snapshot --clean
+
+# Installs the amd64 RPM and DEB from `make packages` in throwaway Fedora 44 and
+# Debian containers, checks what they put where, and removes them again.
+test-packages:
+	PODMAN="$(PODMAN)" test/packages/run.sh
+
+# The files the packages carry besides the binary, filled in for /usr, in
+# build/package; goreleaser runs this first.
+PKGDIR := build/package
+package-files:
+	rm -rf $(PKGDIR)
+	mkdir -p $(PKGDIR)
+	sed 's|@BINDIR@|/usr/bin|g' packaging/systemd/shuttle.service.in > $(PKGDIR)/shuttle.service
+	sed 's|@BINDIR@|/usr/bin|g' packaging/desktop/$(DESKTOP).in > $(PKGDIR)/$(DESKTOP)
+	cp -r extension $(PKGDIR)/extension
+	rm -rf $(PKGDIR)/extension/test
 
 # SMB integration tests run against a throwaway Samba container.
 CONTAINER    ?= podman
@@ -152,4 +175,4 @@ test-extension:
 PODMAN ?= podman
 
 clean:
-	rm -rf bin/ dist/ coverage.out
+	rm -rf bin/ build/ dist/ coverage.out

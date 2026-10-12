@@ -3,6 +3,11 @@ version: 2
 
 project_name: shuttle
 
+# The files `make install` fills in, filled in for /usr: see `make package-files`.
+before:
+  hooks:
+    - make package-files
+
 builds:
   - id: shuttle
     main: ./cmd/shuttle
@@ -29,6 +34,24 @@ nfpms:
     license: GPL-2.0-or-later
     formats: [rpm, deb]
     bindir: /usr/bin
+    # What `make install` and `make install-extension` put in place. The service
+    # is a user unit, enabled by each user (the README says how); the extension
+    # is there for each user to enable.
+    contents:
+      - src: build/package/shuttle.service
+        dst: /usr/lib/systemd/user/shuttle.service
+      - src: build/package/io.github.fqazzazee.Shuttle.desktop
+        dst: /usr/share/applications/io.github.fqazzazee.Shuttle.desktop
+      # tree: the folders inside it (lib/, icons/) stay folders.
+      - src: build/package/extension
+        dst: /usr/share/gnome-shell/extensions/shuttle@fqazzazee.github.io
+        type: tree
+      - src: LICENSE
+        dst: /usr/share/licenses/shuttle/LICENSE
+        packager: rpm
+      - src: LICENSE
+        dst: /usr/share/doc/shuttle/copyright
+        packager: deb
 
 # Release notes come from conventional commit subjects (squash merges keep them
 # one per PR).

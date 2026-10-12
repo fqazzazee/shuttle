@@ -23,8 +23,9 @@ Thumbs.db
 credentials.json
 secrets.yaml
 
-# Build output (dist/ is also goreleaser's)
+# Build output (dist/ is also goreleaser's; build/ holds the files it packages)
 /bin/
+/build/
 /shuttle
 dist/
 coverage/

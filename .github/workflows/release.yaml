@@ -23,7 +23,7 @@ jobs:
           check-latest: true
       - uses: goreleaser/goreleaser-action@v7
         with:
-          version: '~> v2'
+          version: 'v2.17.1'   # keep in step with GORELEASER in the Makefile
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
