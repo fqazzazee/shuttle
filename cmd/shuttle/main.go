@@ -17,6 +17,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/charmbracelet/x/term"
 	"github.com/godbus/dbus/v5"
 
 	"github.com/fqazzazee/shuttle/internal/bus"
@@ -42,6 +43,10 @@ func main() {
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
+		// The TUI, in a terminal; scripts and pipes get the usage.
+		if f, ok := stdout.(*os.File); ok && term.IsTerminal(f.Fd()) && term.IsTerminal(os.Stdin.Fd()) {
+			return runTUI(ctx, stderr)
+		}
 		usage(stderr)
 		return 2
 	}
@@ -131,7 +136,9 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprint(w, `Usage: shuttle <command>
+	fmt.Fprint(w, `Usage: shuttle [<command>]
+
+Without a command, in a terminal: the TUI.
 
 Commands:
   status            Show every shuttle's state

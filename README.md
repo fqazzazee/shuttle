@@ -104,6 +104,10 @@ than restarting it over and over.
 
 ## Use
 
+Run `shuttle` on its own for the terminal interface: every shuttle live, with its progress and
+transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it. `?`
+lists the keys. The other tabs (conflicts, activity, profiles, shares) are still to come.
+
 ```bash
 shuttle status            # one line per shuttle
 shuttle sync documents    # sync now

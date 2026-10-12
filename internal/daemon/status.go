@@ -5,6 +5,7 @@ package daemon
 import (
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/engine"
 )
 
@@ -24,6 +25,7 @@ const (
 // Status is one shuttle's status.
 type Status struct {
 	Name    string
+	Mode    config.Mode // push, pull or sync
 	State   State
 	Paused  bool   // paused by the user, itself or with all shuttles
 	Pending bool   // a run is waiting: triggered while paused or while running

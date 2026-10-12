@@ -8,6 +8,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/fsys"
@@ -73,6 +74,7 @@ func encode(st *daemon.Status) map[string]dbus.Variant {
 	}
 	return map[string]dbus.Variant{
 		"State":         dbus.MakeVariant(string(st.State)),
+		"Mode":          dbus.MakeVariant(string(st.Mode)),
 		"Paused":        dbus.MakeVariant(st.Paused),
 		"Pending":       dbus.MakeVariant(st.Pending),
 		"Share":         dbus.MakeVariant(st.Share),
@@ -116,12 +118,13 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 			_ = v.Store(into)
 		}
 	}
-	var state string
+	var state, mode string
 	var lastRun, lastOK int64
 	var copied, deleted, held uint32
 	var conflicts []conflict
 	var errs []issue
 	get("State", &state)
+	get("Mode", &mode)
 	get("Paused", &st.Paused)
 	get("Pending", &st.Pending)
 	get("Share", &st.Share)
@@ -149,7 +152,7 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	st.Progress.Done, st.Progress.Total = int(done), int(total)
 	st.Progress.Bytes, st.Progress.TotalBytes = s64(bytes), s64(totalBytes)
 	st.Progress.RateUp, st.Progress.RateDown = s64(rateUp), s64(rateDown)
-	st.State = daemon.State(state)
+	st.State, st.Mode = daemon.State(state), config.Mode(mode)
 	if lastRun != 0 {
 		st.LastRun = time.Unix(lastRun, 0)
 	}
