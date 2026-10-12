@@ -102,10 +102,8 @@ func (r *runner) runEvents(st *Status, ran, requested bool) []Event {
 // it: their probes run apart, and a "path" share is probed per folder, so
 // one folder missing is that shuttle's problem, not the share's. A change
 // is announced once, whichever shuttle saw it; the first view after start
-// is not news.
+// is not news. The caller holds shareMu.
 func (d *Daemon) shareChanged(share string) {
-	d.shareMu.Lock()
-	defer d.shareMu.Unlock()
 	now, users, notify := "", []string(nil), false
 	unknown := false
 	for _, r := range d.all() {

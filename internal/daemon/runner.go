@@ -224,13 +224,13 @@ func (r *runner) runOnce(requested bool) {
 			r.d.event(&events[i])
 		}
 	}
-	r.mu.Lock()
-	r.st.State = state
-	r.mu.Unlock()
 	if isOffline(err) {
 		// Tell at once, rather than at the next probe.
 		r.shareChanged(false)
 	}
+	r.mu.Lock()
+	r.st.State = state
+	r.mu.Unlock()
 
 	if err != nil && !errors.Is(err, engine.ErrStopped) {
 		log.Warn("run failed", "state", state, "err", err)
