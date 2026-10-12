@@ -49,7 +49,7 @@ grep -q "^path = \"$share\"$" "$HOME/.config/shuttle/config.toml" || fail "the s
 
 step "profiles: add one"
 keys 4 n; typed live; keys Tab Right Right Right  # mode: sync
-for _ in 1 2 3 4 5; do keys Tab; done; keys Left     # conflicts: ask
+keys Tab Tab; keys Left # triggers, conflicts (every, at, poll need triggers): ask
 keys C-s
 shows "saved the profile live"
 shows "live  sync"
@@ -64,7 +64,9 @@ keys Right; shows "Folder here: $HOME/Documents"; keys Enter
 shows "▸ none"
 keys Down Enter
 shows "from live: sync"
-for _ in $(seq 18); do keys Down; done; keys Left Down  # notify.completed: off
+# Down to notify.completed, past the rows that do not apply to a sync shuttle
+# with no triggers and trash versions: every, at, poll, deletions, keep last.
+for _ in $(seq 13); do keys Down; done; keys Left Down  # notify.completed: off
 shows " ●Tell done      off"
 shows "from live: ask"
 keys C-s
