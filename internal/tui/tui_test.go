@@ -39,7 +39,11 @@ type fake struct {
 }
 
 func newFake() *fake {
-	return &fake{changes: make(chan daemon.Status, 8), shuttles: []daemon.Status{
+	// The status stream ends at once: a command waiting on it would wait
+	// for ever, and tests send their changes straight to the model.
+	changes := make(chan daemon.Status)
+	close(changes)
+	return &fake{changes: changes, shuttles: []daemon.Status{
 		{Name: "docs", Mode: config.ModeSync, State: daemon.StateIdle, LastRun: now.Add(-5 * time.Minute)},
 		{Name: "photos", Mode: config.ModePush, State: daemon.StateHeld, LastRun: now.Add(-3 * time.Hour),
 			Conflicts: []engine.Issue{{Path: "a.jpg", Outcome: "held"}, {Path: "b.jpg", Outcome: "held"}}},
@@ -167,8 +171,10 @@ func press(t *testing.T, m *model, keys ...string) {
 	}
 }
 
-// run runs cmd and feeds its messages back, as the program would. A
-// command still waiting after a moment (for a status change) is left.
+// run runs cmd and feeds its messages back, as the program would. Nothing
+// the tests run waits for ever (the fake's status stream is closed), so a
+// command is given as long as a slow disk may need: saving a config file
+// on CI can take more than a moment.
 func run(t *testing.T, m *model, cmd tea.Cmd) {
 	t.Helper()
 	if cmd == nil {
@@ -179,8 +185,8 @@ func run(t *testing.T, m *model, cmd tea.Cmd) {
 	var msg tea.Msg
 	select {
 	case msg = <-got:
-	case <-time.After(50 * time.Millisecond):
-		return
+	case <-time.After(10 * time.Second):
+		t.Fatal("a command did not return")
 	}
 	switch msg := msg.(type) {
 	case nil:
