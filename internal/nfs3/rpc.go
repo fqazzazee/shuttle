@@ -196,6 +196,9 @@ type program struct {
 	prog, vers uint32
 }
 
+// v4Only is what to do about a server that has turned NFSv3 off.
+const v4Only = "an NFSv4-only server: mount it and use a mounted folder"
+
 var (
 	portmapProg = program{"portmapper", 100000, 2}
 	mountProg   = program{"mount service", 100005, 3}
@@ -292,10 +295,19 @@ func acceptedResults(p program, rec []byte) (*decoder, error) {
 		case acceptSuccess:
 			return d, nil
 		case acceptProgUnavail:
+			if p == mountProg {
+				return nil, fmt.Errorf("nfs: the server runs no %s (%s)", p.name, v4Only)
+			}
 			return nil, fmt.Errorf("nfs: the server runs no %s", p.name)
 		case acceptProgMismatch:
 			lo, hi := d.u32(), d.u32()
-			return nil, fmt.Errorf("nfs: the server's %s speaks versions %d to %d, not %d", p.name, lo, hi, p.vers)
+			err := fmt.Errorf("nfs: the server's %s speaks versions %d to %d, not %d", p.name, lo, hi, p.vers)
+			// With NFSv3 turned off, the Linux kernel server keeps MOUNT v1
+			// and v2, and its portmapper gives their port when asked for v3.
+			if (p == mountProg && hi < p.vers) || (p == nfsProg && lo > p.vers) {
+				err = fmt.Errorf("%w (%s)", err, v4Only)
+			}
+			return nil, err
 		case acceptProcUnavail:
 			return nil, fmt.Errorf("nfs: the server's %s lacks a call shuttle needs", p.name)
 		case acceptGarbageArgs:
