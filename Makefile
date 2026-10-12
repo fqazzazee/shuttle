@@ -5,7 +5,11 @@ BINDIR  ?= $(PREFIX)/bin
 # packages set /usr/lib/systemd/user.
 USERUNITDIR ?= $(PREFIX)/share/systemd/user
 APPDIR      ?= $(PREFIX)/share/applications
+ICONDIR     ?= $(PREFIX)/share/icons/hicolor
 DESKTOP     := io.github.fqazzazee.Shuttle.desktop
+# The app icon, and its symbolic form: the extension's own, one file.
+APPICON     := packaging/icons/io.github.fqazzazee.Shuttle.svg
+SYMICON     := extension/icons/shuttle-symbolic.svg
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
@@ -37,12 +41,16 @@ install: build
 	sed 's|@BINDIR@|$(BINDIR)|g' packaging/systemd/shuttle.service.in > $(DESTDIR)$(USERUNITDIR)/shuttle.service
 	install -d $(DESTDIR)$(APPDIR)
 	sed 's|@BINDIR@|$(BINDIR)|g' packaging/desktop/$(DESKTOP).in > $(DESTDIR)$(APPDIR)/$(DESKTOP)
+	install -Dm644 $(APPICON) $(DESTDIR)$(ICONDIR)/scalable/apps/io.github.fqazzazee.Shuttle.svg
+	install -Dm644 $(SYMICON) $(DESTDIR)$(ICONDIR)/symbolic/apps/io.github.fqazzazee.Shuttle-symbolic.svg
 	@echo "Installed. To run it with your desktop session:"
 	@echo "  systemctl --user daemon-reload && systemctl --user enable --now shuttle"
 	@echo "Then run shuttle to add a share and a shuttle; the service picks them up."
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/$(BINARY) $(DESTDIR)$(USERUNITDIR)/shuttle.service $(DESTDIR)$(APPDIR)/$(DESKTOP)
+	rm -f $(DESTDIR)$(BINDIR)/$(BINARY) $(DESTDIR)$(USERUNITDIR)/shuttle.service $(DESTDIR)$(APPDIR)/$(DESKTOP) \
+		$(DESTDIR)$(ICONDIR)/scalable/apps/io.github.fqazzazee.Shuttle.svg \
+		$(DESTDIR)$(ICONDIR)/symbolic/apps/io.github.fqazzazee.Shuttle-symbolic.svg
 
 # Checks the systemd unit and the desktop file as installed. systemd-analyze
 # and desktop-file-validate only warn about a bad setting, so any output at
