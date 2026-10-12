@@ -16,7 +16,7 @@ func TestCoreHasNoDesktopDependencies(t *testing.T) {
 	if err != nil {
 		t.Skip("go not installed")
 	}
-	core := []string{"engine", "config", "fsys", "state", "ignore"}
+	core := []string{"engine", "config", "fsys", "state", "ignore", "activity"}
 	args := []string{"list", "-deps", "-f", "{{.ImportPath}}"}
 	for _, p := range core {
 		args = append(args, "github.com/fqazzazee/shuttle/internal/"+p)
@@ -34,8 +34,8 @@ func TestCoreHasNoDesktopDependencies(t *testing.T) {
 		"github.com/godbus/",                                            // D-Bus
 		"github.com/coreos/go-systemd",                                  // systemd
 		"github.com/zalando/go-keyring", "github.com/99designs/keyring", // Secret Service
-		"github.com/charmbracelet/", // TUI
-		"os/exec", "os/signal",      // processes and signals belong to the daemon
+		"github.com/charmbracelet/", "charm.land/", // TUI
+		"os/exec", "os/signal", // processes and signals belong to the daemon
 	}
 	for _, dep := range strings.Fields(string(out)) {
 		for _, f := range forbidden {

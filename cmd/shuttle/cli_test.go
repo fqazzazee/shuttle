@@ -178,6 +178,8 @@ func TestCLIErrors(t *testing.T) {
 		{[]string{"pause", "a", "b"}, 2, "wrong arguments"},
 		{[]string{"disable", "nope"}, 1, "no shuttle by that name"},
 		{[]string{"enable"}, 2, "wrong arguments"},
+		{[]string{"activity", "nope"}, 1, "no shuttle by that name"},
+		{[]string{"activity", "a", "b"}, 2, "wrong arguments"},
 	} {
 		code, _, stderr := cli(t, tt.args...)
 		if code != tt.code || !strings.Contains(stderr, tt.msg) {
@@ -253,4 +255,33 @@ func waitForStatus(t *testing.T, want string) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Errorf("status never showed %q:\n%s", want, out)
+}
+
+func TestActivity(t *testing.T) {
+	local, mount := startDaemon(t)
+	if code, out, _ := cli(t, "activity"); code != 0 || !strings.HasPrefix(out, "Nothing yet") {
+		t.Errorf("activity before any run = %d %q", code, out)
+	}
+	if err := os.WriteFile(filepath.Join(local, "x.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli(t, "sync", "a")
+	for range 300 {
+		if _, out, _ := cli(t, "activity", "a"); strings.Contains(out, "1 copied") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	code, out, _ := cli(t, "activity", "a")
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if code != 0 || len(lines) != 2 || !strings.HasSuffix(lines[0], "a  x.txt: copied to the share") ||
+		!strings.HasSuffix(lines[1], "a  1 copied") {
+		t.Errorf("activity a = %d:\n%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(mount, "x.txt")); err != nil {
+		t.Error(err)
+	}
+	if _, all, _ := cli(t, "activity"); all != out {
+		t.Errorf("every shuttle's activity:\n%s\nwant a's alone:\n%s", all, out)
+	}
 }

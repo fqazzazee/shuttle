@@ -110,7 +110,12 @@ shuttle sync documents    # sync now
 shuttle pause [documents] # pause one shuttle, or all
 shuttle resume [documents]
 shuttle disable documents # turn a shuttle off, or on again with enable
+shuttle activity          # what every shuttle did lately; or one: shuttle activity documents
 ```
+
+The activity log keeps each file copied or deleted, each conflict and error, and a summary of
+every run that did something, for 30 days or 10,000 entries per shuttle, whichever is less. It
+lives next to the shuttle's state in `~/.local/state/shuttle/`.
 
 `enable` and `disable` are saved in the config file, as `enabled = false` under the shuttle, and
 change nothing else in it. Without a running daemon they edit the file directly, and the change

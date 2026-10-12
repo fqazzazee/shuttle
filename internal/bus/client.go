@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
 )
@@ -83,6 +85,21 @@ func (c *Client) SetEnabled(ctx context.Context, name string, on bool) error {
 // AllowDeletions lets the next run pass the deletion guard.
 func (c *Client) AllowDeletions(ctx context.Context, name string) error {
 	return clientErr(c.call(ctx, "AllowDeletions", name).Err)
+}
+
+// Activity returns the newest entries of a shuttle's activity log, or of
+// every shuttle's when name is "", newest first: at most limit (0: all).
+func (c *Client) Activity(ctx context.Context, name string, limit int) ([]activity.Entry, error) {
+	var es []entry
+	if err := c.call(ctx, "Activity", name, u32(limit)).Store(&es); err != nil {
+		return nil, clientErr(err)
+	}
+	out := make([]activity.Entry, 0, len(es))
+	for _, e := range es {
+		out = append(out, activity.Entry{Shuttle: e.Shuttle, Time: time.Unix(e.Time, 0),
+			Kind: activity.Kind(e.Kind), Path: e.Path, Text: e.Text})
+	}
+	return out, nil
 }
 
 // Reload asks the daemon to re-read its config file now.

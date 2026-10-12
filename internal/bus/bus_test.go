@@ -16,6 +16,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/dbustest"
 	"github.com/fqazzazee/shuttle/internal/engine"
@@ -277,7 +278,7 @@ func TestIntrospection(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{Interface, "ListShuttles", "SyncNow", "SetPaused", "ResolveConflict",
-		"AllowDeletions", "SetEnabled", "ReloadConfig", "ShuttleChanged", "ConflictRaised", "ShuttleRemoved",
+		"AllowDeletions", "SetEnabled", "ReloadConfig", "Activity", "ShuttleChanged", "ConflictRaised", "ShuttleRemoved",
 		`name="State"`, `name="Paused"`, `name="ConfigError"`, `name="RateUp"`, `name="RateDown"`} {
 		if !strings.Contains(xml, want) {
 			t.Errorf("introspection lacks %s", want)
@@ -446,4 +447,28 @@ func TestProgressOverTheBus(t *testing.T) {
 		up, down, err := f.c.Rates(ctx(t))
 		return err == nil && up == 0 && down == 0
 	})
+}
+
+func TestActivityOverTheBus(t *testing.T) {
+	f := newFixture(t, "push", "")
+	write(t, f.local, "a.txt", "a")
+	changes, _ := f.c.Changes(ctx(t))
+	if err := f.c.SyncNow(ctx(t), "s"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor(changes, "the run", ran)
+	es, err := f.c.Activity(ctx(t), "s", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(es) != 2 || es[0].Kind != activity.KindRun || es[0].Text != "1 copied" || es[0].Shuttle != "s" ||
+		es[1].Path != "a.txt" || es[1].Text != "copied to the share" || time.Since(es[1].Time) > time.Minute {
+		t.Errorf("activity = %+v", es)
+	}
+	if all, err := f.c.Activity(ctx(t), "", 1); err != nil || len(all) != 1 || all[0].Kind != activity.KindRun {
+		t.Errorf("every shuttle's, limit 1: %+v, %v", all, err)
+	}
+	if _, err := f.c.Activity(ctx(t), "nope", 0); !errors.Is(err, daemon.ErrUnknownShuttle) {
+		t.Errorf("Activity(nope) = %v, want ErrUnknownShuttle", err)
+	}
 }

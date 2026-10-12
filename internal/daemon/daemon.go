@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/secrets"
@@ -303,6 +304,7 @@ func (d *Daemon) Resolve(ctx context.Context, name, path string, choice engine.C
 		return err
 	}
 	d.o.Log.Info("conflict resolved", "shuttle", name, "path", path, "choice", choice)
+	r.addActivity(activity.KindConflict, path, "resolved: "+resolvedText[choice])
 	r.trigger()
 	return nil
 }
