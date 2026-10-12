@@ -106,15 +106,16 @@ than restarting it over and over.
 ## Use
 
 Run `shuttle` on its own for the terminal interface: every shuttle live, with its progress and
-transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it. The
+transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it, and to
+add (`n`), edit (`e`) and delete (`x`) shuttles: a few steps that browse the share's folders and
+yours, choose a profile, and set what the shuttle does differently from it. The
 Conflicts tab lists what waits for you, with both copies' size and time: keep this computer's
 copy (`l`), the share's (`r`) or both (`b`), and let deletions the guard held back go ahead
 (`a`). The Activity tab shows what the shuttles did lately, newest first, as it happens; `f`
 shows one shuttle at a time. The Shares tab adds (`n`), edits (`e`), tests (`t`) and deletes
 (`x`) shares, works with the daemon stopped, and keeps passwords in the keyring, never in the
 config file. The Profiles tab adds (`n`), edits (`e`), copies (`c`) and deletes (`x`) profiles: a
-setting left empty is not written, and its default applies. `?` lists the keys. The shuttle
-editor is still to come.
+setting left empty is not written, and its default applies. `?` lists the keys.
 
 ```bash
 shuttle status            # one line per shuttle

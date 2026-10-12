@@ -71,7 +71,9 @@ type model struct {
 	// The Profiles tab.
 	profileSel string
 	settings   *settingsForm
-	changes    <-chan daemon.Status // nil until subscribed
+
+	wizard  *wizard              // the shuttle editor, on the Shuttles tab
+	changes <-chan daemon.Status // nil until subscribed
 }
 
 func newModel(ctx context.Context, c Client, o Options) *model {
@@ -100,7 +102,7 @@ type (
 )
 
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(m.refresh(), m.subscribe(), m.tick())
+	return tea.Batch(m.refresh(), m.subscribe(), m.tick(), m.loadConfig())
 }
 
 func (m *model) call() (context.Context, context.CancelFunc) {
@@ -189,7 +191,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tab == tabActivity {
 			cmds = append(cmds, m.loadActivity())
 		}
-		if (m.tab == tabShares && m.form == nil) || (m.tab == tabProfiles && m.settings == nil) {
+		if m.form == nil && m.settings == nil && m.wizard == nil {
 			cmds = append(cmds, m.loadConfig())
 		}
 		if m.changes == nil {
@@ -200,6 +202,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.gotActivity(msg)
 	case configMsg:
 		m.gotConfig(msg)
+	case openedMsg:
+		cmd := m.opened(msg)
+		return m, cmd
+	case listedMsg:
+		if w := m.wizard; w != nil {
+			for _, b := range []*browser{w.remote, w.local} {
+				if b != nil {
+					b.listed(msg)
+				}
+			}
+		}
 	case testedMsg:
 		m.gotTest(msg)
 	case savedMsg:
@@ -212,6 +225,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			in = m.form.inputs[m.form.focus]
 		case m.settings != nil && m.tab == tabProfiles && m.settings.busy == "":
 			in = m.settings.inputs[m.settings.rows[m.settings.focus]]
+		case m.wizard != nil && m.tab == tabShuttles && m.wizard.busy == "":
+			in = m.wizard.input()
 		}
 		if in != nil {
 			updated, cmd := in.Update(msg)
@@ -240,6 +255,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.settings != nil && m.tab == tabProfiles && !m.help && m.question == "" && msg.String() != "ctrl+c" {
 			cmd := m.settingsKey(msg)
+			return m, cmd
+		}
+		if m.wizard != nil && m.tab == tabShuttles && !m.help && m.question == "" && msg.String() != "ctrl+c" {
+			cmd := m.wizardKey(msg)
 			return m, cmd
 		}
 		cmd := m.key(msg.String())
@@ -349,6 +368,8 @@ func (m *model) shuttlesKey(k string) tea.Cmd {
 		m.move(-len(m.shuttles))
 	case "end", "G":
 		m.move(len(m.shuttles))
+	case "n":
+		return m.openWizard(nil)
 	}
 	st := m.current()
 	if st == nil {
@@ -366,6 +387,17 @@ func (m *model) shuttlesKey(k string) tea.Cmd {
 		paused := !st.Paused
 		return m.do(map[bool]string{true: "paused ", false: "resumed "}[paused]+name,
 			func(ctx context.Context) error { return m.c.SetPaused(ctx, name, paused) })
+	case "e", "enter":
+		if sh := m.configShuttle(name); sh != nil {
+			return m.openWizard(sh)
+		}
+		m.say(name+" is not in the config file as it is now", true)
+	case "x":
+		m.ask("Delete the shuttle "+name+" from the config file? Its files stay where they are, on both sides.", func() tea.Cmd {
+			return m.saveConfig("deleted the shuttle "+name, func(d *config.Doc) error {
+				return d.DeleteTable([]string{"shuttles", name})
+			})
+		})
 	case "d":
 		on := st.State == daemon.StateDisabled
 		return m.do(map[bool]string{true: "enabled ", false: "disabled "}[on]+name,
@@ -379,6 +411,18 @@ const messageFor = 5 * time.Second
 
 func (m *model) say(text string, failed bool) {
 	m.message, m.failed, m.messageAt = text, failed, m.now()
+}
+
+// configShuttle is the named shuttle as the config file has it.
+func (m *model) configShuttle(name string) *config.Shuttle {
+	if m.cfg == nil || m.cfgErr != nil {
+		return nil
+	}
+	i := slices.IndexFunc(m.cfg.Shuttles, func(s config.Shuttle) bool { return s.Name == name })
+	if i < 0 {
+		return nil
+	}
+	return &m.cfg.Shuttles[i]
 }
 
 func (m *model) move(by int) {

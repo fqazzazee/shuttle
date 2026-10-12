@@ -15,6 +15,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 	"github.com/fqazzazee/shuttle/internal/shares"
@@ -202,7 +203,10 @@ func runTUI(ctx context.Context, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "shuttle: %v\n", err)
 		return 1
 	}
-	o := tui.Options{Config: paths.Config, Home: home, Store: secrets.SecretService(), Test: shares.Test}
+	o := tui.Options{Config: paths.Config, Home: home, Store: secrets.SecretService(), Test: shares.Test,
+		Browse: func(ctx context.Context, share *config.Share, store secrets.Store) (fsys.FS, error) {
+			return shares.OpenShare(ctx, share, ".", store)
+		}}
 	if err := tui.Run(ctx, c, o); err != nil {
 		fmt.Fprintf(stderr, "shuttle: %v\n", err)
 		return 1

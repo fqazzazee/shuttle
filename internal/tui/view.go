@@ -98,6 +98,9 @@ func (m *model) heldConflicts() int {
 func (m *model) content(room int) []string {
 	switch m.tab {
 	case tabShuttles:
+		if m.wizard != nil {
+			return m.wizard.lines(m, room)
+		}
 		return m.shuttlesTable(room)
 	case tabConflicts:
 		return m.conflictsTable(room)
@@ -315,6 +318,9 @@ func (m *model) keysLine() string {
 	if m.tab == tabProfiles && !m.help && m.settings != nil {
 		form = [][2]string{{"tab", "next"}, {"←→", "choose"}, {"ctrl+s", "save"}, {"esc", "cancel"}}
 	}
+	if m.tab == tabShuttles && !m.help && m.wizard != nil {
+		form = m.wizard.keys()
+	}
 	if m.tab == tabShares && !m.help && m.form != nil {
 		form = [][2]string{{"tab", "next"}, {"←→", "type"}, {"ctrl+t", "test"}, {"ctrl+s", "save"}, {"esc", "cancel"}}
 	}
@@ -344,7 +350,8 @@ func (m *model) keysLine() string {
 				enable = "enable"
 			}
 		}
-		keys = append(keys, [2]string{"s", "sync"}, [2]string{"p", pause}, [2]string{"d", enable})
+		keys = append(keys, [2]string{"s", "sync"}, [2]string{"p", pause}, [2]string{"d", enable},
+			[2]string{"n", "new"}, [2]string{"e", "edit"}, [2]string{"x", "delete"})
 	}
 	all := "pause all"
 	if m.pausedAll {
@@ -370,6 +377,7 @@ func helpLines() []string {
 		"  p                     pause or resume the shuttle: a run in progress finishes its file",
 		"  P                     pause or resume every shuttle",
 		"  d                     disable or enable the shuttle, saved in the config file",
+		"  n, e or enter, x      add a shuttle, edit it, delete it (its files stay on both sides)",
 		"",
 		"  On the Conflicts tab:",
 		"  l, r                  keep this computer's copy, or the share's, replacing the other",

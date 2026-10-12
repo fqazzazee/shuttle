@@ -59,28 +59,47 @@ var settings = []setting{
 		hint: "desktop notifications: a share lost or back"},
 }
 
-// settingsForm edits the settings of a table: a profile now, a shuttle's
-// overrides later.
+// settingsForm edits the settings of a table: a profile's, or a shuttle's
+// overrides of its profile.
 type settingsForm struct {
-	kind    string // "profile"
+	kind    string // "profile", "shuttle"
+	title   string
 	editing string // the table's name; "" for a new one
-	values  map[string]string
-	inputs  map[string]*textinput.Model // the typed settings, and the name
-	rows    []string                    // the keys, in order; "name" first when new
-	focus   int
-	busy    string
-	result  string
-	failed  bool
+	// base is what applies where the form sets nothing: a shuttle's
+	// profile's settings, as written; from names it. Empty for a profile:
+	// the defaults apply.
+	base   map[string]any
+	from   string
+	values map[string]string
+	inputs map[string]*textinput.Model // the typed settings, and the name
+	rows   []string                    // the keys, in order; "name" first when new
+	focus  int
+	busy   string
+	result string
+	failed bool
 }
 
-// newSettingsForm opens a form on raw, the table's settings as written. A
-// new table gets a name row, filled in with name.
-func newSettingsForm(kind, editing, name string, raw map[string]any) *settingsForm {
-	f := &settingsForm{kind: kind, editing: editing, values: map[string]string{}, inputs: map[string]*textinput.Model{}}
-	if editing == "" {
-		f.rows = append(f.rows, "name")
-		f.inputs["name"] = newInput(name)
+// newProfileForm opens a form on a profile's settings as written. A new
+// profile gets a name row, filled in with name.
+func newProfileForm(editing, name string, raw map[string]any) *settingsForm {
+	f := newSettingsForm("profile", editing, raw, nil, "")
+	f.title = "New profile"
+	if editing != "" {
+		f.title = "The profile " + editing
 	}
+	f.rows = append([]string{"name"}, f.rows...)
+	if editing != "" {
+		f.rows = f.rows[1:] // renaming is not supported
+	}
+	f.inputs["name"] = newInput(name)
+	return f
+}
+
+// newSettingsForm opens a form on raw, a table's settings as written, over
+// base, what applies where they are not set.
+func newSettingsForm(kind, editing string, raw, base map[string]any, from string) *settingsForm {
+	f := &settingsForm{kind: kind, editing: editing, base: base, from: from,
+		values: map[string]string{}, inputs: map[string]*textinput.Model{}}
 	for _, s := range settings {
 		f.rows = append(f.rows, s.key)
 		f.values[s.key] = rawText(lookup(raw, s.key))
@@ -112,8 +131,8 @@ func lookup(raw map[string]any, key string) any {
 	return g[sub]
 }
 
-// rawText is a raw value as typed: lists joined with commas, bools as on
-// and off.
+// rawText is a raw value as typed: lists joined with commas ("none" for an
+// empty one), bools as on and off.
 func rawText(v any) string {
 	switch v := v.(type) {
 	case nil:
@@ -121,6 +140,9 @@ func rawText(v any) string {
 	case bool:
 		return map[bool]string{true: "on", false: "off"}[v]
 	case []any:
+		if len(v) == 0 {
+			return "none"
+		}
 		parts := make([]string, 0, len(v))
 		for _, x := range v {
 			parts = append(parts, fmt.Sprint(x))
@@ -213,7 +235,11 @@ func (f *settingsForm) apply(d *config.Doc, table []string) error {
 		switch {
 		case text == "":
 		case s.list:
-			var items []string
+			items := []string{} // "none" is an empty list: no triggers, nothing ignored
+			if text == "none" {
+				v = items
+				break
+			}
 			for _, x := range strings.Split(text, ",") {
 				if x = strings.TrimSpace(x); x != "" {
 					items = append(items, x)
@@ -270,11 +296,10 @@ func (f *settingsForm) set() bool {
 }
 
 func (f *settingsForm) lines(room, width int) []string {
-	title := "New " + f.kind
-	if f.editing != "" {
-		title = "The " + f.kind + " " + f.editing
+	head := []string{headStyle.Render(f.title), ""}
+	if f.from != "" {
+		head = []string{headStyle.Render(f.title), faint.Render("● marks a setting of this shuttle's own; emptied, the profile's applies again"), ""}
 	}
-	head := []string{headStyle.Render(title), ""}
 	var foot []string
 	switch {
 	case f.busy != "":
@@ -308,17 +333,23 @@ func (f *settingsForm) row(i int) string {
 	case s != nil && s.choices != nil:
 		value = f.values[key]
 		if i == f.focus {
-			value = keyStyle.Render("‹ " + orNotSet(value) + " ›")
+			value = keyStyle.Render("‹ " + f.orBase(s, value) + " ›")
 		}
 	default:
 		value = f.inputs[key].View()
 	}
 	if s != nil && f.value(key) == "" && i != f.focus {
 		value = faint.Render("not set: " + s.def)
+		if from := rawText(lookup(f.base, key)); from != "" {
+			value = faint.Render("from " + f.from + ": " + from)
+		}
 	}
 	mark := "  "
 	if i == f.focus {
 		mark = "› "
+	}
+	if s != nil && f.from != "" && f.value(key) != "" {
+		mark = map[bool]string{true: "›●", false: " ●"}[i == f.focus]
 	}
 	line := mark + pad(label, 15) + pad(value, 38)
 	if i == f.focus {
@@ -327,11 +358,15 @@ func (f *settingsForm) row(i int) string {
 	return line
 }
 
-func orNotSet(s string) string {
-	if s == "" {
-		return "not set"
+// orBase is a choice's value, or what applies when it is not set.
+func (f *settingsForm) orBase(s *setting, value string) string {
+	switch {
+	case value != "":
+		return value
+	case rawText(lookup(f.base, s.key)) != "":
+		return "from " + f.from + ": " + rawText(lookup(f.base, s.key))
 	}
-	return s
+	return "not set: " + s.def
 }
 
 var errNothingSet = errors.New("set at least one setting: a profile with none would not be written")

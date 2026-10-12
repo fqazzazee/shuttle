@@ -44,16 +44,22 @@ func OpenRemote(ctx context.Context, cfg *config.Config, s *config.Shuttle, stor
 	if !ok {
 		return nil, fmt.Errorf("shuttle %s: no share named %q", s.Name, s.Share)
 	}
+	return OpenShare(ctx, &share, s.Remote, store)
+}
+
+// OpenShare connects to folder, a slash path inside share ("." for its top),
+// with the share's password from store.
+func OpenShare(ctx context.Context, share *config.Share, folder string, store secrets.Store) (fsys.FS, error) {
 	switch share.Type {
 	case config.SharePath:
-		dir := filepath.Join(share.Path, filepath.FromSlash(s.Remote))
+		dir := filepath.Join(share.Path, filepath.FromSlash(folder))
 		f, err := fsys.OpenLocal(dir)
 		if err != nil {
 			return nil, fmt.Errorf("share %s: folder %s: %w (is the share mounted?)", share.Name, dir, err)
 		}
 		return f, nil
 	case config.ShareSMB:
-		return openSMB(ctx, &share, s.Remote, store)
+		return openSMB(ctx, share, folder, store)
 	case config.ShareNFS3:
 		return nil, fmt.Errorf("share %s: NFS: %w (planned)", share.Name, ErrNotSupported)
 	}

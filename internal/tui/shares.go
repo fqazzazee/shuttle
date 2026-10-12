@@ -152,6 +152,8 @@ type savedMsg struct {
 	share    string // the share saved, selected next
 	settings bool   // the settings form's save: it closes on success
 	profile  string // the profile saved, selected next
+	wizard   bool   // the shuttle wizard's save: it closes on success
+	shuttle  string // the shuttle saved, selected next
 }
 
 // saveConfig edits the config file as it was read, and saves it if it is
@@ -289,6 +291,17 @@ func (m *model) gotSave(msg *savedMsg) tea.Cmd {
 			return m.loadConfig()
 		}
 		m.settings = nil
+	}
+	if msg.wizard && m.wizard != nil {
+		m.wizard.busy = ""
+		if msg.err != nil {
+			m.wizard.result, m.wizard.failed = msg.err.Error(), true
+			return m.loadConfig()
+		}
+		m.closeWizard()
+	}
+	if msg.shuttle != "" && msg.err == nil {
+		m.selected = msg.shuttle
 	}
 	if msg.share != "" && msg.err == nil {
 		m.shareSel = msg.share

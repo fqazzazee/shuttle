@@ -51,11 +51,15 @@ func ctrl(t *testing.T, m *model, r rune) {
 	send(t, m, tea.KeyPressMsg{Code: r, Mod: tea.ModCtrl})
 }
 
-// toRow moves the form's focus to the row of key.
+// toRow moves the open settings form's focus to the row of key.
 func toRow(t *testing.T, m *model, key string) {
 	t.Helper()
-	for range len(m.settings.rows) {
-		if m.settings.rows[m.settings.focus] == key {
+	f := m.settings
+	if m.wizard != nil {
+		f = m.wizard.settings
+	}
+	for range len(f.rows) {
+		if f.rows[f.focus] == key {
 			return
 		}
 		press(t, m, "tab")

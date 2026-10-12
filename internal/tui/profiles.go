@@ -57,7 +57,7 @@ func (m *model) profilesKey(k string) tea.Cmd {
 		return nil // the file must be fixed first: saving checks all of it
 	}
 	if k == "n" {
-		m.settings = newSettingsForm("profile", "", "", nil)
+		m.settings = newProfileForm("", "", nil)
 		return m.settings.focusOn(0)
 	}
 	name := m.profileSel
@@ -66,10 +66,10 @@ func (m *model) profilesKey(k string) tea.Cmd {
 	}
 	switch k {
 	case "e", "enter":
-		m.settings = newSettingsForm("profile", name, "", m.rawProfile(name))
+		m.settings = newProfileForm(name, "", m.rawProfile(name))
 		return m.settings.focusOn(0)
 	case "c":
-		m.settings = newSettingsForm("profile", "", name+"-copy", m.rawProfile(name))
+		m.settings = newProfileForm("", name+"-copy", m.rawProfile(name))
 		return m.settings.focusOn(0)
 	case "x":
 		if users := m.profilesUsing(name); len(users) > 0 {
