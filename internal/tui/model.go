@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/fqazzazee/shuttle/internal/activity"
@@ -66,7 +67,11 @@ type model struct {
 	shareSel  string
 	form      *shareForm
 	tested    map[string]testResult // each share's last test
-	changes   <-chan daemon.Status  // nil until subscribed
+
+	// The Profiles tab.
+	profileSel string
+	settings   *settingsForm
+	changes    <-chan daemon.Status // nil until subscribed
 }
 
 func newModel(ctx context.Context, c Client, o Options) *model {
@@ -184,7 +189,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tab == tabActivity {
 			cmds = append(cmds, m.loadActivity())
 		}
-		if m.tab == tabShares && m.form == nil {
+		if (m.tab == tabShares && m.form == nil) || (m.tab == tabProfiles && m.settings == nil) {
 			cmds = append(cmds, m.loadConfig())
 		}
 		if m.changes == nil {
@@ -198,15 +203,20 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case testedMsg:
 		m.gotTest(msg)
 	case savedMsg:
-		cmd := m.gotSave(msg)
+		cmd := m.gotSave(&msg)
 		return m, cmd
 	case tea.PasteMsg:
-		if m.form != nil && m.tab == tabShares {
-			if in, ok := m.form.inputs[m.form.focus]; ok && m.form.busy == "" {
-				updated, cmd := in.Update(msg)
-				*in = updated
-				return m, cmd
-			}
+		var in *textinput.Model
+		switch {
+		case m.form != nil && m.tab == tabShares && m.form.busy == "":
+			in = m.form.inputs[m.form.focus]
+		case m.settings != nil && m.tab == tabProfiles && m.settings.busy == "":
+			in = m.settings.inputs[m.settings.rows[m.settings.focus]]
+		}
+		if in != nil {
+			updated, cmd := in.Update(msg)
+			*in = updated
+			return m, cmd
 		}
 	case resolvedMsg:
 		m.say(msg.text, msg.err != nil)
@@ -226,6 +236,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		if m.form != nil && m.tab == tabShares && !m.help && m.question == "" && msg.String() != "ctrl+c" {
 			cmd := m.formKey(msg)
+			return m, cmd
+		}
+		if m.settings != nil && m.tab == tabProfiles && !m.help && m.question == "" && msg.String() != "ctrl+c" {
+			cmd := m.settingsKey(msg)
 			return m, cmd
 		}
 		cmd := m.key(msg.String())
@@ -307,6 +321,8 @@ func (m *model) key(k string) tea.Cmd {
 		return m.activityKey(k)
 	case m.tab == tabShares:
 		return m.sharesKey(k)
+	case m.tab == tabProfiles:
+		return m.profilesKey(k)
 	}
 	return nil
 }
@@ -317,7 +333,7 @@ func (m *model) toTab(t int) tea.Cmd {
 	switch t {
 	case tabActivity:
 		return m.loadActivity()
-	case tabShares:
+	case tabShares, tabProfiles:
 		return m.loadConfig()
 	}
 	return nil

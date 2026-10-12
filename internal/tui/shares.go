@@ -55,6 +55,9 @@ func (m *model) gotConfig(msg configMsg) {
 	if !slices.Contains(names, m.shareSel) && len(names) > 0 {
 		m.shareSel = names[0]
 	}
+	if m.cfg != nil && !slices.Contains(m.cfg.Profiles, m.profileSel) && len(m.cfg.Profiles) > 0 {
+		m.profileSel = m.cfg.Profiles[0]
+	}
 }
 
 func (m *model) shareNames() []string {
@@ -143,10 +146,12 @@ func (m *model) sharesKey(k string) tea.Cmd {
 }
 
 type savedMsg struct {
-	text  string
-	err   error
-	form  bool   // the form's save: it closes on success
-	share string // the share saved, selected next
+	text     string
+	err      error
+	form     bool   // the share form's save: it closes on success
+	share    string // the share saved, selected next
+	settings bool   // the settings form's save: it closes on success
+	profile  string // the profile saved, selected next
 }
 
 // saveConfig edits the config file as it was read, and saves it if it is
@@ -268,7 +273,7 @@ func (m *model) gotTest(msg testedMsg) {
 	}
 }
 
-func (m *model) gotSave(msg savedMsg) tea.Cmd {
+func (m *model) gotSave(msg *savedMsg) tea.Cmd {
 	if msg.form && m.form != nil {
 		m.form.busy = ""
 		if msg.err != nil {
@@ -277,8 +282,19 @@ func (m *model) gotSave(msg savedMsg) tea.Cmd {
 		}
 		m.form = nil
 	}
+	if msg.settings && m.settings != nil {
+		m.settings.busy = ""
+		if msg.err != nil {
+			m.settings.result, m.settings.failed = msg.err.Error(), true
+			return m.loadConfig()
+		}
+		m.settings = nil
+	}
 	if msg.share != "" && msg.err == nil {
 		m.shareSel = msg.share
+	}
+	if msg.profile != "" && msg.err == nil {
+		m.profileSel = msg.profile
 	}
 	if msg.err != nil {
 		m.say(firstLine(msg.err.Error()), true)
