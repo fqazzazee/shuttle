@@ -100,12 +100,7 @@ func (m *model) content(room int) []string {
 	case tabShuttles:
 		return m.shuttlesTable(room)
 	case tabConflicts:
-		return []string{
-			"Not built yet: held conflicts will be listed here, with both copies,",
-			"to keep this computer's, the share's, or both.",
-			"",
-			fmt.Sprintf("Waiting for you now: %s.", present.Plural(m.heldConflicts(), "conflict")),
-		}
+		return m.conflictsTable(room)
 	case tabActivity:
 		return []string{"Not built yet: what each shuttle did lately, file by file.", "", "Until then: shuttle activity"}
 	case tabProfiles:
@@ -125,14 +120,8 @@ const (
 
 func (m *model) shuttlesTable(room int) []string {
 	switch {
-	case !m.loaded:
-		return []string{faint.Render("Asking the daemon…")}
-	case m.down != nil:
-		return []string{
-			badStyle.Render(errorText(m.down)),
-			"",
-			"This screen catches up by itself once the daemon runs.",
-		}
+	case !m.loaded || m.down != nil:
+		return m.waiting()
 	case len(m.shuttles) == 0:
 		return []string{"No shuttles in the config file yet."}
 	}
@@ -170,6 +159,86 @@ func (m *model) shuttlesTable(room int) []string {
 	return lines
 }
 
+// waiting is what a tab shows until the daemon answers.
+func (m *model) waiting() []string {
+	if m.down == nil {
+		return []string{faint.Render("Asking the daemon…")}
+	}
+	return []string{
+		badStyle.Render(errorText(m.down)),
+		"",
+		"This screen catches up by itself once the daemon runs.",
+	}
+}
+
+// Column widths of the conflicts table; WHY takes the rest.
+const copyWidth = 28
+
+func (m *model) conflictsTable(room int) []string {
+	if !m.loaded || m.down != nil {
+		return m.waiting()
+	}
+	items := m.items()
+	if len(items) == 0 {
+		return []string{"Nothing waiting for you: no conflicts held, no deletions held back."}
+	}
+	nameWidth, pathWidth := len("SHUTTLE"), len("PATH")
+	for i := range items {
+		nameWidth = max(nameWidth, lipgloss.Width(items[i].shuttle))
+		if c := items[i].conflict; c != nil {
+			pathWidth = max(pathWidth, lipgloss.Width(c.Path))
+		}
+	}
+	nameWidth += 2
+	pathWidth = min(pathWidth, 40) + 2
+	row := func(name, path, local, remote, why string) string {
+		return pad(name, nameWidth) + pad(path, pathWidth) + pad(local, copyWidth) + pad(remote, copyWidth) + why
+	}
+	lines := []string{headStyle.Render(row("SHUTTLE", "PATH", "THIS COMPUTER", "THE SHARE", "WHY"))}
+
+	rows := room - 3 // the header, and a blank line and the selected row's explanation below
+	first := 0
+	if i := m.itemIndex(); i >= rows {
+		first = i - rows + 1
+	}
+	now := m.now()
+	for i := first; i < len(items) && i < first+rows; i++ {
+		it := &items[i]
+		var line string
+		if c := it.conflict; c != nil {
+			why := c.Reason
+			if m.resolving[it.key()] {
+				why = "resolving…"
+			}
+			line = row(it.shuttle, c.Path, copyText(c.Local, c.Remote, now), copyText(c.Remote, c.Local, now), why)
+		} else {
+			line = row(it.shuttle, "", "", "",
+				present.Plural(it.deletions, "deletion")+" held back: too many at once for the deletion guard")
+		}
+		if it.key() == m.conflictSel {
+			line = selected.Render(ansi.Truncate(pad(line, m.width), m.width, "…"))
+		}
+		lines = append(lines, line)
+	}
+	if it := m.currentItem(items); it != nil {
+		lines = append(lines, "", faint.Render(explain(it)))
+	}
+	return lines
+}
+
+// explain says what can be done about an item.
+func explain(it *item) string {
+	switch it.choices() {
+	case "a":
+		return "a lets the next run make these deletions. Until then, nothing is deleted on either side."
+	case "b":
+		return "A file against a folder: b keeps both, renaming the file beside the folder."
+	case "lrb":
+		return "l keeps this computer's copy, r the share's; b keeps both, saving the older beside the newer under a conflict name."
+	}
+	return "Two names that differ only in case, which the share cannot hold apart: rename one of them on this computer."
+}
+
 // progress is a run's progress in a few characters: "45% ↑ 2.1 MB/s".
 func progress(p *daemon.Progress) string {
 	var s string
@@ -205,6 +274,8 @@ func (m *model) statusLine() string {
 	var left string
 	fresh := m.message != "" && m.now().Sub(m.messageAt) < messageFor
 	switch {
+	case m.question != "":
+		return heldStyle.Render(m.question + " (y/n)")
 	case m.configErr != "":
 		left = badStyle.Render("The config file has an error, so the previous settings are in use: " + firstLine(m.configErr))
 	case fresh && m.failed:
@@ -229,6 +300,16 @@ func (m *model) statusLine() string {
 
 func (m *model) keysLine() string {
 	var keys [][2]string
+	if m.question != "" {
+		return keyStyle.Render("y") + " " + faint.Render("yes") + "  " + keyStyle.Render("n") + " " + faint.Render("no")
+	}
+	if m.tab == tabConflicts && !m.help {
+		if it := m.currentItem(m.items()); it != nil && !m.resolving[it.key()] {
+			for _, c := range it.choices() {
+				keys = append(keys, [2]string{string(c), choiceNames[c]})
+			}
+		}
+	}
 	if m.tab == tabShuttles && !m.help {
 		pause, enable := "pause", "disable"
 		if st := m.current(); st != nil {
@@ -253,6 +334,8 @@ func (m *model) keysLine() string {
 	return strings.Join(parts, "  ")
 }
 
+var choiceNames = map[rune]string{'l': "keep this computer's", 'r': "keep the share's", 'b': "keep both", 'a': "allow the deletions"}
+
 func helpLines() []string {
 	return []string{
 		headStyle.Render("Keys"),
@@ -263,6 +346,11 @@ func helpLines() []string {
 		"  p                     pause or resume the shuttle: a run in progress finishes its file",
 		"  P                     pause or resume every shuttle",
 		"  d                     disable or enable the shuttle, saved in the config file",
+		"",
+		"  On the Conflicts tab:",
+		"  l, r                  keep this computer's copy, or the share's, replacing the other",
+		"  b                     keep both: the older is saved beside the newer under a conflict name",
+		"  a                     let the deletions the deletion guard held back go ahead",
 		"  ?, esc                show or hide this help",
 		"  q, ctrl+c             quit; the daemon carries on",
 	}

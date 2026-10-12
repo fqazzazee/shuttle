@@ -30,6 +30,7 @@ type fake struct {
 	shuttles  []daemon.Status
 	pausedAll bool
 	configErr string
+	resolve   error // what Resolve returns
 	calls     []string
 	changes   chan daemon.Status
 }
@@ -82,6 +83,17 @@ func (f *fake) SetEnabled(_ context.Context, name string, on bool) error {
 	return f.record("enable %s %v", name, on)
 }
 func (f *fake) Changes(context.Context) (<-chan daemon.Status, error) { return f.changes, nil }
+func (f *fake) Resolve(_ context.Context, name, path string, c engine.Choice) error {
+	if err := f.record("resolve %s %s %s", name, path, c); err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.resolve
+}
+func (f *fake) AllowDeletions(_ context.Context, name string) error {
+	return f.record("allow %s", name)
+}
 
 func (f *fake) took() []string {
 	f.mu.Lock()
@@ -324,7 +336,7 @@ func TestTabsAndHelp(t *testing.T) {
 	if len(f.took()) != 0 {
 		t.Errorf("the shuttles' keys acted on another tab: %q", f.took())
 	}
-	if s := screen(m); !strings.Contains(s, "Waiting for you now: 2 conflicts.") || strings.Contains(s, "s sync") {
+	if s := screen(m); !strings.Contains(s, "SHUTTLE  PATH") || strings.Contains(s, "s sync") {
 		t.Errorf("conflicts tab:\n%s", s)
 	}
 	press(t, m, "tab", "tab", "tab")

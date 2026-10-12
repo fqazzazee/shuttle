@@ -44,11 +44,17 @@ type model struct {
 	message   string // what the last action did, or why it failed
 	failed    bool
 	messageAt time.Time
-	changes   <-chan daemon.Status // nil until subscribed
+
+	conflictSel string               // the selected row of the Conflicts tab, by item key
+	resolving   map[string]bool      // rows resolved, until they are gone from the list
+	question    string               // a question waiting for y or n
+	then        func() tea.Cmd       // what y does
+	changes     <-chan daemon.Status // nil until subscribed
 }
 
 func newModel(ctx context.Context, c Client) *model {
-	return &model{ctx: ctx, c: c, now: time.Now, every: refreshEvery, width: 80, height: 24}
+	return &model{ctx: ctx, c: c, now: time.Now, every: refreshEvery, width: 80, height: 24,
+		resolving: map[string]bool{}}
 }
 
 // Messages.
@@ -135,6 +141,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case refreshedMsg:
+		before := m.itemIndex()
+		defer m.listChanged(before)
 		m.loaded = true
 		if msg.err != nil {
 			m.down, m.shuttles = msg.err, nil
@@ -149,6 +157,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, next(m.changes)
 		}
 	case changedMsg:
+		before := m.itemIndex()
+		defer m.listChanged(before)
 		st := daemon.Status(msg)
 		m.changed(&st)
 		return m, next(m.changes)
@@ -158,6 +168,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.subscribe())
 		}
 		return m, tea.Batch(cmds...)
+	case resolvedMsg:
+		m.say(msg.text, msg.err != nil)
+		if msg.err != nil {
+			delete(m.resolving, msg.key)
+			m.message = errorText(msg.err)
+		}
+		cmd := m.refresh()
+		return m, cmd
 	case doneMsg:
 		m.say(msg.text, msg.err != nil)
 		if msg.err != nil {
@@ -184,6 +202,14 @@ func (m *model) changed(st *daemon.Status) {
 	m.keepSelection()
 }
 
+// listChanged keeps the selections where they belong after the list of
+// shuttles changed.
+func (m *model) listChanged(itemBefore int) {
+	m.keepSelection()
+	m.keepItemSelection(itemBefore)
+	m.forgetResolved()
+}
+
 // keepSelection keeps the selected shuttle selected, or selects the first.
 func (m *model) keepSelection() {
 	if m.index() < 0 && len(m.shuttles) > 0 {
@@ -204,6 +230,9 @@ func (m *model) current() *daemon.Status {
 }
 
 func (m *model) key(k string) tea.Cmd {
+	if m.question != "" && k != "ctrl+c" {
+		return m.answer(k)
+	}
 	switch k {
 	case "ctrl+c", "q":
 		return tea.Quit
@@ -227,8 +256,12 @@ func (m *model) key(k string) tea.Cmd {
 		return m.do(map[bool]string{true: "paused all shuttles", false: "resumed all shuttles"}[paused],
 			func(ctx context.Context) error { return m.c.SetPaused(ctx, "", paused) })
 	}
-	if m.tab == tabShuttles && !m.help {
+	switch {
+	case m.help:
+	case m.tab == tabShuttles:
 		return m.shuttlesKey(k)
+	case m.tab == tabConflicts:
+		return m.conflictsKey(k)
 	}
 	return nil
 }
