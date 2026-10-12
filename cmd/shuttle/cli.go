@@ -22,14 +22,14 @@ import (
 const callTimeout = 10 * time.Second
 
 // runClient runs a command that talks to the daemon: status, sync, pause,
-// resume, enable and disable. It returns the process exit code.
+// resume, enable, disable and activity. It returns the process exit code.
 func runClient(ctx context.Context, cmd string, args []string, stdout, stderr io.Writer) int {
 	var name string
 	switch {
 	case cmd == "status" && len(args) == 0:
 	case (cmd == "sync" || cmd == "enable" || cmd == "disable") && len(args) == 1:
 		name = args[0]
-	case (cmd == "pause" || cmd == "resume") && len(args) <= 1:
+	case (cmd == "pause" || cmd == "resume" || cmd == "activity") && len(args) <= 1:
 		if len(args) == 1 {
 			name = args[0]
 		}
@@ -58,6 +58,8 @@ func runClient(ctx context.Context, cmd string, args []string, stdout, stderr io
 		if err = c.SyncNow(ctx, name); err == nil {
 			fmt.Fprintf(stdout, "syncing %s\n", name)
 		}
+	case "activity":
+		err = printActivity(ctx, c, name, stdout)
 	case "enable", "disable":
 		err = c.SetEnabled(ctx, name, cmd == "enable")
 		if errors.Is(err, bus.ErrNotRunning) {
@@ -96,6 +98,32 @@ func setEnabledOffline(name string, on bool, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "%sd %s (the daemon is not running: it applies when the daemon starts)\n", cmd, name)
 	return 0
+}
+
+// activityShown is how many entries shuttle activity prints.
+const activityShown = 50
+
+// printActivity prints the newest entries of the activity log, oldest
+// first, as a log reads.
+func printActivity(ctx context.Context, c *bus.Client, name string, w io.Writer) error {
+	es, err := c.Activity(ctx, name, activityShown)
+	if err != nil {
+		return err
+	}
+	if len(es) == 0 {
+		fmt.Fprintln(w, "Nothing yet: entries appear as shuttles copy, delete or run into problems.")
+		return nil
+	}
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	for i := len(es) - 1; i >= 0; i-- {
+		e := &es[i]
+		what := e.Text
+		if e.Path != "" {
+			what = e.Path + ": " + e.Text
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", e.Time.Local().Format("2006-01-02 15:04:05"), e.Shuttle, what)
+	}
+	return tw.Flush()
 }
 
 func orElse(s, otherwise string) string {

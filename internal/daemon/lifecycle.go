@@ -44,6 +44,7 @@ func (r *runner) openState() error {
 		r.markAttempt(last)
 	}
 	r.db = db
+	r.openActivity()
 	return nil
 }
 
@@ -99,6 +100,10 @@ func closeAll(rs []*runner) error {
 	for _, r := range rs {
 		errs = append(errs, r.db.Close())
 		r.db = nil
+		if r.activity != nil {
+			errs = append(errs, r.activity.Close())
+			r.activity = nil
+		}
 	}
 	return errors.Join(errs...)
 }

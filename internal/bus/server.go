@@ -237,6 +237,30 @@ func (s *server) ReloadConfig() *dbus.Error {
 	return busErr(s.d.Reload())
 }
 
+// entry is an activity log entry on the bus: (shuttle, time in unix
+// seconds, kind, path, text).
+type entry struct {
+	Shuttle string
+	Time    int64
+	Kind    string
+	Path    string
+	Text    string
+}
+
+// Activity returns the newest entries of a shuttle's activity log, or of
+// every shuttle's when name is "", newest first: at most limit (0: all).
+func (s *server) Activity(name string, limit uint32) ([]entry, *dbus.Error) {
+	es, err := s.d.Activity(name, int(limit))
+	if err != nil {
+		return nil, busErr(err)
+	}
+	out := make([]entry, 0, len(es))
+	for _, e := range es {
+		out = append(out, entry{e.Shuttle, e.Time.Unix(), string(e.Kind), e.Path, e.Text})
+	}
+	return out, nil
+}
+
 func (s *server) AllowDeletions(name string) *dbus.Error {
 	return busErr(s.d.AllowDeletions(name))
 }

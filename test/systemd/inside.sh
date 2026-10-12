@@ -120,6 +120,9 @@ echo a >~/m/a
 "$shuttle" sync m
 wait_for "the manual sync" 10 test -f "$share/m/a"
 wait_for "its notification" 10 note '^transfer\.complete\|m: synced\|Copied 1 file\.$'
+"$shuttle" activity m | grep -q '  m  a: copied to the share$' || fail "the activity log lacks the copy"
+"$shuttle" activity m | grep -q '  m  1 copied$' || fail "the activity log lacks the run"
+[ "$(stat -c %a ~/.local/state/shuttle/m.activity)" = 600 ] || fail "the activity log is readable by others"
 
 step "real-time: a local change syncs by itself"
 echo hello >~/rt/hello

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/fsys"
@@ -26,6 +27,9 @@ type runner struct {
 	cfg     *config.Config // the config it was made from
 	shuttle *config.Shuttle
 	db      *state.DB // open between openState and stop
+	// activity is the shuttle's activity log, open with db; nil if it
+	// could not be opened.
+	activity *activity.Log
 	// kick wakes the loop. It holds at most one wake-up, so any number of
 	// triggers during a run add up to one more run.
 	kick     chan struct{}
@@ -231,6 +235,7 @@ func (r *runner) runOnce(requested bool) {
 		// Tell at once, rather than at the next probe.
 		r.shareChanged(false)
 	}
+	r.logRun(res, err)
 	r.mu.Lock()
 	r.st.State = state
 	r.mu.Unlock()
@@ -266,7 +271,7 @@ func (r *runner) options(local, remote fsys.FS) *engine.Options {
 	return &engine.Options{
 		Local: local, Remote: remote, State: r.db, Settings: &r.shuttle.Settings,
 		LocalName: r.d.hostname, RemoteName: r.shuttle.Share, Cap: r.d.global,
-		Stop: r.shouldStop, Now: r.d.o.Now, OnAction: r.noteOwnWrite,
+		Stop: r.shouldStop, Now: r.d.o.Now, OnAction: r.onAction,
 	}
 }
 
