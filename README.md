@@ -42,6 +42,17 @@ git clone https://github.com/fqazzazee/shuttle.git
 cd shuttle && make install
 ```
 
+Or as a package, built from the clone (none are published yet):
+
+```bash
+make packages                                      # RPM, DEB and tarballs in dist/
+sudo dnf install ./dist/shuttle_*_linux_amd64.rpm  # Fedora; on Debian or Ubuntu:
+sudo apt install ./dist/shuttle_*_linux_amd64.deb  #   the .deb
+```
+
+The package installs the same things system-wide, the GNOME extension included (enable it
+as below). Either way, the service is yours to enable.
+
 **Requires:** Go 1.26+ to build, systemd, and a Secret Service (GNOME Keyring) for share
 passwords. Developed and tested on Fedora 44; CI also builds and runs it on Arch and Debian.
 
