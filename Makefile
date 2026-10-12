@@ -12,7 +12,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Pinned to match CI. `go run` builds it on first use, so no separate install.
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui test-extension
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -112,6 +112,14 @@ test-systemd:
 # private session bus. Needs tmux and dbus-run-session.
 test-tui:
 	test/tui/run.sh
+
+# The GNOME extension: its unit tests in plain gjs, then the extension in a
+# headless GNOME Shell 50 against a running daemon, on a private session bus
+# with every XDG folder in a temp folder. Needs gnome-shell, gjs and
+# dbus-run-session.
+test-extension:
+	gjs -m extension/test/run.js
+	test/extension/run.sh
 
 PODMAN ?= podman
 

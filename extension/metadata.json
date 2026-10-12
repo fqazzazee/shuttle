@@ -1,0 +1,9 @@
+{
+  "uuid": "shuttle@fqazzazee.github.io",
+  "name": "Shuttle",
+  "description": "The state of your shuttles in the top bar: folders kept in step with SMB and NFS shares by the shuttle service.",
+  "shell-version": [
+    "50"
+  ],
+  "url": "https://github.com/fqazzazee/shuttle"
+}
