@@ -1,0 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
+.shuttle-row-when {
+  font-size: smaller;
+  padding-left: 1em;
+}
+
+/* What a shuttle is doing or what needs the user: errors can be long. */
+.shuttle-row-detail {
+  font-size: smaller;
+  max-width: 28em;
+}
