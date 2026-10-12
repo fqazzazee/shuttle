@@ -38,7 +38,25 @@ is() {
 	done
 	fail "$1 never became $2 (last: ${got:-no answer})"
 }
-shows() { is "$indicator?.shownState ?? null" "\"$1\""; }
+# shows <state>: wait until the indicator shows that state: the bus, always,
+# and beside it the state's icon (none while syncing: the bus pulses).
+shows() {
+	is "$indicator?.shownState ?? null" "\"$1\""
+	local badge
+	case $1 in
+	idle) badge=object-select-symbolic ;;
+	running) badge= ;;
+	paused) badge=media-playback-pause-symbolic ;;
+	held) badge=dialog-warning-symbolic ;;
+	error) badge=dialog-error-symbolic ;;
+	offline) badge=network-offline-symbolic ;;
+	not-running) badge=action-unavailable-symbolic ;;
+	esac
+	is "$indicator._icon.gicon.get_file?.()?.get_basename() ?? ''" '"shuttle-symbolic.svg"'
+	is "$indicator.shownBadge" "\"$badge\""
+	is "$indicator._badge.visible" "$([ -n "$badge" ] && echo true || echo false)"
+	snap "bar-$1" none
+}
 # row <name> <js on r>: wait until the dropdown's row for name satisfies it.
 row() { is "(r => !!r && ($2))($indicator.shownRows.find(r => r.name === '$1'))" true; }
 rows() { is "$indicator.shownRows.map(r => r.name).join(',')" "\"$1\""; }
@@ -54,6 +72,8 @@ status() {
 snap() {
 	[ -n "${SHUTTLE_EXT_SCREENSHOTS:-}" ] || return 0
 	local menus=${2:-$indicator.menu} m
+	[ "$menus" = none ] && menus=
+	[ -e "$SHUTTLE_EXT_SCREENSHOTS/$1.png" ] && return 0 # the first time is enough
 	for m in $menus; do ev "$m.open(false)" >/dev/null; done
 	sleep 0.5
 	gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell/Screenshot \
@@ -131,6 +151,11 @@ daemon=
 trap 'kill $daemon $shell 2>/dev/null || true; wait 2>/dev/null || true' EXIT
 for _ in $(seq 100); do ev true >/dev/null && break; sleep 0.2; done
 ev true >/dev/null || fail "the shell did not start"
+# The shell opens on the overview, which hides the top bar's icons: once it
+# has finished starting up, leave it for the desktop, as a user would.
+is "Main.layoutManager._startingUp" false
+ev "Main.overview.hide()" >/dev/null
+is "Main.overview.visible || Main.overview.animationInProgress" false
 echo "GNOME Shell $(ev Config.PACKAGE_VERSION)"
 
 step "enabled, with no daemon: not running"
