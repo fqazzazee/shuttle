@@ -12,7 +12,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Pinned to match CI. `go run` builds it on first use, so no separate install.
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-keyring test-systemd test-tui
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -89,6 +89,12 @@ samba-down:
 # `make samba-up` first, plus dbus-run-session and gnome-keyring-daemon.
 test-integration:
 	$(SMB_TEST_ENV) internal/secrets/testdata/with-test-keyring.sh go test -race -count=1 ./...
+
+# The engine suite with its remote side on an in-process NFSv3 server
+# (willscott/go-nfs) instead of a local folder. The fsys contract over NFS
+# already runs in `make test`.
+test-nfs:
+	SHUTTLE_TEST_NFS=inprocess go test -race -count=1 ./internal/engine/
 
 # Keyring tests run in a private D-Bus session with a throwaway GNOME Keyring;
 # the user's own keyring is never touched. Needs dbus-run-session and

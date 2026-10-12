@@ -48,7 +48,7 @@ func ListenOn(addr, dir string) (net.Listener, error) {
 		return nil, err
 	}
 	fsys := changeFS{osfs.New(dir, osfs.WithBoundOS()), dir}
-	h := helpers.NewCachingHandler(helpers.NewNullAuthHandler(fsys), 4096)
+	h := helpers.NewCachingHandler(helpers.NewNullAuthHandler(fsys), 1<<16)
 	go func() { _ = nfs.Serve(l, h) }() // returns once the listener is closed
 	return l, nil
 }
