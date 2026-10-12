@@ -20,14 +20,13 @@ like Syncthing.
 
 ## Status
 
-Early, but usable from the command line: the sync engine, SMB and NFSv3 shares, the keyring and
-the background service work. SMB is tested against a real Samba server, NFS so far against an
-in-process test server. Still to come:
+Early, but usable: the sync engine, SMB and NFSv3 shares, the keyring, the background service
+and the terminal interface work. SMB is tested against a real Samba server, NFS so far against
+an in-process test server. Still to come:
 
-1. Terminal UI (until then: edit the config file, use the commands below)
-2. NFS tested against the Linux kernel server: NFSv3 directly, NFSv4 through a mount
-3. GNOME Shell 50 extension: indicator and Quick Settings toggle
-4. Packages: RPM (Fedora COPR), DEB, extensions.gnome.org
+1. NFS tested against the Linux kernel server: NFSv3 directly, NFSv4 through a mount
+2. GNOME Shell 50 extension: indicator and Quick Settings toggle
+3. Packages: RPM (Fedora COPR), DEB, extensions.gnome.org
 
 ### Not planned
 
