@@ -95,7 +95,7 @@ func TestNewShuttle(t *testing.T) {
 	if s := screen(m); !strings.Contains(s, "Folder on nas: /docs") || !strings.Contains(s, "2026/") {
 		t.Fatalf("in docs:\n%s", s)
 	}
-	key(t, m, tea.KeyLeft) // up to the top, docs selected
+	key(t, m, tea.KeyLeft)     // up to the top, docs selected
 	press(t, m, "G", "g", "G") // music, the last
 	key(t, m, tea.KeyRight)
 	key(t, m, tea.KeyLeft) // and out again: music stays selected
