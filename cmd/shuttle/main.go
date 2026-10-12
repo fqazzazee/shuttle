@@ -12,8 +12,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/notify"
 	"github.com/fqazzazee/shuttle/internal/secrets"
+	"github.com/fqazzazee/shuttle/internal/terminal"
 )
 
 // exitConfig is EX_CONFIG from sysexits.h: the systemd unit does not
@@ -42,10 +45,14 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	inTerminal := func() bool {
+		f, ok := stdout.(*os.File)
+		return ok && term.IsTerminal(f.Fd()) && term.IsTerminal(os.Stdin.Fd())
+	}
 	if len(args) == 0 {
 		// The TUI, in a terminal; scripts and pipes get the usage.
-		if f, ok := stdout.(*os.File); ok && term.IsTerminal(f.Fd()) && term.IsTerminal(os.Stdin.Fd()) {
-			return runTUI(ctx, stderr)
+		if inTerminal() {
+			return runTUI(ctx, "", stderr)
 		}
 		usage(stderr)
 		return 2
@@ -66,6 +73,17 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		return 0
+	case "open":
+		if len(args) > 2 {
+			fmt.Fprintf(stderr, "shuttle open: wrong arguments\n\n")
+			usage(stderr)
+			return 2
+		}
+		if !inTerminal() {
+			fmt.Fprintln(stderr, "shuttle open: the TUI needs a terminal")
+			return 2
+		}
+		return runTUI(ctx, strings.Join(args[1:], ""), stderr)
 	case "status", "sync", "pause", "resume", "enable", "disable", "activity":
 		return runClient(ctx, args[0], args[1:], stdout, stderr)
 	default:
@@ -101,6 +119,7 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	notifier.Open = func(tab string) { openInTerminal(d.Terminal(), tab, log) }
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		return fmt.Errorf("connecting to the session bus: %w", err)
@@ -141,6 +160,8 @@ func usage(w io.Writer) {
 Without a command, in a terminal: the TUI.
 
 Commands:
+  open [<tab>]      Open the TUI on a tab: shuttles, conflicts, activity,
+                    profiles or shares
   status            Show every shuttle's state
   sync <name>       Sync a shuttle now
   pause [<name>]    Pause a shuttle, or all of them
@@ -152,4 +173,19 @@ Commands:
   version           Print the version
   help              Show this help
 `)
+}
+
+// openInTerminal opens the TUI on tab in a new terminal window: the
+// notifications' "Open shuttle" button.
+func openInTerminal(configured []string, tab string, log *slog.Logger) {
+	self, err := os.Executable()
+	if err == nil {
+		var argv []string
+		if argv, err = terminal.Command(configured, exec.LookPath, self, "open", tab); err == nil {
+			err = terminal.Start(argv, exec.LookPath)
+		}
+	}
+	if err != nil {
+		log.Warn("opening shuttle in a terminal", "err", err)
+	}
 }

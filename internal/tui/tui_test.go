@@ -426,3 +426,25 @@ func TestErrorsDoNotPanic(t *testing.T) {
 	press(t, m, "s", "p", "d", "down", "up")
 	_ = screen(m)
 }
+
+func TestFirstTab(t *testing.T) {
+	for name, want := range map[string]int{"shuttles": tabShuttles, "Conflicts": tabConflicts, "activity": tabActivity,
+		"profiles": tabProfiles, "shares": tabShares} {
+		if got, ok := Tab(name); !ok || got != want {
+			t.Errorf("Tab(%q) = %d, %v", name, got, ok)
+		}
+	}
+	if _, ok := Tab("settings"); ok {
+		t.Error("an unknown tab")
+	}
+	f := newFake()
+	o := testOptions(t)
+	o.Tab = tabActivity
+	m := newModel(context.Background(), f, o)
+	m.every, m.now = 0, func() time.Time { return now }
+	send(t, m, tea.WindowSizeMsg{Width: 120, Height: 12})
+	run(t, m, m.Init())
+	if m.tab != tabActivity || len(f.asked) != 1 || !strings.Contains(screen(m), "Every shuttle") {
+		t.Errorf("tab %d, asked %q:\n%s", m.tab, f.asked, screen(m))
+	}
+}

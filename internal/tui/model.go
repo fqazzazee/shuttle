@@ -77,7 +77,7 @@ type model struct {
 }
 
 func newModel(ctx context.Context, c Client, o Options) *model {
-	return &model{ctx: ctx, c: c, o: o, now: time.Now, every: refreshEvery, width: 80, height: 24,
+	return &model{ctx: ctx, c: c, o: o, tab: o.Tab, now: time.Now, every: refreshEvery, width: 80, height: 24,
 		resolving: map[string]bool{}, tested: map[string]testResult{}}
 }
 
@@ -102,7 +102,7 @@ type (
 )
 
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(m.refresh(), m.subscribe(), m.tick(), m.loadConfig())
+	return tea.Batch(m.refresh(), m.subscribe(), m.tick(), m.loadConfig(), m.toTab(m.tab))
 }
 
 func (m *model) call() (context.Context, context.CancelFunc) {

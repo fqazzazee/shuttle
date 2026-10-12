@@ -178,9 +178,13 @@ type Shuttle struct {
 // Config is a loaded and validated configuration.
 type Config struct {
 	Bandwidth Bandwidth // global cap across all shuttles
-	Shares    map[string]Share
-	Profiles  []string  // profile names, sorted
-	Shuttles  []Shuttle // sorted by name
+	// Terminal runs a command in a new terminal window when the command's
+	// words are added to it, e.g. ptyxis --new-window --; nil: the first
+	// terminal found.
+	Terminal []string
+	Shares   map[string]Share
+	Profiles []string  // profile names, sorted
+	Shuttles []Shuttle // sorted by name
 }
 
 // Shuttle returns the named shuttle.

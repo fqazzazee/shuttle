@@ -278,6 +278,14 @@ func (d *Daemon) askReload() {
 	}
 }
 
+// Terminal is the terminal the config names for "Open shuttle"; nil when
+// it names none.
+func (d *Daemon) Terminal() []string {
+	d.runnersMu.RLock()
+	defer d.runnersMu.RUnlock()
+	return d.cfg.Terminal
+}
+
 // ConfigError is why the config file was last not loaded, or "": the
 // daemon then still runs the config it last loaded.
 func (d *Daemon) ConfigError() string {

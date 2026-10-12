@@ -4,6 +4,8 @@ BINDIR  ?= $(PREFIX)/bin
 # Found by systemd from ~/.local/share/systemd/user for a user install;
 # packages set /usr/lib/systemd/user.
 USERUNITDIR ?= $(PREFIX)/share/systemd/user
+APPDIR      ?= $(PREFIX)/share/applications
+DESKTOP     := io.github.fqazzazee.Shuttle.desktop
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
@@ -31,19 +33,24 @@ install: build
 	install -Dm755 bin/$(BINARY) $(DESTDIR)$(BINDIR)/$(BINARY)
 	install -d $(DESTDIR)$(USERUNITDIR)
 	sed 's|@BINDIR@|$(BINDIR)|g' packaging/systemd/shuttle.service.in > $(DESTDIR)$(USERUNITDIR)/shuttle.service
+	install -d $(DESTDIR)$(APPDIR)
+	sed 's|@BINDIR@|$(BINDIR)|g' packaging/desktop/$(DESKTOP).in > $(DESTDIR)$(APPDIR)/$(DESKTOP)
 	@echo "Installed. To run it with your desktop session:"
 	@echo "  systemctl --user daemon-reload && systemctl --user enable --now shuttle"
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/$(BINARY) $(DESTDIR)$(USERUNITDIR)/shuttle.service
+	rm -f $(DESTDIR)$(BINDIR)/$(BINARY) $(DESTDIR)$(USERUNITDIR)/shuttle.service $(DESTDIR)$(APPDIR)/$(DESKTOP)
 
-# Checks the systemd unit as installed. systemd-analyze only warns about a
-# bad setting, so any output at all fails the check.
+# Checks the systemd unit and the desktop file as installed. systemd-analyze
+# and desktop-file-validate only warn about a bad setting, so any output at
+# all fails the check.
 unit-check:
 	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT && \
 	$(MAKE) -s install PREFIX="$$tmp" >/dev/null && \
 	out=$$(systemd-analyze --user verify "$$tmp/share/systemd/user/shuttle.service" 2>&1) ; \
-	if [ -n "$$out" ]; then echo "$$out"; exit 1; fi; echo "shuttle.service: ok"
+	if [ -n "$$out" ]; then echo "$$out"; exit 1; fi; echo "shuttle.service: ok" && \
+	out=$$(desktop-file-validate "$$tmp/share/applications/$(DESKTOP)" 2>&1) ; \
+	if [ -n "$$out" ]; then echo "$$out"; exit 1; fi; echo "$(DESKTOP): ok"
 
 # Runs the installed copy from outside the source tree, so a binary that only
 # works from a checkout fails here.

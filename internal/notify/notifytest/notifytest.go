@@ -22,10 +22,12 @@ type Note struct {
 	Body       string
 	Category   string // the "category" hint
 	Urgency    byte   // the "urgency" hint
+	Actions    []string
 }
 
 // Server records notifications.
 type Server struct {
+	conn   *dbus.Conn
 	markup bool
 	onNote func(Note)
 
@@ -38,7 +40,7 @@ type Server struct {
 // to advertise the body-markup capability. onNote, if set, is called with
 // each note as it arrives.
 func Serve(conn *dbus.Conn, markup bool, onNote func(Note)) (*Server, error) {
-	s := &Server{markup: markup, onNote: onNote}
+	s := &Server{conn: conn, markup: markup, onNote: onNote}
 	if err := conn.Export(methods{s}, "/org/freedesktop/Notifications", "org.freedesktop.Notifications"); err != nil {
 		return nil, err
 	}
@@ -52,6 +54,12 @@ func Serve(conn *dbus.Conn, markup bool, onNote func(Note)) (*Server, error) {
 	return s, nil
 }
 
+// Invoke clicks a notification's action, as the desktop does: it emits
+// ActionInvoked.
+func (s *Server) Invoke(id uint32, action string) error {
+	return s.conn.Emit("/org/freedesktop/Notifications", "org.freedesktop.Notifications.ActionInvoked", id, action)
+}
+
 // Notes returns the notifications received so far.
 func (s *Server) Notes() []Note {
 	s.mu.Lock()
@@ -63,11 +71,11 @@ func (s *Server) Notes() []Note {
 type methods struct{ s *Server }
 
 func (m methods) Notify(app string, replaces uint32, icon, summary, body string,
-	_ []string, hints map[string]dbus.Variant, _ int32,
+	actions []string, hints map[string]dbus.Variant, _ int32,
 ) (uint32, *dbus.Error) {
 	s := m.s
 	s.mu.Lock()
-	n := Note{ID: replaces, AppName: app, ReplacesID: replaces, Icon: icon, Summary: summary, Body: body}
+	n := Note{ID: replaces, AppName: app, ReplacesID: replaces, Icon: icon, Summary: summary, Body: body, Actions: actions}
 	if n.ID == 0 {
 		s.next++
 		n.ID = s.next

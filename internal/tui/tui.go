@@ -10,6 +10,7 @@ package tui
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -46,6 +47,19 @@ type Options struct {
 	Test func(ctx context.Context, share *config.Share, password string, store secrets.Store) error
 	// Browse opens a share's top folder to look for folders in.
 	Browse func(ctx context.Context, share *config.Share, store secrets.Store) (fsys.FS, error)
+	// Tab is the tab shown first; see Tab.
+	Tab int
+}
+
+// Tab is the tab of a name, as shuttle open takes it: shuttles,
+// conflicts, activity, profiles or shares.
+func Tab(name string) (int, bool) {
+	for i, n := range tabNames {
+		if strings.EqualFold(n, name) {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // Run shows the TUI until the user quits or ctx is done.

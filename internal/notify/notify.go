@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,6 +20,10 @@ import (
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
 )
+
+// desktopEntry is shuttle's desktop file, without .desktop: it gives the
+// notifications shuttle's name and icon.
+const desktopEntry = "io.github.fqazzazee.Shuttle"
 
 const (
 	busName = "org.freedesktop.Notifications"
@@ -36,6 +41,9 @@ const queueSize = 64
 type Notifier struct {
 	log   *slog.Logger
 	queue chan daemon.Event
+	// Open, if set, is called when the user clicks a notification's "Open
+	// shuttle" button, with the TUI tab to open.
+	Open func(tab string)
 }
 
 // New returns a Notifier that logs to log, which may be nil.
@@ -61,13 +69,33 @@ func (n *Notifier) Send(e *daemon.Event) {
 // done. A missing or failing server is logged, once, and never stops the
 // daemon: events meanwhile are lost, the sync goes on.
 func (n *Notifier) Run(ctx context.Context, conn *dbus.Conn) {
-	s := &sender{log: n.log, obj: conn.Object(busName, objPath), ids: map[string]uint32{}}
+	s := &sender{log: n.log, obj: conn.Object(busName, objPath), ids: map[string]uint32{}, opens: map[uint32]string{}}
+	clicks := make(chan *dbus.Signal, 8)
+	if err := conn.AddMatchSignalContext(ctx, dbus.WithMatchObjectPath(objPath), dbus.WithMatchInterface(busName),
+		dbus.WithMatchMember("ActionInvoked")); err != nil {
+		n.log.Warn("not listening for notification buttons", "err", err)
+	}
+	conn.Signal(clicks)
+	defer conn.RemoveSignal(clicks)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case e := <-n.queue:
 			s.show(ctx, &e)
+		case sig, ok := <-clicks:
+			if !ok || sig == nil {
+				clicks = nil // the connection closed
+				continue
+			}
+			var id uint32
+			var action string
+			if sig.Name != busName+".ActionInvoked" || dbus.Store(sig.Body, &id, &action) != nil || action != "open" {
+				continue
+			}
+			if tab, ok := s.opens[id]; ok && n.Open != nil {
+				go n.Open(tab)
+			}
 		}
 	}
 }
@@ -77,6 +105,7 @@ type sender struct {
 	log     *slog.Logger
 	obj     dbus.BusObject
 	ids     map[string]uint32 // note key -> the server's id, to replace it
+	opens   map[uint32]string // the server's id -> the TUI tab its button opens
 	markup  *bool             // whether the server reads markup; nil until asked
 	failing bool
 }
@@ -114,17 +143,25 @@ func (s *sender) call(ctx context.Context, e *daemon.Event) error {
 		body = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(body)
 	}
 	hints := map[string]dbus.Variant{
-		"category": dbus.MakeVariant(m.category),
-		"urgency":  dbus.MakeVariant(byte(1)), // normal
+		"category":      dbus.MakeVariant(m.category),
+		"urgency":       dbus.MakeVariant(byte(1)), // normal
+		"desktop-entry": dbus.MakeVariant(desktopEntry),
+	}
+	actions := []string{}
+	if m.open != "" {
+		actions = []string{"open", "Open shuttle"}
 	}
 	var id uint32
 	err := s.obj.CallWithContext(ctx, busName+".Notify", 0,
-		appName, s.ids[m.key], m.icon, m.summary, body, []string{}, hints, int32(-1)).Store(&id)
+		appName, s.ids[m.key], m.icon, m.summary, body, actions, hints, int32(-1)).Store(&id)
 	if err != nil {
 		return err
 	}
 	if m.key != "" {
 		s.ids[m.key] = id
+	}
+	if m.open != "" {
+		s.opens[id] = m.open
 	}
 	return nil
 }
@@ -137,6 +174,7 @@ type note struct {
 	key            string
 	icon, category string
 	summary, body  string // body is plain text; call escapes it
+	open           string // the TUI tab its "Open shuttle" button opens; "" for none
 }
 
 // message words an event.
@@ -148,7 +186,11 @@ func message(e *daemon.Event) note {
 		return note{key: "error/" + e.Shuttle, icon: "dialog-error-symbolic", category: "transfer.error",
 			summary: e.Shuttle + ": sync failed", body: strings.Join(lines, "\n")}
 	case daemon.EventConflicts:
-		return note{icon: "dialog-warning-symbolic", category: "transfer",
+		open := ""
+		if slices.ContainsFunc(e.Conflicts, func(i engine.Issue) bool { return i.Outcome == "held" }) {
+			open = "conflicts" // it waits for the user
+		}
+		return note{icon: "dialog-warning-symbolic", category: "transfer", open: open,
 			summary: fmt.Sprintf("%s: %s", e.Shuttle, plural(len(e.Conflicts), "conflict")),
 			body: strings.Join(issueLines(e.Conflicts, func(i engine.Issue) string {
 				if i.Outcome == "held" {
@@ -157,7 +199,7 @@ func message(e *daemon.Event) note {
 				return i.Outcome
 			}), "\n")}
 	case daemon.EventDeletionsHeld:
-		return note{key: "deletions/" + e.Shuttle, icon: "dialog-warning-symbolic", category: "transfer",
+		return note{key: "deletions/" + e.Shuttle, icon: "dialog-warning-symbolic", category: "transfer", open: "conflicts",
 			summary: fmt.Sprintf("%s: %s held back", e.Shuttle, plural(e.HeldDeletions, "deletion")),
 			body: "More files would be deleted at once than the deletion guard allows, so none were. " +
 				"Check that both folders are there and mounted before allowing them."}
