@@ -207,6 +207,51 @@ func TestAddAShare(t *testing.T) {
 	}
 }
 
+// An NFS share's IDs: 0 is root and is written; empty is the user's own,
+// and is not.
+func TestAddAnNFSShare(t *testing.T) {
+	m, kr, _ := sharesTab(t, sharesConfig)
+	press(t, m, "n")
+	typeIn(t, m, "store")
+	press(t, m, "tab", "right", "tab") // type: nfs3
+	typeIn(t, m, "store.example")
+	press(t, m, "tab")
+	typeIn(t, m, "/volume1/store")
+	press(t, m, "tab")
+	if s := screen(m); !strings.Contains(s, "› User ID") || !strings.Contains(s, "the server believes it as sent") {
+		t.Errorf("the user ID field:\n%s", s)
+	}
+	typeIn(t, m, "-1")
+	send(t, m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+	if !strings.Contains(screen(m), `the user id must be a number from 0 to 4294967295, not "-1"`) {
+		t.Errorf("a bad user ID:\n%s", screen(m))
+	}
+	send(t, m, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	send(t, m, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	typeIn(t, m, "0")
+	press(t, m, "tab", "tab", "tab") // past the group ID and the port
+	typeIn(t, m, "892")
+	send(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}) // the mount port is the last field: saves
+	if m.form != nil {
+		t.Fatalf("form still open: %s", m.form.result)
+	}
+	want := strings.Replace(sharesConfig, "path = \"/mnt/usb\"\n",
+		"path = \"/mnt/usb\"\n\n[shares.store]\ntype = \"nfs3\"\nhost = \"store.example\"\nmount_port = 892\nexport = \"/volume1/store\"\nuid = 0\n", 1)
+	if got := configFile(t, m); got != want {
+		t.Errorf("config:\n%s\nwant:\n%s", got, want)
+	}
+	if len(kr.pw) != 0 {
+		t.Errorf("an NFS share wrote the keyring: %v", kr.pw)
+	}
+
+	// Back in the form, the IDs read as they were saved.
+	m.shareSel = "store"
+	press(t, m, "e")
+	if got := m.form.inputs["uid"].Value() + "," + m.form.inputs["gid"].Value(); got != "0," {
+		t.Errorf("uid,gid in the form = %q", got)
+	}
+}
+
 func TestEditAShare(t *testing.T) {
 	m, kr, _ := sharesTab(t, sharesConfig)
 	kr.pw["smb://user@nas.example/home"] = "old-pw"

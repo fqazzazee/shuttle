@@ -19,6 +19,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/fsys/fsystest"
+	"github.com/fqazzazee/shuttle/internal/nfs3/nfs3test"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
@@ -105,19 +106,68 @@ remote = "m:/docs"
 	}
 }
 
-func TestNFSIsNotSupportedYet(t *testing.T) {
-	cfg, s := load(t, `
+// nfsShare is an NFS share of a folder served in-process, which holds
+// docs/a.txt.
+func nfsShare(t *testing.T) config.Share {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "docs", "a.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	host, port := nfs3test.Serve(t, dir)
+	return config.Share{Name: "n", Type: config.ShareNFS3, Host: host, Port: port, MountPort: port, Export: "/"}
+}
+
+func TestNFSShare(t *testing.T) {
+	share := nfsShare(t)
+	cfg, s := load(t, fmt.Sprintf(`
 [shares.n]
 type = "nfs3"
-host = "nas.example"
-export = "/volume1"
+host = %q
+port = %d
+mount_port = %d
+export = "/"
 [shuttles.s]
 mode = "pull"
-local = "/tmp/x"
-remote = "n:/"
-`)
-	if _, err := OpenRemote(context.Background(), cfg, s, memStore{t: t}); !errors.Is(err, ErrNotSupported) {
-		t.Errorf("OpenRemote = %v, want ErrNotSupported", err)
+local = "/tmp/never-used"
+remote = "n:/docs"
+`, share.Host, share.Port, share.MountPort))
+	ctx := context.Background()
+	f, err := OpenRemote(ctx, cfg, s, memStore{t: t}) // a nil map: the keyring is never asked
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if info, err := f.Stat(ctx, "a.txt"); err != nil || info.Size != 1 {
+		t.Errorf("Stat(a.txt) = %+v, %v", info, err)
+	}
+	if _, err := OpenShare(ctx, &share, "missing", memStore{t: t}); err == nil || !strings.Contains(err.Error(), "share n:") {
+		t.Errorf("a folder that is not there: %v", err)
+	}
+}
+
+// Unset IDs are the user running shuttle, with its groups; a share that sets
+// either is someone else, and gets none of this user's groups.
+func TestNFSUser(t *testing.T) {
+	me, mine := uint32(os.Getuid()), uint32(os.Getgid()) //nolint:gosec // test IDs
+	groups, err := os.Getgroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, gid, got := NFSUser(&config.Share{Type: config.ShareNFS3})
+	if uid != me || gid != mine || len(got) != len(groups) {
+		t.Errorf("unset: %d, %d, %v; want %d, %d and %d groups", uid, gid, got, me, mine, len(groups))
+	}
+	uid, gid, got = NFSUser(&config.Share{Type: config.ShareNFS3, UID: ptr[uint32](0)})
+	if uid != 0 || gid != mine || got != nil {
+		t.Errorf("uid = 0: %d, %d, %v", uid, gid, got)
+	}
+	uid, gid, got = NFSUser(&config.Share{Type: config.ShareNFS3, GID: ptr[uint32](100)})
+	if uid != me || gid != 100 || got != nil {
+		t.Errorf("gid = 100: %d, %d, %v", uid, gid, got)
 	}
 }
 
@@ -263,8 +313,17 @@ func TestTestAPathShare(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "is the share mounted?") {
 		t.Errorf("a folder that is not there: %v", err)
 	}
-	if err := Test(ctx, &config.Share{Name: "n", Type: config.ShareNFS3, Host: "nas.example"}, "", memStore{t: t}); !errors.Is(err, ErrNotSupported) {
-		t.Errorf("NFS: %v", err)
+}
+
+func TestTestAnNFSShare(t *testing.T) {
+	ctx := context.Background()
+	share := nfsShare(t)
+	if err := Test(ctx, &share, "", memStore{t: t}); err != nil {
+		t.Errorf("a served export: %v", err)
+	}
+	share.Port, share.MountPort = 1, 1
+	if err := Test(ctx, &share, "", memStore{t: t}); err == nil {
+		t.Error("a closed port answered")
 	}
 }
 

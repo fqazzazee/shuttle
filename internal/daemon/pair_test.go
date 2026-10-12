@@ -109,3 +109,41 @@ func TestPairOf(t *testing.T) {
 		}
 	}
 }
+
+func TestPairOfNFS(t *testing.T) {
+	base := func() (*config.Config, *config.Shuttle) {
+		cfg := &config.Config{Shares: map[string]config.Share{
+			"nas": {Name: "nas", Type: config.ShareNFS3, Host: "nas.example", Export: "/volume1/home"},
+		}}
+		return cfg, &config.Shuttle{Name: "docs", Local: "/home/u/Documents", Share: "nas", Remote: "docs"}
+	}
+	share := func(f func(*config.Share)) func(*config.Config) {
+		return func(c *config.Config) {
+			sh := c.Shares["nas"]
+			f(&sh)
+			c.Shares["nas"] = sh
+		}
+	}
+	me, mine := uint32(os.Getuid()), uint32(os.Getgid()) //nolint:gosec // test IDs
+	other, others := me+1, mine+1
+	cfg, s := base()
+	want := pairOf(cfg, s)
+	for _, tc := range []struct {
+		name   string
+		change func(*config.Config)
+		same   bool
+	}{
+		{"the user's own IDs spelled out", share(func(sh *config.Share) { sh.UID, sh.GID = &me, &mine }), true},
+		{"the default port spelled out", share(func(sh *config.Share) { sh.Port = 2049 }), true},
+		{"another mount port", share(func(sh *config.Share) { sh.MountPort = 892 }), true},
+		{"another export", share(func(sh *config.Share) { sh.Export = "/volume1/backup" }), false},
+		{"another user", share(func(sh *config.Share) { sh.UID = &other }), false},
+		{"another group", share(func(sh *config.Share) { sh.GID = &others }), false},
+	} {
+		cfg, s := base()
+		tc.change(cfg)
+		if got := pairOf(cfg, s) == want; got != tc.same {
+			t.Errorf("%s: same pair = %v, want %v", tc.name, got, tc.same)
+		}
+	}
+}
