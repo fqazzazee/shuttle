@@ -115,7 +115,14 @@ interval = "1m"`)
 	f.d.runners["s"].shuttle.Settings.Interval = 150 * time.Millisecond
 	f.run()
 
-	f.waitFor("s", "two scheduled runs", func(Status) bool { return f.runCount() >= 2 })
+	// Ends, not starts: a probe's snapshot from before the first run can
+	// arrive after its "running", and the run's next one then counts as a
+	// second start while it is still copying.
+	f.waitFor("s", "two scheduled runs", func(Status) bool {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return f.ended >= 2
+	})
 	if !exists(f.mount, "a.txt") {
 		t.Error("the scheduled run did not push")
 	}
