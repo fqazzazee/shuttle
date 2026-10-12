@@ -29,7 +29,7 @@ func TestRun(t *testing.T) {
 	}{
 		{"version", []string{"version"}, 0, "shuttle dev\n", ""},
 		{"version flag", []string{"--version"}, 0, "shuttle dev\n", ""},
-		{"help", []string{"help"}, 0, "Usage: shuttle", ""},
+		{"help", []string{"help"}, 0, "  | o  ==  o |\n  '-[]----[]-'\n\nUsage: shuttle", ""},
 		{"no args", nil, 2, "", "Usage: shuttle"},
 		{"open, not in a terminal", []string{"open", "conflicts"}, 2, "", "the TUI needs a terminal"},
 		{"open, too many", []string{"open", "a", "b"}, 2, "", "wrong arguments"},

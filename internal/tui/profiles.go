@@ -140,7 +140,7 @@ func (m *model) profilesLines(room int) []string {
 			"Fix it in " + m.o.Config + " first: saving a profile checks the whole file.",
 		}
 	case len(m.cfg.Profiles) == 0:
-		return []string{"No profiles yet: n adds one. A profile is a set of settings that shuttles share."}
+		return withBus("No profiles yet: n adds one. A profile is a set of settings that shuttles share.")
 	}
 	nameWidth := len("NAME")
 	for _, n := range m.cfg.Profiles {

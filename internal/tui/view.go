@@ -26,6 +26,7 @@ var (
 	heldStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	busyStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 	goodStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	busStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 	keyStyle    = lipgloss.NewStyle().Bold(true)
 	stateStyles = map[daemon.State]lipgloss.Style{
 		daemon.StateError:    badStyle,
@@ -113,6 +114,15 @@ func (m *model) content(room int) []string {
 	}
 }
 
+// withBus is an empty state on a first run: shuttle's icon, then text.
+func withBus(text ...string) []string {
+	lines := make([]string, 0, len(present.Bus)+1+len(text))
+	for _, l := range present.Bus {
+		lines = append(lines, busStyle.Render(l))
+	}
+	return append(append(lines, ""), text...)
+}
+
 // Column widths of the shuttles table; DETAILS takes the rest.
 const (
 	modeWidth     = 8
@@ -126,7 +136,7 @@ func (m *model) shuttlesTable(room int) []string {
 	case !m.loaded || m.down != nil:
 		return m.waiting()
 	case len(m.shuttles) == 0:
-		return []string{"No shuttles in the config file yet."}
+		return withBus("No shuttles yet.", "Press n to add one.")
 	}
 	nameWidth := len("NAME")
 	for i := range m.shuttles {
