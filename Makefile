@@ -10,7 +10,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Pinned to match CI. `go run` builds it on first use, so no separate install.
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-keyring test-systemd
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-keyring test-systemd test-tui
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -94,6 +94,11 @@ test-keyring:
 # config. About three minutes. PODMAN="sudo podman" where rootless fails.
 test-systemd:
 	PODMAN="$(PODMAN)" test/systemd/run.sh
+
+# Phase 4's exit test: the TUI, in tmux, against a running daemon on a
+# private session bus. Needs tmux and dbus-run-session.
+test-tui:
+	test/tui/run.sh
 
 PODMAN ?= podman
 

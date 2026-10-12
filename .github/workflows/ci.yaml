@@ -109,6 +109,20 @@ jobs:
       # cgroup delegation for its user), so this one uses sudo.
       - run: make test-systemd PODMAN="sudo podman"
 
+  tui:
+    name: tui
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tmux dbus
+      - run: make test-tui
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest
