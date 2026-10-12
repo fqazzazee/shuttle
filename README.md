@@ -25,7 +25,8 @@ and the terminal interface work. SMB is tested against a real Samba server, NFS 
 an in-process test server. Still to come:
 
 1. NFS tested against the Linux kernel server: NFSv3 directly, NFSv4 through a mount
-2. GNOME Shell 50 extension: indicator and Quick Settings toggle
+2. GNOME Shell 50 extension: built and tested in a headless shell, still to be tried on a
+   real desktop (see below to try it yourself)
 3. Packages: RPM (Fedora COPR), DEB, extensions.gnome.org
 
 ### Not planned
@@ -128,6 +129,22 @@ files that differ become conflicts.
 
 A broken config at startup stops the service with a message in `journalctl --user -u shuttle`, rather
 than restarting it over and over.
+
+### GNOME extension
+
+On GNOME 50, an extension shows shuttle in the top bar and in Quick Settings: an icon for
+the overall state (pulsing while it syncs, with the transfer rate beside it) and a list of
+the shuttles with what each is doing; a toggle that pauses and resumes every shuttle, a switch
+and a "Sync now" button for each, and "Open shuttle". It only talks to the running service;
+settings stay in the terminal interface.
+
+```bash
+make install-extension   # into ~/.local/share/gnome-shell/extensions
+```
+
+Then log out and back in (on Wayland, GNOME Shell finds new extensions at login), and run
+`gnome-extensions enable shuttle@fqazzazee.github.io`. `make uninstall-extension` takes it
+out again.
 
 ## Use
 
