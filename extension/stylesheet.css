@@ -1,5 +1,18 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
+/* The bus in the top bar, with no room on its right: the mark beside it
+   sits close. (A negative margin on the mark instead stops the whole panel
+   from being drawn.) */
+.shuttle-bus {
+  padding-right: 0;
+}
+
+/* Beside the bus, at its lower right: a mark, smaller than the bus. */
+.shuttle-badge {
+  icon-size: 9px;
+  padding-left: 1px;
+}
+
 .shuttle-row-when {
   font-size: smaller;
   padding-left: 1em;

@@ -81,14 +81,22 @@ class Indicator extends PanelMenu.Button {
         super(0.5, 'Shuttle');
         const shuttleIcon = new Gio.FileIcon({file: ext.dir.get_child('icons').get_child('shuttle-symbolic.svg')});
         this._iconFor = name => name === SHUTTLE_ICON ? shuttleIcon : new Gio.ThemedIcon({name});
-        this._icon = new St.Icon({style_class: 'system-status-icon'});
+        // The bus, always; beside it, smaller, what state the shuttles are in.
+        this._icon = new St.Icon({style_class: 'system-status-icon shuttle-bus', gicon: shuttleIcon});
+        this._badge = new St.Icon({style_class: 'shuttle-badge', y_align: Clutter.ActorAlign.END, visible: false});
         this._rates = new St.Label({y_align: Clutter.ActorAlign.CENTER, visible: false});
+        // The bus and its mark in a box of their own, as tall as the bus, so
+        // the mark sits at the bus's lower right and not the panel's.
+        const icons = new St.BoxLayout({y_align: Clutter.ActorAlign.CENTER});
+        icons.add_child(this._icon);
+        icons.add_child(this._badge);
         const box = new St.BoxLayout();
-        box.add_child(this._icon);
+        box.add_child(icons);
         box.add_child(this._rates);
         this.add_child(box);
         // What is on show, for the headless tests to read.
         this.shownState = '';
+        this.shownBadge = '';
         this.shownRates = '';
         this.pulsing = false;
 
@@ -164,7 +172,12 @@ class Indicator extends PanelMenu.Button {
         if (state === this.shownState)
             return;
         const {icon, label} = presentation(state);
-        this._icon.gicon = this._iconFor(icon);
+        // Syncing has no icon of its own beside the bus: the bus pulses.
+        const badge = icon === SHUTTLE_ICON ? '' : icon;
+        if (badge)
+            this._badge.gicon = this._iconFor(badge);
+        this._badge.visible = badge !== '';
+        this.shownBadge = badge;
         this.accessible_name = `Shuttle: ${label}`;
         this.shownState = state;
         this._pulse(state === 'running');
