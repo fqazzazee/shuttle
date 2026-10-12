@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
 var resolvedAt = time.Date(2026, 10, 11, 15, 30, 0, 0, time.UTC)
@@ -301,4 +302,42 @@ func TestDeletionGuardOnFirstMirrorPush(t *testing.T) {
 	if len(res.HeldDeletions) != 12 || res.Copied != 1 {
 		t.Errorf("held %d, copied %d", len(res.HeldDeletions), res.Copied)
 	}
+}
+
+// Every conflict carries its two copies as the run found them, whatever
+// was done about it: the user may want to know what was kept and lost.
+func TestConflictsCarryBothCopies(t *testing.T) {
+	for _, policy := range []config.ConflictPolicy{config.ConflictAsk, config.ConflictKeepBoth, config.ConflictNewestWins} {
+		t.Run(string(policy), func(t *testing.T) {
+			h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+			h.settings.Conflicts = policy
+			write(t, h.localDir, "a.txt", "base", t0)
+			h.run()
+			write(t, h.localDir, "a.txt", "local edit", t1)
+			write(t, h.remoteDir, "a.txt", "remote, longer edit", t1.Add(time.Hour))
+			res := h.run()
+			if len(res.Conflicts) != 1 {
+				t.Fatalf("conflicts = %+v", res.Conflicts)
+			}
+			c := res.Conflicts[0]
+			if c.Local == nil || c.Local.Size != int64(len("local edit")) || !c.Local.ModTime.Equal(t1) {
+				t.Errorf("local copy = %+v", c.Local)
+			}
+			if c.Remote == nil || c.Remote.Size != int64(len("remote, longer edit")) || !c.Remote.ModTime.Equal(t1.Add(time.Hour)) {
+				t.Errorf("remote copy = %+v", c.Remote)
+			}
+		})
+	}
+	t.Run("a file against a folder", func(t *testing.T) {
+		h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
+		write(t, h.localDir, "x", "file", t0)
+		write(t, h.remoteDir, "x/inside.txt", "i", t0)
+		res := h.run()
+		if len(res.Conflicts) != 1 {
+			t.Fatalf("conflicts = %+v", res.Conflicts)
+		}
+		if c := res.Conflicts[0]; c.Local == nil || c.Local.Kind != fsys.KindFile || c.Remote == nil || c.Remote.Kind != fsys.KindDir {
+			t.Errorf("sides: %+v, %+v", c.Local, c.Remote)
+		}
+	})
 }

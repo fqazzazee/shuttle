@@ -126,6 +126,9 @@ func TestCaseClashIsHeldOverSMB(t *testing.T) {
 		if len(res.Conflicts) != 2 || len(res.Skipped) != 0 || res.Copied != 0 {
 			t.Fatalf("result = %+v, want both names held", res)
 		}
+		if c := res.Conflicts[0]; c.Local == nil || c.Local.Size == 0 || c.Remote != nil {
+			t.Errorf("conflict sides: local %+v, remote %+v; want the local copy only", c.Local, c.Remote)
+		}
 		if !strings.Contains(res.Conflicts[0].Reason, "differs only in case") {
 			t.Errorf("reason = %q", res.Conflicts[0].Reason)
 		}

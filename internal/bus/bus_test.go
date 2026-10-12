@@ -20,6 +20,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/dbustest"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
@@ -212,6 +213,16 @@ func TestConflictRaisedOnceThenResolved(t *testing.T) {
 	case body := <-raised:
 		t.Errorf("ConflictRaised again for an old conflict: %v", body)
 	case <-time.After(200 * time.Millisecond):
+	}
+
+	// Both copies are described, for the user to choose between.
+	all, err := f.c.Shuttles(ctx(t))
+	if err != nil || len(all) != 1 || len(all[0].Conflicts) != 1 {
+		t.Fatalf("Shuttles = %+v, %v", all, err)
+	}
+	if c := all[0].Conflicts[0]; c.Local == nil || c.Local.Size != int64(len("local edit")) ||
+		c.Remote == nil || c.Remote.Size != int64(len("remote edit!")) || !c.Remote.ModTime.Equal(later.Truncate(time.Second)) {
+		t.Errorf("conflict copies: local %+v, remote %+v", c.Local, c.Remote)
 	}
 
 	// The overall state, the one icon in the top bar, shows it too.
@@ -411,8 +422,14 @@ func TestStatusRoundTrip(t *testing.T) {
 		Name: "s", State: daemon.StateRunning, Paused: true, Pending: true, Share: daemon.ShareOnline,
 		Note: "n", Error: "e", LastRun: time.Unix(1000, 0), LastOK: time.Unix(900, 0),
 		Copied: 3, Deleted: 2, HeldDeletions: 1,
-		Conflicts: []engine.Issue{{Path: "c", Reason: "r", Outcome: "held", Op: engine.OpConflict}},
-		Errors:    []engine.Issue{{Path: "x", Reason: "denied"}},
+		Conflicts: []engine.Issue{
+			{Path: "c", Reason: "r", Outcome: "held", Op: engine.OpConflict,
+				Local:  &fsys.FileInfo{Name: "c", Kind: fsys.KindFile, Size: 10, ModTime: time.Unix(2000, 0)},
+				Remote: &fsys.FileInfo{Name: "c", Kind: fsys.KindDir, ModTime: time.Unix(3000, 0)}},
+			{Path: "Readme", Reason: "differs only in case", Outcome: "held", Op: engine.OpConflict,
+				Local: &fsys.FileInfo{Name: "Readme", Kind: fsys.KindFile, Size: 1 << 40, ModTime: time.Unix(4000, 0)}},
+		},
+		Errors: []engine.Issue{{Path: "x", Reason: "denied"}},
 		Progress: daemon.Progress{Phase: engine.PhaseSyncing, Done: 4, Total: 9, Bytes: 5 << 30,
 			TotalBytes: 7 << 30, Path: "big.iso", RateUp: 2_100_000, RateDown: 1},
 	}

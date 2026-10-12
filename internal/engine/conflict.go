@@ -38,7 +38,13 @@ func (e *executor) conflict(a *Action) error {
 }
 
 func (e *executor) hold(a *Action) {
-	e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: OpConflict, Reason: a.Reason, Outcome: "held"})
+	e.settled(a, "held")
+}
+
+// settled reports a conflict and what was done about it.
+func (e *executor) settled(a *Action, outcome string) {
+	e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: OpConflict, Reason: a.Reason,
+		Outcome: outcome, Local: a.Local, Remote: a.Remote})
 }
 
 // newestWins copies the more recently modified copy over the other.
@@ -53,8 +59,7 @@ func (e *executor) newestWins(a *Action) error {
 	if err := e.copyFile(a.Path, toRemote, src, dst, false); err != nil {
 		return err
 	}
-	e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: OpConflict, Reason: a.Reason,
-		Outcome: "newest wins: kept the " + label(winner) + " copy"})
+	e.settled(a, "newest wins: kept the "+label(winner)+" copy")
 	return nil
 }
 
@@ -88,8 +93,7 @@ func (e *executor) keepBoth(a *Action) error {
 	if err := loserFS.Rename(e.ctx, a.Path, saved); err != nil {
 		return err
 	}
-	e.res.Conflicts = append(e.res.Conflicts, Issue{Path: a.Path, Op: OpConflict, Reason: a.Reason,
-		Outcome: "kept both: the " + label(loserName) + " copy is now " + saved})
+	e.settled(a, "kept both: the "+label(loserName)+" copy is now "+saved)
 
 	if a.Local.Kind != a.Remote.Kind {
 		return nil // the folder and the renamed file sync on the next run

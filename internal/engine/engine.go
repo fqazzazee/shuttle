@@ -84,6 +84,9 @@ type Issue struct {
 	// Outcome says what was done about a conflict: "held", "newest wins: ...",
 	// "kept both: ...".
 	Outcome string
+	// Local and Remote are a conflict's two copies as the run found them,
+	// for the user to choose between; nil for a side without one.
+	Local, Remote *fsys.FileInfo
 }
 
 // Result summarises a run.
