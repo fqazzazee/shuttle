@@ -96,6 +96,19 @@ jobs:
         if: failure()
         run: docker logs shuttle-samba
 
+  nfs:
+    name: nfs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      # The engine suite against the in-process NFSv3 server.
+      - run: make test-nfs
+
   systemd:
     name: systemd
     runs-on: ubuntu-latest

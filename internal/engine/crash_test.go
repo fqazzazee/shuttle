@@ -36,7 +36,9 @@ func TestMain(m *testing.M) {
 		crashChild()
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	stopNFS()
+	os.Exit(code)
 }
 
 // crashChild runs one sync and kills itself, SIGKILL and all, at the Nth
