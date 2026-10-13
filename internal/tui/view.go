@@ -17,29 +17,6 @@ import (
 	"github.com/fqazzazee/shuttle/internal/present"
 )
 
-// Styles use the terminal's own 16 colors, so they follow its theme.
-var (
-	titleStyle  = lipgloss.NewStyle().Bold(true)
-	activeTab   = lipgloss.NewStyle().Bold(true).Reverse(true)
-	headStyle   = lipgloss.NewStyle().Bold(true)
-	faint       = lipgloss.NewStyle().Faint(true)
-	selected    = lipgloss.NewStyle().Reverse(true)
-	badStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	heldStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	busyStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-	goodStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	busStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
-	keyStyle    = lipgloss.NewStyle().Bold(true)
-	stateStyles = map[daemon.State]lipgloss.Style{
-		daemon.StateError:    badStyle,
-		daemon.StateOffline:  badStyle,
-		daemon.StateHeld:     heldStyle,
-		daemon.StateRunning:  busyStyle,
-		daemon.StatePaused:   faint,
-		daemon.StateDisabled: faint,
-	}
-)
-
 func (m *model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true

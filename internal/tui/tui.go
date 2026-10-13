@@ -67,6 +67,7 @@ func Tab(name string) (int, bool) {
 func Run(ctx context.Context, c Client, o Options) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	pickTheme()
 	_, err := tea.NewProgram(newModel(ctx, c, o), tea.WithContext(ctx)).Run()
 	return err
 }
