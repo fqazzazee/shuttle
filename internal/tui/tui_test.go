@@ -386,6 +386,11 @@ func TestTabsAndHelp(t *testing.T) {
 	if s := screen(m); !strings.Contains(s, "pause or resume every shuttle") {
 		t.Errorf("help:\n%s", s)
 	}
+	// Below what this terminal shows: the tree's keys are on both steps.
+	if s := strings.Join(helpLines(), "\n"); !strings.Contains(s, "on the share and on this computer:") ||
+		!strings.Contains(s, "type the folder's path") {
+		t.Errorf("help on the tree:\n%s", s)
+	}
 	press(t, m, "s") // keys of the tab do nothing under the help
 	press(t, m, "esc")
 	if m.help {
