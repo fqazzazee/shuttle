@@ -4,6 +4,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -49,11 +50,11 @@ func (m *model) View() tea.View {
 // the keys.
 func (m *model) render() string {
 	header := m.header()
-	status, keys := m.statusLine(), m.keysLine()
-	room := max(m.height-4, 1) // the header and a blank line, the two lines below
+	status, keys := m.statusLine(), m.keyLines()
+	room := m.room(len(keys))
 	var body []string
 	if m.help {
-		body = helpLines()
+		body = m.helpView(room)
 	} else {
 		body = m.content(room)
 	}
@@ -61,31 +62,63 @@ func (m *model) render() string {
 		body = body[:room]
 	}
 	lines := append([]string{header, ""}, body...)
-	for len(lines) < m.height-2 {
+	for len(lines) < m.height-1-len(keys) {
 		lines = append(lines, "")
 	}
-	lines = append(lines, status, keys)
+	lines = append(append(lines, status), keys...)
 	for i, l := range lines {
 		lines[i] = ansi.Truncate(l, m.width, "…")
 	}
 	return strings.Join(lines, "\n")
 }
 
-func (m *model) header() string {
-	parts := []string{titleStyle.Render("shuttle") + " "}
-	for i, name := range tabNames {
-		label := fmt.Sprintf(" %d %s ", i+1, name)
-		if i == tabConflicts {
-			if n := m.heldConflicts(); n > 0 {
-				label = fmt.Sprintf(" %d %s (%d) ", i+1, name, n)
-			}
-		}
-		if i == m.tab {
-			label = activeTab.Render(label)
-		}
-		parts = append(parts, label)
+// keyLines are the keys, on two lines when one is too narrow for them; on
+// one, cut short, when the terminal is too short to spare the room.
+func (m *model) keyLines() []string {
+	lines := strings.Split(m.keysLine(), "\n")
+	most := 2
+	if m.height < 12 {
+		most = 1
 	}
-	return strings.Join(parts, "")
+	if len(lines) > most {
+		lines = append(lines[:most-1], strings.Join(lines[most-1:], "  "))
+	}
+	return lines
+}
+
+// room is how many lines a tab has: all but the header and a blank line,
+// the status line and the keys below.
+func (m *model) room(keys int) int {
+	return max(m.height-3-keys, 1)
+}
+
+// header is the tabs. In a narrow terminal, the tabs but the open one are
+// their numbers alone.
+func (m *model) header() string {
+	tabs := func(short bool) string {
+		parts := []string{titleStyle.Render("shuttle") + " "}
+		for i, name := range tabNames {
+			if short && i != m.tab {
+				name = ""
+			}
+			label := strings.TrimRight(fmt.Sprintf(" %d %s", i+1, name), " ")
+			if i == tabConflicts {
+				if n := m.heldConflicts(); n > 0 {
+					label += fmt.Sprintf(" (%d)", n)
+				}
+			}
+			label += " "
+			if i == m.tab {
+				label = activeTab.Render(label)
+			}
+			parts = append(parts, label)
+		}
+		return strings.Join(parts, "")
+	}
+	if h := tabs(false); lipgloss.Width(h) <= m.width {
+		return h
+	}
+	return tabs(true)
 }
 
 func (m *model) heldConflicts() int {
@@ -126,12 +159,22 @@ func withBus(text ...string) []string {
 // Column widths of the shuttles table; DETAILS takes the rest.
 const (
 	modeWidth     = 8
+	arrowWidth    = 3 // MODE as its arrow alone, in a narrow terminal
 	stateWidth    = 10
 	sizeWidth     = 10
 	filesWidth    = 10
 	lastRunWidth  = 10
 	progressWidth = 24
+	detailsMin    = 20 // what DETAILS keeps before columns go
 )
+
+// column is one of the shuttles table's columns, but DETAILS.
+type column struct {
+	title string
+	width int
+	least int // what it can shrink to in a narrow terminal; 0: it cannot
+	cell  func(st *daemon.Status) string
+}
 
 func (m *model) shuttlesTable(room int) []string {
 	switch {
@@ -145,11 +188,39 @@ func (m *model) shuttlesTable(room int) []string {
 		nameWidth = max(nameWidth, lipgloss.Width(m.shuttles[i].Name))
 	}
 	nameWidth += 2
-	row := func(name, mode, state, size, files, lastRun, progress, details string) string {
-		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) + pad(size, sizeWidth) +
-			pad(files, filesWidth) + pad(lastRun, lastRunWidth) + pad(progress, progressWidth) + details
+	now := m.now()
+	// PROGRESS can shrink to what it shows now.
+	progressLeast := len("PROGRESS") + 2
+	for i := range m.shuttles {
+		progressLeast = max(progressLeast, lipgloss.Width(progress(&m.shuttles[i].Progress))+2)
 	}
-	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SIZE", "FILES", "LAST RUN", "PROGRESS", "DETAILS"))}
+	cols := []column{
+		{"NAME", nameWidth, 0, func(st *daemon.Status) string { return st.Name }},
+		{"MODE", modeWidth, arrowWidth, func(st *daemon.Status) string {
+			return present.ModeArrow(st.Mode) + " " + string(st.Mode)
+		}},
+		{"STATE", stateWidth, 0, func(st *daemon.Status) string {
+			if style, ok := stateStyles[st.State]; ok && st.Name != m.selected {
+				return style.Render(string(st.State))
+			}
+			return string(st.State)
+		}},
+		{"SIZE", sizeWidth, 0, func(st *daemon.Status) string { size, _ := present.Synced(st); return size }},
+		{"FILES", filesWidth, 0, func(st *daemon.Status) string { _, files := present.Synced(st); return files }},
+		{"LAST RUN", lastRunWidth, 0, func(st *daemon.Status) string { return present.Ago(st.LastRun, now) }},
+		{"PROGRESS", progressWidth, min(progressLeast, progressWidth), func(st *daemon.Status) string {
+			return progress(&st.Progress)
+		}},
+	}
+	cols = fitColumns(cols, m.width)
+	row := func(cells func(c *column) string, details string) string {
+		var b strings.Builder
+		for i := range cols {
+			b.WriteString(pad(cells(&cols[i]), cols[i].width))
+		}
+		return b.String() + details
+	}
+	lines := []string{headStyle.Render(row(func(c *column) string { return c.title }, "DETAILS"))}
 
 	// Scroll so the selected shuttle shows.
 	rows := room - 1
@@ -157,22 +228,45 @@ func (m *model) shuttlesTable(room int) []string {
 	if i := m.index(); i >= rows {
 		first = i - rows + 1
 	}
-	now := m.now()
 	for i := first; i < len(m.shuttles) && i < first+rows; i++ {
 		st := &m.shuttles[i]
-		state := string(st.State)
-		if style, ok := stateStyles[st.State]; ok && st.Name != m.selected {
-			state = style.Render(state)
-		}
-		size, files := present.Synced(st)
-		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state, size, files,
-			present.Ago(st.LastRun, now), progress(&st.Progress), present.Attention(st))
+		line := row(func(c *column) string { return c.cell(st) }, present.Attention(st))
 		if st.Name == m.selected {
 			line = selected.Render(ansi.Truncate(pad(line, m.width), m.width, "…"))
 		}
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+// fitColumns leaves DETAILS at least detailsMin columns of width, as far
+// as it can: FILES goes first, then SIZE; then MODE keeps only its arrow,
+// and PROGRESS shrinks to what it shows; then LAST RUN goes. NAME, STATE
+// and PROGRESS stay.
+func fitColumns(cols []column, width int) []column {
+	used := func() int {
+		n := 0
+		for i := range cols {
+			n += cols[i].width
+		}
+		return n
+	}
+	for _, step := range []string{"FILES", "SIZE", "MODE", "PROGRESS", "LAST RUN"} {
+		if width-used() >= detailsMin {
+			break
+		}
+		i := slices.IndexFunc(cols, func(c column) bool { return c.title == step })
+		switch step {
+		case "MODE":
+			cols[i].title, cols[i].width = "", cols[i].least
+			cols[i].cell = func(st *daemon.Status) string { return present.ModeArrow(st.Mode) }
+		case "PROGRESS":
+			cols[i].width = cols[i].least
+		default:
+			cols = slices.Delete(cols, i, i+1)
+		}
+	}
+	return cols
 }
 
 // waiting is what a tab shows until the daemon answers.
@@ -342,13 +436,16 @@ func (m *model) keysLine() string {
 		for _, k := range form {
 			parts = append(parts, keyStyle.Render(k[0])+" "+faint.Render(k[1]))
 		}
-		return strings.Join(parts, "  ")
+		return wrapKeys(parts, m.width)
 	}
 	if m.tab == tabProfiles && !m.help {
 		keys = append(keys, [2]string{"n", "new"}, [2]string{"e", "edit"}, [2]string{"c", "copy"}, [2]string{"x", "delete"})
 	}
 	if m.tab == tabShares && !m.help {
 		keys = append(keys, [2]string{"n", "new"}, [2]string{"e", "edit"}, [2]string{"t", "test"}, [2]string{"x", "delete"})
+	}
+	if m.help {
+		keys = append(keys, [2]string{"↑↓", "scroll"}, [2]string{"esc", "close"})
 	}
 	if m.tab == tabActivity && !m.help {
 		keys = append(keys, [2]string{"↑↓", "scroll"}, [2]string{"f", "filter"})
@@ -375,10 +472,92 @@ func (m *model) keysLine() string {
 	for _, k := range keys {
 		parts = append(parts, keyStyle.Render(k[0])+" "+faint.Render(k[1]))
 	}
-	return strings.Join(parts, "  ")
+	return wrapKeys(parts, m.width)
+}
+
+// wrapKeys puts the keys on as many lines as the width needs, rather than
+// cut short the last ones: help and quit.
+func wrapKeys(parts []string, width int) string {
+	var lines []string
+	line := ""
+	for _, p := range parts {
+		switch {
+		case line == "":
+			line = p
+		case lipgloss.Width(line)+2+lipgloss.Width(p) > width:
+			lines = append(lines, line)
+			line = p
+		default:
+			line += "  " + p
+		}
+	}
+	return strings.Join(append(lines, line), "\n")
 }
 
 var choiceNames = map[rune]string{'l': "keep this computer's", 'r': "keep the share's", 'b': "keep both", 'a': "allow the deletions"}
+
+// helpView is the help wrapped to the width, from where it is scrolled to,
+// in room lines; the last says when there is more below.
+func (m *model) helpView(room int) []string {
+	lines := m.helpWrapped()
+	lines = lines[min(m.helpScroll, max(len(lines)-room, 0)):]
+	if len(lines) > room {
+		lines = append(lines[:max(room-1, 0)], faint.Render("  ↓ more"))
+	}
+	return lines
+}
+
+// helpWrapped is the help wrapped to the width.
+func (m *model) helpWrapped() []string {
+	var out []string
+	for _, l := range helpLines() {
+		out = append(out, wrapHelp(l, m.width)...)
+	}
+	return out
+}
+
+// helpKey scrolls the help.
+func (m *model) helpKey(k string) {
+	room := m.room(len(m.keyLines()))
+	last := max(len(m.helpWrapped())-room, 0)
+	switch k {
+	case "up", "k":
+		m.helpScroll--
+	case "down", "j":
+		m.helpScroll++
+	case "pgup":
+		m.helpScroll -= room
+	case "pgdown", "space":
+		m.helpScroll += room
+	case "home", "g":
+		m.helpScroll = 0
+	case "end", "G":
+		m.helpScroll = last
+	}
+	m.helpScroll = min(max(m.helpScroll, 0), last)
+}
+
+// wrapHelp wraps a line of the help to width, going on under its
+// description: the text after the gap that ends the keys, if it has one.
+func wrapHelp(line string, width int) []string {
+	if lipgloss.Width(line) <= width {
+		return []string{line}
+	}
+	indent := len(line) - len(strings.TrimLeft(line, " "))
+	if i := strings.Index(line[indent:], "   "); i >= 0 {
+		rest := line[indent+i:]
+		indent += i + len(rest) - len(strings.TrimLeft(rest, " "))
+	}
+	if indent > width/2 {
+		indent = 2
+	}
+	wrapped := strings.Split(ansi.Wrap(line[indent:], width-indent, " "), "\n")
+	out := []string{line[:indent] + wrapped[0]}
+	for _, w := range wrapped[1:] {
+		out = append(out, strings.Repeat(" ", indent)+w)
+	}
+	return out
+}
 
 func helpLines() []string {
 	return []string{
@@ -410,14 +589,14 @@ func helpLines() []string {
 		"",
 		"  On the Profiles tab:",
 		"  n, e or enter, c, x   add a profile, edit it, copy it, delete it (only when no shuttle uses it)",
-		"  in the form: tab, shift+tab to move; ←/→ choose; a setting left empty is not set,",
-		"  and its default applies; ctrl+s saves; esc leaves it unsaved",
+		"  in the form: tab, shift+tab to move; ←/→ choose; a setting left empty is not set, and its " +
+			"default applies; ctrl+s saves; esc leaves it unsaved",
 		"",
 		"  On the Shares tab:",
 		"  n, e or enter, x      add a share, edit it, delete it (only when no shuttle uses it)",
 		"  t                     test the share: log in with the stored password and read it",
-		"  in the form: tab, shift+tab to move; ←/→ change the type; ctrl+t tests what is typed;",
-		"  ctrl+s or enter on the last field saves; esc leaves it unsaved",
+		"  in the form: tab, shift+tab to move; ←/→ change the type; ctrl+t tests what is typed; " +
+			"ctrl+s or enter on the last field saves; esc leaves it unsaved",
 		"  ?, esc                show or hide this help",
 		"  q, ctrl+c             quit; the daemon carries on",
 	}

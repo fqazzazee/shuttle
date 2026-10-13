@@ -475,3 +475,26 @@ func TestMeasureDisks(t *testing.T) {
 		t.Error("a second asking went out while one was out")
 	}
 }
+
+// In a narrow terminal, a long WHERE gives up its middle, and the columns
+// after it still show.
+func TestSharesNarrow(t *testing.T) {
+	m, _, _ := sharesTab(t, sharesConfig+`
+[shares.deep]
+type = "path"
+path = "/run/media/user/Backup Disk 2TB/shuttle/everything"
+`)
+	send(t, m, tea.WindowSizeMsg{Width: 80, Height: 20})
+	s := screen(m)
+	if !strings.Contains(s, "FREE                LAST TEST") || !strings.Contains(s, "/run/me…rything") {
+		t.Errorf("a narrow Shares tab:\n%s", s)
+	}
+	for _, l := range strings.Split(s, "\n") {
+		if strings.HasSuffix(l, "…") {
+			t.Errorf("a line is cut short: %q", l)
+		}
+	}
+	if got := cutMiddle("abcdefghij", 7); got != "abc…hij" {
+		t.Errorf("cutMiddle = %q", got)
+	}
+}

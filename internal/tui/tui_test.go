@@ -228,6 +228,77 @@ func TestShuttlesTab(t *testing.T) {
 	}
 }
 
+// A narrow terminal keeps room for DETAILS: FILES and SIZE go first, then
+// MODE keeps its arrow and PROGRESS shrinks to what it shows, then LAST RUN
+// goes.
+func TestNarrowShuttlesTab(t *testing.T) {
+	for _, tc := range []struct {
+		width     int
+		head, row string
+	}{
+		{80, "NAME    MODE    STATE     LAST RUN  PROGRESS                DETAILS",
+			"photos  → push  held      3h ago                            2 conflicts"},
+		{75, "NAME       STATE     LAST RUN  PROGRESS                DETAILS",
+			"photos  →  held      3h ago                            2 conflicts"},
+		{70, "NAME       STATE     LAST RUN  PROGRESS  DETAILS",
+			"photos  →  held      3h ago              2 conflicts waiting for you"},
+		{60, "NAME       STATE     PROGRESS  DETAILS",
+			"photos  →  held                2 conflicts waiting for you"},
+	} {
+		s := screen(start(t, newFake(), tc.width, 12))
+		if !strings.Contains(s, tc.head) || !strings.Contains(s, tc.row) {
+			t.Errorf("%d columns:\n%s", tc.width, s)
+		}
+	}
+}
+
+// A narrow terminal shows the other tabs by number, and the keys on a
+// second line rather than cut short.
+func TestNarrowHeaderAndKeys(t *testing.T) {
+	m := start(t, newFake(), 64, 24)
+	lines := strings.Split(screen(m), "\n")
+	if lines[0] != "shuttle  1 Shuttles  2 (2)  3  4  5 " {
+		t.Errorf("header %q", lines[0])
+	}
+	if keys := lines[len(lines)-2:]; !strings.HasPrefix(keys[0], "s sync") || !strings.HasSuffix(keys[1], "? help  q quit") {
+		t.Errorf("keys %q", keys)
+	}
+	if s := screen(start(t, newFake(), 120, 24)); !strings.Contains(s, "shuttle  1 Shuttles  2 Conflicts (2)  3 Activity") {
+		t.Errorf("a wide terminal lost the tabs' names:\n%s", s)
+	}
+}
+
+// The help wraps to the terminal and scrolls when it is longer.
+func TestHelpScrolls(t *testing.T) {
+	m := start(t, newFake(), 60, 24)
+	press(t, m, "?")
+	s := screen(m)
+	if !strings.Contains(s, "  ↓ more") || strings.Contains(s, "q, ctrl+c") {
+		t.Errorf("the help's first page:\n%s", s)
+	}
+	// Wrapped under its description, not under its keys.
+	if !strings.Contains(s, "  p                     pause or resume the shuttle: a run\n"+
+		"                        in progress finishes its file") {
+		t.Errorf("a long line is not wrapped under its description:\n%s", s)
+	}
+	press(t, m, "G")
+	if s := screen(m); strings.Contains(s, "↓ more") || !strings.Contains(s, "q, ctrl+c") {
+		t.Errorf("the help's end:\n%s", s)
+	}
+	press(t, m, "down", "up") // past the end it stays, so up goes up at once
+	if s := screen(m); !strings.Contains(s, "↓ more") {
+		t.Errorf("up from the end:\n%s", s)
+	}
+	press(t, m, "g")
+	if s := screen(m); !strings.Contains(s, "1-5, tab, shift+tab") {
+		t.Errorf("back to the help's start:\n%s", s)
+	}
+	press(t, m, "pgdown", "esc", "?") // opens at the start again
+	if s := screen(m); !strings.Contains(s, "1-5, tab, shift+tab") {
+		t.Errorf("the help reopened scrolled:\n%s", s)
+	}
+}
+
 func TestActions(t *testing.T) {
 	f := newFake()
 	m := start(t, f, 120, 12)
@@ -415,8 +486,13 @@ func TestSmallTerminals(t *testing.T) {
 				t.Errorf("%v: line %q is %d wide", size, l, w)
 			}
 		}
-		if !strings.HasPrefix(lines[len(lines)-1], "s sync") {
-			t.Errorf("%v: last line %q, want the keys", size, lines[len(lines)-1])
+		// Wrapped onto a second line when there is room for it.
+		keys := lines[len(lines)-1]
+		if size[1] >= 12 && size[0] < 100 {
+			keys = lines[len(lines)-2]
+		}
+		if !strings.HasPrefix(keys, "s sync") {
+			t.Errorf("%v: keys %q, want the shuttles' keys", size, keys)
 		}
 	}
 	// Scrolled to keep the selection in view.
