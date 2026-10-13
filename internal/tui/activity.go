@@ -89,14 +89,6 @@ func nextFilter(f string, shuttles []daemon.Status) string {
 	return ""
 }
 
-var kindStyles = map[activity.Kind]lipgloss.Style{
-	activity.KindError:    badStyle,
-	activity.KindConflict: heldStyle,
-	activity.KindHeld:     heldStyle,
-	activity.KindSkipped:  faint,
-	activity.KindRun:      headStyle,
-}
-
 func (m *model) activityLines(room int) []string {
 	if !m.loaded || m.down != nil {
 		return m.waiting()

@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 )
 
@@ -73,6 +74,7 @@ var (
 	busStyle    lipgloss.Style
 	keyStyle    lipgloss.Style
 	stateStyles map[daemon.State]lipgloss.Style
+	kindStyles  map[activity.Kind]lipgloss.Style
 )
 
 // Tests see the dark palette; Run picks one for the terminal.
@@ -136,5 +138,12 @@ func useTheme(p *palette) {
 		daemon.StateRunning:  busyStyle,
 		daemon.StatePaused:   faint,
 		daemon.StateDisabled: faint,
+	}
+	kindStyles = map[activity.Kind]lipgloss.Style{
+		activity.KindError:    badStyle,
+		activity.KindConflict: heldStyle,
+		activity.KindHeld:     heldStyle,
+		activity.KindSkipped:  faint,
+		activity.KindRun:      headStyle,
 	}
 }

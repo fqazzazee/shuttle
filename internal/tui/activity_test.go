@@ -26,6 +26,15 @@ func logged(n int) *fake {
 	return f
 }
 
+// An error stands out in the log, in the theme's color for errors.
+func TestActivityErrorInColor(t *testing.T) {
+	m := start(t, logged(0), 120, 12)
+	press(t, m, "3")
+	if want := badStyle.Render("b.jpg: could not copy to the share: denied"); !strings.Contains(m.View().Content, want) {
+		t.Errorf("the error is not in %q:\n%q", want, m.View().Content)
+	}
+}
+
 func TestActivityTab(t *testing.T) {
 	f := logged(0)
 	m := start(t, f, 120, 12)
