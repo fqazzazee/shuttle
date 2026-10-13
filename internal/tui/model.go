@@ -211,13 +211,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case openedMsg:
 		cmd := m.opened(msg)
 		return m, cmd
-	case listedMsg:
-		if w := m.wizard; w != nil && w.local != nil {
-			w.local.listed(msg)
-		}
 	case treeListedMsg:
-		if w := m.wizard; w != nil && w.remote != nil {
-			w.remote.listed(msg)
+		if w := m.wizard; w != nil {
+			// Each tree takes only its own listings.
+			for _, t := range []*tree{w.remote, w.local} {
+				if t != nil {
+					t.listed(msg)
+				}
+			}
 		}
 	case testedMsg:
 		m.gotTest(msg)

@@ -162,9 +162,10 @@ out again.
 Run `shuttle` on its own for the terminal interface: every shuttle live, with its progress and
 transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it, and to
 add (`n`), edit (`e`) and delete (`x`) shuttles: a few steps that browse the share's folders and
-yours, choose a profile, and set what the shuttle does differently from it. On the share, the
-folder opens as a tree of what is in it, where `m` chooses to sync everything, only what you mark,
-or all but what you mark, and `space` marks a file or folder. The
+yours, choose a profile, and set what the shuttle does differently from it. On the share and on
+this computer, the folder opens as a tree of what is in it, where `m` chooses to sync everything,
+only what you mark, or all but what you mark, and `space` marks a file or folder; a mark made on
+one side shows on the other. The
 Conflicts tab lists what waits for you, with both copies' size and time: keep this computer's
 copy (`l`), the share's (`r`) or both (`b`), and let deletions the guard held back go ahead
 (`a`). The Activity tab shows what the shuttles did lately, newest first, as it happens; `f`

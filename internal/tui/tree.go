@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"context"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -17,7 +18,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
-// picking is what a shuttle syncs of its folder on the share.
+// picking is what a shuttle syncs of its folder.
 type picking int
 
 const (
@@ -28,14 +29,14 @@ const (
 
 var pickingNames = []string{"everything", "only what is marked", "all but what is marked"}
 
-// entry is one thing in a folder on the share.
+// entry is one thing in a folder.
 type entry struct {
 	name string
 	dir  bool
 }
 
 // node is a file or folder in the tree; path is a slash path from the
-// share's top, "/" for the top itself.
+// share's top, or this computer's, "/" for the top itself.
 type node struct {
 	path    string
 	dir     bool
@@ -48,20 +49,30 @@ type node struct {
 
 func (n *node) name() string { return path.Base(n.path) }
 
-// tree picks the shuttle's folder on the share, shown with what is in it,
-// folders opening in place, and marks the files and folders it syncs or
-// leaves out.
+// tree picks the shuttle's folder on the share or on this computer, shown
+// with what is in it, folders opening in place, and marks the files and
+// folders it syncs or leaves out.
 type tree struct {
-	id     int
-	where  string // "on nas"
-	list   func(ctx context.Context, dir string) ([]entry, error)
-	root   *node // the shuttle's folder
-	sel    int   // in rows()
-	pick   picking
-	marks  map[string]bool // slash paths from the share's top
-	typing bool
-	input  *textinput.Model
-	note   string
+	id    int
+	where string // "on nas", "here"
+	list  func(ctx context.Context, dir string) ([]entry, error)
+	clean func(typed string) string // a typed path as the tree's
+	root  *node                     // the shuttle's folder
+	sel   int                       // in rows()
+	pick  picking
+	marks map[string]bool // slash paths from the top
+	// folders are marks the other side's tree showed as folders: not
+	// here, they would not be known to be.
+	folders map[string]bool
+	typing  bool
+	input   *textinput.Model
+	note    string
+}
+
+var treeIDs int
+
+func cleanSlash(p string) string {
+	return path.Clean("/" + strings.TrimPrefix(p, "/"))
 }
 
 type treeListedMsg struct {
@@ -74,33 +85,63 @@ type treeListedMsg struct {
 // remoteTree shows the share through f, from dir.
 func remoteTree(where string, f fsys.FS, dir string) *tree {
 	return newTree(where, dir, func(ctx context.Context, dir string) ([]entry, error) {
-		rel := strings.TrimPrefix(dir, "/")
-		if rel == "" {
-			rel = "."
-		}
-		infos, err := f.ReadDir(ctx, rel)
-		if err != nil {
-			return nil, err
-		}
-		var out []entry
-		for _, fi := range infos {
-			base := path.Base(fi.Name)
-			// Never synced, so never marked: the versions folder, temp files
-			// of a run in progress, and what is neither file nor folder.
-			if base == engine.VersionsDir || fsys.IsTemp(base) || fi.Kind != fsys.KindDir && fi.Kind != fsys.KindFile {
-				continue
-			}
-			out = append(out, entry{name: base, dir: fi.Kind == fsys.KindDir})
-		}
-		return out, nil
+		return listFS(ctx, f, dir)
 	})
 }
 
+// localTree shows this computer, from dir. A typed path may start with ~,
+// for home.
+func localTree(dir, home string) *tree {
+	t := newTree("here", dir, func(ctx context.Context, dir string) ([]entry, error) {
+		// Through the local backend, as a run sees it; opened for each
+		// listing, so there is nothing to close.
+		f, err := fsys.OpenLocal("/")
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		return listFS(ctx, f, dir)
+	})
+	t.clean = func(p string) string {
+		if rest, ok := strings.CutPrefix(p, "~"); ok {
+			p = filepath.Join(home, rest)
+		}
+		if !filepath.IsAbs(p) {
+			return p // the wizard refuses it, with an example
+		}
+		return filepath.Clean(p)
+	}
+	return t
+}
+
+// listFS lists dir, a slash path from f's top, as the tree shows it.
+func listFS(ctx context.Context, f fsys.FS, dir string) ([]entry, error) {
+	rel := strings.TrimPrefix(dir, "/")
+	if rel == "" {
+		rel = "."
+	}
+	infos, err := f.ReadDir(ctx, rel)
+	if err != nil {
+		return nil, err
+	}
+	var out []entry
+	for _, fi := range infos {
+		base := path.Base(fi.Name)
+		// Never synced, so never marked: the versions folder, temp files
+		// of a run in progress, and what is neither file nor folder.
+		if base == engine.VersionsDir || fsys.IsTemp(base) || fi.Kind != fsys.KindDir && fi.Kind != fsys.KindFile {
+			continue
+		}
+		out = append(out, entry{name: base, dir: fi.Kind == fsys.KindDir})
+	}
+	return out, nil
+}
+
 func newTree(where, dir string, list func(context.Context, string) ([]entry, error)) *tree {
-	browserIDs++
+	treeIDs++
 	dir = cleanSlash(dir)
-	return &tree{id: browserIDs, where: where, list: list, root: &node{path: dir, dir: true, open: true},
-		marks: map[string]bool{}, input: newInput(dir)}
+	return &tree{id: treeIDs, where: where, list: list, clean: cleanSlash,
+		root: &node{path: dir, dir: true, open: true}, marks: map[string]bool{}, input: newInput(dir)}
 }
 
 // dir is the shuttle's folder: the top of the tree.
@@ -114,10 +155,17 @@ func (t *tree) load(ctx context.Context, n *node) tea.Cmd {
 		ctx, cancel := context.WithTimeout(ctx, keyringTimeout)
 		defer cancel()
 		entries, err := list(ctx, dir)
-		// Folders first, as in a file manager.
+		// Folders first, as in a file manager, and hidden ones after the
+		// rest: a home folder has many.
 		slices.SortFunc(entries, func(a, b entry) int {
 			if a.dir != b.dir {
 				if a.dir {
+					return -1
+				}
+				return 1
+			}
+			if ha, hb := strings.HasPrefix(a.name, "."), strings.HasPrefix(b.name, "."); ha != hb {
+				if hb {
 					return -1
 				}
 				return 1
@@ -219,7 +267,7 @@ func (t *tree) key(ctx context.Context, msg tea.KeyPressMsg) (cmd tea.Cmd, chose
 		switch k {
 		case "enter":
 			t.typing = false
-			t.setRoot(&node{path: cleanSlash(strings.TrimSpace(t.input.Value())), dir: true})
+			t.setRoot(&node{path: t.clean(strings.TrimSpace(t.input.Value())), dir: true})
 			t.sel = 0
 			// Listed for when the user comes back to this step.
 			return t.load(ctx, t.root), true
@@ -403,6 +451,27 @@ func (t *tree) inside() []string {
 	return out
 }
 
+// adopt takes from's marks inside its folder, as marks inside this tree's:
+// the shuttle has one list of them for both sides.
+func (t *tree) adopt(from *tree) {
+	t.pick, t.marks, t.folders = from.pick, map[string]bool{}, map[string]bool{}
+	for _, m := range from.inside() {
+		p := path.Join(t.root.path, strings.TrimPrefix(m, from.root.path))
+		t.marks[p] = true
+		if from.folder(m) {
+			t.folders[p] = true
+		}
+	}
+}
+
+// folder reports whether the mark p is a folder, as far as is known.
+func (t *tree) folder(p string) bool {
+	if n := t.find(p); n != nil {
+		return n.dir
+	}
+	return t.folders[p]
+}
+
 // setSelection marks what the shuttle includes or excludes, as in the config.
 func (t *tree) setSelection(include, exclude []string) {
 	t.pick = pickAll
@@ -533,7 +602,7 @@ func (t *tree) marksLine(width int) string {
 	names := make([]string, len(inside))
 	for i, m := range inside {
 		names[i] = strings.TrimPrefix(strings.TrimPrefix(m, t.root.path), "/")
-		if n := t.find(m); n != nil && n.dir {
+		if t.folder(m) {
 			names[i] += "/"
 		}
 	}
