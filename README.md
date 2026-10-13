@@ -145,8 +145,9 @@ than restarting it over and over.
 On GNOME 50, an extension shows shuttle in the top bar and in Quick Settings: an icon for
 the overall state (pulsing while it syncs, with the transfer rate beside it) and a list of
 the shuttles with what each is doing; a toggle that pauses and resumes every shuttle, a switch
-and a "Sync now" button for each, and "Open shuttle". It only talks to the running service;
-settings stay in the terminal interface.
+and a "Sync now" button for each, and "Open shuttle". The top bar's menu has the same
+controls as the Quick Settings toggle. It only talks to the running service; settings stay in
+the terminal interface.
 
 ```bash
 make install-extension   # into ~/.local/share/gnome-shell/extensions
