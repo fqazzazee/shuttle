@@ -12,16 +12,13 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-
-	"github.com/fqazzazee/shuttle/internal/engine"
-	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
-// browser picks a folder, on a share or on this computer, by going in and
-// out of folders, or by typing its path.
+// browser picks a folder on this computer by going in and out of folders,
+// or by typing its path. On the share, a tree does: see tree.go.
 type browser struct {
 	id       int
-	where    string // "on nas", "here"
+	where    string // "here"
 	list     func(ctx context.Context, dir string) ([]string, error)
 	join     func(dir, name string) string
 	parent   func(dir string) string
@@ -43,29 +40,6 @@ type listedMsg struct {
 	dir     string
 	entries []string
 	err     error
-}
-
-// remoteBrowser browses the folders of a share through f; dir is a slash
-// path from the share's top, "/" for the top itself.
-func remoteBrowser(where string, f fsys.FS, dir string) *browser {
-	return newBrowser(where, "/", cleanSlash(dir), func(ctx context.Context, dir string) ([]string, error) {
-		rel := strings.TrimPrefix(dir, "/")
-		if rel == "" {
-			rel = "."
-		}
-		infos, err := f.ReadDir(ctx, rel)
-		if err != nil {
-			return nil, err
-		}
-		var names []string
-		for _, fi := range infos {
-			base := path.Base(fi.Name)
-			if fi.Kind == fsys.KindDir && base != engine.VersionsDir {
-				names = append(names, base)
-			}
-		}
-		return names, nil
-	}, func(dir, name string) string { return path.Join(dir, name) }, path.Dir)
 }
 
 func cleanSlash(p string) string {
