@@ -8,11 +8,13 @@ package nfs3test
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"testing"
 	"time"
 
@@ -90,9 +92,27 @@ func ListenOn(addr, dir string) (net.Listener, error) {
 		return nil, err
 	}
 	fsys := changeFS{osfs.New(dir, osfs.WithBoundOS()), dir}
-	h := helpers.NewCachingHandler(helpers.NewNullAuthHandler(fsys), 1<<16)
+	h := statfsHandler{helpers.NewCachingHandler(helpers.NewNullAuthHandler(fsys), 1<<16), dir}
 	go func() { _ = nfs.Serve(l, h) }() // returns once the listener is closed
 	return l, nil
+}
+
+// statfsHandler answers FSSTAT with the room of the served folder's disk,
+// as a real server does: go-nfs on its own says 4 EiB of everything.
+type statfsHandler struct {
+	nfs.Handler
+	dir string
+}
+
+func (h statfsHandler) FSStat(_ context.Context, _ billy.Filesystem, s *nfs.FSStat) error {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(h.dir, &st); err != nil {
+		return err
+	}
+	bs := uint64(st.Bsize) //nolint:gosec // a block size is positive
+	s.TotalSize, s.FreeSize, s.AvailableSize = st.Blocks*bs, st.Bfree*bs, st.Bavail*bs
+	s.TotalFiles, s.FreeFiles, s.AvailableFiles = st.Files, st.Ffree, st.Ffree
+	return nil
 }
 
 // changeFS lets the server set times and modes, which billy's osfs cannot:

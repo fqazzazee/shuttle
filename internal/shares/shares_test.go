@@ -319,8 +319,8 @@ func TestTestAPathShare(t *testing.T) {
 func TestTestAnNFSShare(t *testing.T) {
 	ctx := context.Background()
 	share := nfsShare(t)
-	if _, err := Test(ctx, &share, "", memStore{t: t}); err != nil {
-		t.Errorf("a served export: %v", err)
+	if space, err := Test(ctx, &share, "", memStore{t: t}); err != nil || space.Total <= 0 {
+		t.Errorf("a served export: %+v, %v", space, err)
 	}
 	share.Port, share.MountPort = 1, 1
 	if _, err := Test(ctx, &share, "", memStore{t: t}); err == nil {
