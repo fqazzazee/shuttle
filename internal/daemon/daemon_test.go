@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
@@ -447,5 +448,20 @@ func TestStatusCountsWhatIsSynced(t *testing.T) {
 	f.start()
 	if st := f.d.Statuses()[0]; st.Files != 2 || st.Size != 5 || !st.LastRun.IsZero() {
 		t.Errorf("after a restart: %d files, %d bytes, last run %v; want 2, 5, none yet", st.Files, st.Size, st.LastRun)
+	}
+}
+
+// A run says how much room each side has, at its end.
+func TestStatusHasEachSidesRoom(t *testing.T) {
+	f := newFixture(t, "push", "")
+	f.start()
+	if st := f.d.Statuses()[0]; st.LocalSpace.Total != 0 || st.RemoteSpace.Total != 0 {
+		t.Errorf("before a run: %+v, %+v", st.LocalSpace, st.RemoteSpace)
+	}
+	st := f.syncNow()
+	for side, sp := range map[string]fsys.Space{"local": st.LocalSpace, "remote": st.RemoteSpace} {
+		if sp.Total <= 0 || sp.Free <= 0 || sp.Free > sp.Total {
+			t.Errorf("%s room after a run: %+v", side, sp)
+		}
 	}
 }

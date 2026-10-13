@@ -202,6 +202,17 @@ func Run(t *testing.T, newFS func(t *testing.T) fsys.FS) {
 		}
 	})
 
+	t.Run("space", func(t *testing.T) {
+		f := newFS(t)
+		if _, ok := f.(fsys.SpaceReporter); !ok {
+			t.Skip("cannot tell its free space")
+		}
+		sp, err := fsys.SpaceOf(ctx, f)
+		if err != nil || sp.Total <= 0 || sp.Free <= 0 || sp.Free > sp.Total {
+			t.Errorf("Space = %+v, %v; want some free space, out of more", sp, err)
+		}
+	})
+
 	t.Run("cancelled context", func(t *testing.T) {
 		f := newFS(t)
 		put(t, f, "a", "x")

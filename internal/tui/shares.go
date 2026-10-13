@@ -16,8 +16,10 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
 // The Shares tab reads and writes the config file itself, so shares can be
@@ -80,13 +82,15 @@ func (m *model) usedBy(share string) []string {
 
 // testResult is how a share's last test went.
 type testResult struct {
-	at  time.Time
-	err error
+	at    time.Time
+	err   error
+	space fsys.Space
 }
 
 type testedMsg struct {
 	share string
 	err   error
+	space fsys.Space
 	form  bool // tested from the form, with what it holds
 }
 
@@ -96,7 +100,8 @@ func (m *model) test(share *config.Share, password string, form bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, keyringTimeout)
 		defer cancel()
-		return testedMsg{share: sh.Name, err: o.Test(ctx, &sh, password, o.Store), form: form}
+		space, err := o.Test(ctx, &sh, password, o.Store)
+		return testedMsg{share: sh.Name, err: err, space: space, form: form}
 	}
 }
 
@@ -230,10 +235,10 @@ func (m *model) sharesLines(room int) []string {
 	}
 	nameWidth += 2
 	whereWidth = min(whereWidth, 50) + 2
-	row := func(name, typ, at, users, test string) string {
-		return pad(name, nameWidth) + pad(typ, 6) + pad(at, whereWidth) + pad(users, 22) + test
+	row := func(name, typ, at, users, free, test string) string {
+		return pad(name, nameWidth) + pad(typ, 6) + pad(at, whereWidth) + pad(users, 22) + pad(free, 20) + test
 	}
-	lines := []string{headStyle.Render(row("NAME", "TYPE", "WHERE", "USED BY", "LAST TEST"))}
+	lines := []string{headStyle.Render(row("NAME", "TYPE", "WHERE", "USED BY", "FREE", "LAST TEST"))}
 	now := m.now()
 	for _, n := range names {
 		if len(lines) >= room {
@@ -247,11 +252,18 @@ func (m *model) sharesLines(room int) []string {
 				test = badStyle.Render("failed, " + stamp(r.at, now))
 			}
 		}
-		line := row(n, string(sh.Type), where(&sh), orNone(strings.Join(m.usedBy(n), ", ")), test)
+		free := freeText(m.shareSpace(n))
+		if n == m.shareSel {
+			free = ansi.Strip(free)
+		}
+		line := row(n, string(sh.Type), where(&sh), orNone(strings.Join(m.usedBy(n), ", ")), free, test)
 		if n == m.shareSel {
 			line = selected.Render(pad(line, m.width))
 		}
 		lines = append(lines, line)
+	}
+	if here := m.hereLine(); here != "" && len(lines)+2 <= room {
+		lines = append(lines, "", here)
 	}
 	return lines
 }
@@ -267,10 +279,13 @@ func (m *model) gotTest(msg testedMsg) {
 		}
 		return
 	}
-	m.tested[msg.share] = testResult{at: m.now(), err: msg.err}
-	if msg.err != nil {
+	m.tested[msg.share] = testResult{at: m.now(), err: msg.err, space: msg.space}
+	switch {
+	case msg.err != nil:
 		m.say(msg.share+": "+firstLine(msg.err.Error()), true)
-	} else {
+	case msg.space.Total > 0:
+		m.say(msg.share+" works: "+spaceText(msg.space), false)
+	default:
 		m.say(msg.share+" works", false)
 	}
 }

@@ -68,15 +68,16 @@ func OpenShare(ctx context.Context, share *config.Share, folder string, store se
 // Test checks that share can be reached and read: an SMB share is logged
 // in to, with password if one is given and otherwise the one stored in the
 // keyring; an NFS export is mounted; a mounted folder must be there. It
-// reads the share's top folder and changes nothing.
-func Test(ctx context.Context, share *config.Share, password string, store secrets.Store) error {
+// reads the share's top folder and changes nothing. It also says how much
+// room the share has, zero when it cannot tell: that is no failure.
+func Test(ctx context.Context, share *config.Share, password string, store secrets.Store) (fsys.Space, error) {
 	var f fsys.FS
 	var err error
 	switch share.Type {
 	case config.SharePath:
 		f, err = fsys.OpenLocal(share.Path)
 		if err != nil {
-			return fmt.Errorf("folder %s: %w (is the share mounted?)", share.Path, err)
+			return fsys.Space{}, fmt.Errorf("folder %s: %w (is the share mounted?)", share.Path, err)
 		}
 	case config.ShareSMB:
 		if password != "" {
@@ -84,19 +85,22 @@ func Test(ctx context.Context, share *config.Share, password string, store secre
 		}
 		f, err = openSMB(ctx, share, ".", store)
 		if err != nil {
-			return err
+			return fsys.Space{}, err
 		}
 	case config.ShareNFS3:
 		f, err = openNFS(ctx, share, ".")
 		if err != nil {
-			return err
+			return fsys.Space{}, err
 		}
 	default:
-		return fmt.Errorf("unknown type %q", share.Type)
+		return fsys.Space{}, fmt.Errorf("unknown type %q", share.Type)
 	}
 	defer f.Close()
-	_, err = f.ReadDir(ctx, ".")
-	return err
+	if _, err := f.ReadDir(ctx, "."); err != nil {
+		return fsys.Space{}, err
+	}
+	space, _ := fsys.SpaceOf(ctx, f)
+	return space, nil
 }
 
 // given is a store that holds one password, the one typed in.

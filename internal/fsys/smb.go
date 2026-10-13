@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path"
 	"slices"
@@ -190,6 +191,21 @@ func (s *SMB) Chtimes(ctx context.Context, name string, mtime time.Time) error {
 	// go-smb2 sends the access time as given; a zero time.Time would become
 	// a garbage timestamp, so use the modification time for both.
 	return smbErr(sh.Chtimes(p, mtime, mtime))
+}
+
+// Space asks the server how much room the share has where the folder is,
+// for this user (quotas included).
+func (s *SMB) Space(ctx context.Context) (Space, error) {
+	sh, p, err := s.at(ctx, "statfs", ".")
+	if err != nil {
+		return Space{}, err
+	}
+	fi, err := sh.Statfs(p)
+	if err != nil {
+		return Space{}, smbErr(err)
+	}
+	size := int64(min(fi.BlockSize(), math.MaxInt64)) //nolint:gosec // clamped on this line
+	return Space{Free: clampInt64(fi.AvailableBlockCount(), size), Total: clampInt64(fi.TotalBlockCount(), size)}, nil
 }
 
 // FoldsCase reports true: SMB servers compare names case-insensitively by

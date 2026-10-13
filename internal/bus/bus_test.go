@@ -432,6 +432,7 @@ func TestStatusRoundTrip(t *testing.T) {
 		},
 		Errors: []engine.Issue{{Path: "x", Reason: "denied"}},
 		Files:  31_204, Size: 48 << 30,
+		LocalSpace: fsys.Space{Free: 120 << 30, Total: 512 << 30}, RemoteSpace: fsys.Space{Free: 1 << 40, Total: 4 << 40},
 		Progress: daemon.Progress{Phase: engine.PhaseSyncing, Done: 4, Total: 9, Bytes: 5 << 30,
 			TotalBytes: 7 << 30, Path: "big.iso", RateUp: 2_100_000, RateDown: 1},
 	}

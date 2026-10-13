@@ -67,6 +67,8 @@ type model struct {
 	shareSel  string
 	form      *shareForm
 	tested    map[string]testResult // each share's last test
+	disks     disksMsg              // the room of the folders here, by folder
+	measuring bool                  // disks are being asked
 
 	// The Profiles tab.
 	profileSel string
@@ -187,7 +189,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.changed(&st)
 		return m, next(m.changes)
 	case tickMsg:
-		cmds := []tea.Cmd{m.refresh(), m.tick()}
+		cmds := []tea.Cmd{m.refresh(), m.tick(), m.measureDisks()}
 		if m.tab == tabActivity {
 			cmds = append(cmds, m.loadActivity())
 		}
@@ -202,6 +204,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.gotActivity(msg)
 	case configMsg:
 		m.gotConfig(msg)
+		cmd := m.measureDisks()
+		return m, cmd
+	case disksMsg:
+		m.disks, m.measuring = msg, false
 	case openedMsg:
 		cmd := m.opened(msg)
 		return m, cmd

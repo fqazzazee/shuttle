@@ -89,6 +89,10 @@ func encode(st *daemon.Status) map[string]dbus.Variant {
 		"Errors":        dbus.MakeVariant(issues(st.Errors)),
 		"Files":         dbus.MakeVariant(u32(st.Files)),
 		"Size":          dbus.MakeVariant(u64(st.Size)),
+		"LocalFree":     dbus.MakeVariant(u64(st.LocalSpace.Free)),
+		"LocalTotal":    dbus.MakeVariant(u64(st.LocalSpace.Total)),
+		"RemoteFree":    dbus.MakeVariant(u64(st.RemoteSpace.Free)),
+		"RemoteTotal":   dbus.MakeVariant(u64(st.RemoteSpace.Total)),
 		// The run in progress; zero when not running.
 		"Phase":      dbus.MakeVariant(string(st.Progress.Phase)),
 		"Done":       dbus.MakeVariant(u32(st.Progress.Done)),
@@ -123,7 +127,7 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	var state, mode string
 	var lastRun, lastOK int64
 	var copied, deleted, held, files uint32
-	var size uint64
+	var size, localFree, localTotal, remoteFree, remoteTotal uint64
 	var conflicts []conflict
 	var errs []issue
 	get("State", &state)
@@ -142,6 +146,10 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	get("Errors", &errs)
 	get("Files", &files)
 	get("Size", &size)
+	get("LocalFree", &localFree)
+	get("LocalTotal", &localTotal)
+	get("RemoteFree", &remoteFree)
+	get("RemoteTotal", &remoteTotal)
 	var phase string
 	var done, total uint32
 	var bytes, totalBytes, rateUp, rateDown uint64
@@ -166,6 +174,8 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	}
 	st.Copied, st.Deleted, st.HeldDeletions = int(copied), int(deleted), int(held)
 	st.Files, st.Size = int(files), s64(size)
+	st.LocalSpace = fsys.Space{Free: s64(localFree), Total: s64(localTotal)}
+	st.RemoteSpace = fsys.Space{Free: s64(remoteFree), Total: s64(remoteTotal)}
 	for _, i := range conflicts {
 		st.Conflicts = append(st.Conflicts, engine.Issue{Path: i.Path, Reason: i.Reason, Outcome: i.Outcome, Op: engine.OpConflict,
 			Local: fromSide(i.Path, i.Local), Remote: fromSide(i.Path, i.Remote)})

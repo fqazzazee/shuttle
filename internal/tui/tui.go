@@ -43,8 +43,9 @@ type Options struct {
 	Config string        // the config file
 	Home   string        // the user's home, for "~" in the config
 	Store  secrets.Store // where share passwords are kept
-	// Test tries a share, with password if given (shares.Test).
-	Test func(ctx context.Context, share *config.Share, password string, store secrets.Store) error
+	// Test tries a share, with password if given, and says how much room it
+	// has (shares.Test).
+	Test func(ctx context.Context, share *config.Share, password string, store secrets.Store) (fsys.Space, error)
 	// Browse opens a share's top folder to look for folders in.
 	Browse func(ctx context.Context, share *config.Share, store secrets.Store) (fsys.FS, error)
 	// Tab is the tab shown first; see Tab.
