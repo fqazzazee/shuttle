@@ -26,6 +26,21 @@ func TestAgo(t *testing.T) {
 	}
 }
 
+func TestUntil(t *testing.T) {
+	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	for d, want := range map[time.Duration]string{
+		-time.Minute: "soon", 10 * time.Second: "soon", 5 * time.Minute: "in 5m",
+		3 * time.Hour: "in 3h", 50 * time.Hour: "in 2d",
+	} {
+		if got := Until(now.Add(d), now); got != want {
+			t.Errorf("Until(%v) = %q, want %q", d, got, want)
+		}
+	}
+	if got := Until(time.Time{}, now); got != "" {
+		t.Errorf("Until(zero) = %q", got)
+	}
+}
+
 func TestProgress(t *testing.T) {
 	for _, tc := range []struct {
 		p    daemon.Progress
@@ -52,7 +67,7 @@ func TestProgress(t *testing.T) {
 }
 
 func TestModeArrow(t *testing.T) {
-	for m, want := range map[config.Mode]string{config.ModePush: "→", config.ModePull: "←", config.ModeSync: "↔", "": "?"} {
+	for m, want := range map[config.Mode]string{config.ModePush: "↑", config.ModePull: "↓", config.ModeSync: "⇅", "": "?"} {
 		if got := ModeArrow(m); got != want {
 			t.Errorf("ModeArrow(%q) = %q, want %q", m, got, want)
 		}

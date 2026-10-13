@@ -82,6 +82,7 @@ func encode(st *daemon.Status) map[string]dbus.Variant {
 		"Error":         dbus.MakeVariant(st.Error),
 		"LastRun":       dbus.MakeVariant(unix(st.LastRun)),
 		"LastOK":        dbus.MakeVariant(unix(st.LastOK)),
+		"NextRun":       dbus.MakeVariant(unix(st.NextRun)),
 		"Copied":        dbus.MakeVariant(u32(st.Copied)),
 		"Deleted":       dbus.MakeVariant(u32(st.Deleted)),
 		"HeldDeletions": dbus.MakeVariant(u32(st.HeldDeletions)),
@@ -125,7 +126,7 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 		}
 	}
 	var state, mode string
-	var lastRun, lastOK int64
+	var lastRun, lastOK, nextRun int64
 	var copied, deleted, held, files uint32
 	var size, localFree, localTotal, remoteFree, remoteTotal uint64
 	var conflicts []conflict
@@ -139,6 +140,7 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	get("Error", &st.Error)
 	get("LastRun", &lastRun)
 	get("LastOK", &lastOK)
+	get("NextRun", &nextRun)
 	get("Copied", &copied)
 	get("Deleted", &deleted)
 	get("HeldDeletions", &held)
@@ -171,6 +173,9 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	}
 	if lastOK != 0 {
 		st.LastOK = time.Unix(lastOK, 0)
+	}
+	if nextRun != 0 {
+		st.NextRun = time.Unix(nextRun, 0)
 	}
 	st.Copied, st.Deleted, st.HeldDeletions = int(copied), int(deleted), int(held)
 	st.Files, st.Size = int(files), s64(size)

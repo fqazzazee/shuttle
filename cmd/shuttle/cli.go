@@ -159,13 +159,13 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 		return nil
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tSTATE\tSHARE\tSIZE\tFILES\tLAST RUN\tDETAILS")
+	fmt.Fprintln(tw, "NAME\tMODE\tSTATE\tSHARE\tSIZE\tFILES\tLAST RUN\tDETAILS")
 	now := time.Now()
 	for i := range all {
 		st := &all[i]
 		size, files := present.Synced(st)
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", st.Name, st.State, orElse(st.Share, "-"), size, files,
-			present.Ago(st.LastRun, now), details(st))
+		fmt.Fprintf(tw, "%s\t%s %s\t%s\t%s\t%s\t%s\t%s\t%s\n", st.Name, present.ModeArrow(st.Mode), st.Mode, st.State,
+			orElse(st.Share, "-"), size, files, present.Ago(st.LastRun, now), details(st, now))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
@@ -177,13 +177,17 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 }
 
 // details is what a status line adds after the columns: the run in
-// progress, then whatever needs the user's attention.
-func details(st *daemon.Status) string {
+// progress, then whatever needs the user's attention, then when the
+// schedule runs it next.
+func details(st *daemon.Status, now time.Time) string {
 	var parts []string
 	for _, p := range []string{present.Progress(&st.Progress), present.Attention(st)} {
 		if p != "" {
 			parts = append(parts, p)
 		}
+	}
+	if next := present.Until(st.NextRun, now); next != "" && st.State != daemon.StateRunning {
+		parts = append(parts, "next run "+next)
 	}
 	return strings.Join(parts, "; ")
 }

@@ -80,6 +80,18 @@ func slotOn(now time.Time, at config.TimeOfDay, days int) time.Time {
 	return time.Date(y, m, d+days, at.Hour, at.Minute, 0, 0, now.Location())
 }
 
+// setNextRun shows when the schedule runs the shuttle next. The scheduler
+// wakes every recheckEvery: only a change goes out.
+func (r *runner) setNextRun(t time.Time) {
+	r.mu.Lock()
+	same := r.st.NextRun.Equal(t)
+	r.st.NextRun = t
+	r.mu.Unlock()
+	if !same {
+		r.changed()
+	}
+}
+
 // schedule triggers the runner whenever its schedule is due, until quit.
 func (r *runner) schedule(quit <-chan struct{}) {
 	for {
@@ -93,6 +105,7 @@ func (r *runner) schedule(quit <-chan struct{}) {
 			r.trigger()
 			continue
 		}
+		r.setNextRun(next)
 		wait := min(next.Sub(now), recheckEvery)
 		select {
 		case <-quit:

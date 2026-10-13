@@ -45,9 +45,9 @@ func newFake() *fake {
 	close(changes)
 	return &fake{changes: changes, shuttles: []daemon.Status{
 		{Name: "docs", Mode: config.ModeSync, State: daemon.StateIdle, LastRun: now.Add(-5 * time.Minute),
-			Files: 31204, Size: 48_200_000_000},
+			Share: daemon.ShareOnline, Files: 31204, Size: 48_200_000_000},
 		{Name: "photos", Mode: config.ModePush, State: daemon.StateHeld, LastRun: now.Add(-3 * time.Hour),
-			Files: 120, Size: 1_500_000_000,
+			Share: daemon.ShareOffline, Files: 120, Size: 1_500_000_000,
 			Conflicts: []engine.Issue{{Path: "a.jpg", Outcome: "held"}, {Path: "b.jpg", Outcome: "held"}}},
 		{Name: "music", Mode: config.ModePull, State: daemon.StateDisabled},
 	}}
@@ -210,10 +210,10 @@ func TestShuttlesTab(t *testing.T) {
 	s := screen(m)
 	for _, want := range []string{
 		"shuttle  1 Shuttles  2 Conflicts (2)  3 Activity",
-		"NAME    MODE    STATE     SIZE      FILES     LAST RUN  PROGRESS                DETAILS",
-		"docs    ↔ sync  idle      48.2 GB   31,204    5m ago",
-		"music   ← pull  disabled  —         —         never",
-		"photos  → push  held      1.5 GB    120       3h ago                            2 conflicts waiting for you",
+		"NAME    MODE    STATE     SHARE    SIZE      FILES     LAST RUN  PROGRESS                  DETAILS",
+		"docs    ⇅ sync  idle      online   48.2 GB   31,204    5m ago",
+		"music   ↓ pull  disabled  —        —         —         never",
+		"photos  ↑ push  held      offline  1.5 GB    120       3h ago                              2 conflicts waiting for you",
 		"s sync  p pause  d disable  n new  e edit  x delete  P pause all  1-5 tabs  ? help  q quit",
 	} {
 		if !strings.Contains(s, want) {
@@ -223,27 +223,30 @@ func TestShuttlesTab(t *testing.T) {
 	if lines := strings.Split(s, "\n"); len(lines) != 12 {
 		t.Errorf("%d lines, want the terminal's 12", len(lines))
 	}
+	if !strings.Contains(m.View().Content, badStyle.Render("offline")) {
+		t.Error("an offline share is not shown as a problem")
+	}
 	if !m.View().AltScreen {
 		t.Error("not on the alternate screen")
 	}
 }
 
 // A narrow terminal keeps room for DETAILS: FILES and SIZE go first, then
-// MODE keeps its arrow and PROGRESS shrinks to what it shows, then LAST RUN
-// goes.
+// MODE keeps its arrow and PROGRESS shrinks to what it shows, then SHARE
+// goes, then LAST RUN.
 func TestNarrowShuttlesTab(t *testing.T) {
 	for _, tc := range []struct {
 		width     int
 		head, row string
 	}{
-		{80, "NAME    MODE    STATE     LAST RUN  PROGRESS                DETAILS",
-			"photos  → push  held      3h ago                            2 conflicts"},
-		{75, "NAME       STATE     LAST RUN  PROGRESS                DETAILS",
-			"photos  →  held      3h ago                            2 conflicts"},
-		{70, "NAME       STATE     LAST RUN  PROGRESS  DETAILS",
-			"photos  →  held      3h ago              2 conflicts waiting for you"},
-		{60, "NAME       STATE     PROGRESS  DETAILS",
-			"photos  →  held                2 conflicts waiting for you"},
+		{100, "NAME    MODE    STATE     SHARE    LAST RUN  PROGRESS                  DETAILS",
+			"photos  ↑ push  held      offline  3h ago                              2 conflicts waiting for you"},
+		{80, "NAME       STATE     SHARE    LAST RUN  PROGRESS  DETAILS",
+			"photos  ↑  held      offline  3h ago              2 conflicts waiting for you"},
+		{64, "NAME       STATE     LAST RUN  PROGRESS  DETAILS",
+			"photos  ↑  held      3h ago              2 conflicts"},
+		{56, "NAME       STATE     PROGRESS  DETAILS",
+			"photos  ↑  held                2 conflicts"},
 	} {
 		s := screen(start(t, newFake(), tc.width, 12))
 		if !strings.Contains(s, tc.head) || !strings.Contains(s, tc.row) {
@@ -367,25 +370,72 @@ func TestLiveProgress(t *testing.T) {
 		Progress: daemon.Progress{Phase: engine.PhaseSyncing, Done: 3, Total: 10, Bytes: 450, TotalBytes: 1000,
 			RateUp: 2_100_000, Path: "a.pdf"}})
 	s := screen(m)
-	if !strings.Contains(s, "docs    ↔ sync  running") || !strings.Contains(s, "45% ↑ 2.1 MB/s") {
+	if !strings.Contains(s, "docs    ⇅ sync  running") || !strings.Contains(s, "━━━╸────  45% ↑ 2.1 MB/s") {
 		t.Errorf("progress not shown:\n%s", s)
 	}
 	if !strings.Contains(s, "↑ 2.1 MB/s  ↓ 0 B/s") {
 		t.Errorf("overall rates not shown:\n%s", s)
 	}
+	// The selected row is highlighted to its end: the bar's colors would
+	// reset the highlight.
+	if row := strings.Split(m.View().Content, "\n")[3]; strings.Count(row, "\x1b[") != 2 {
+		t.Errorf("the selected row has colors inside its highlight: %q", row)
+	}
+	// A scan's length is not known: a spinner turns instead of a bar.
+	send(t, m, changedMsg{Name: "docs", Mode: config.ModeSync, State: daemon.StateRunning,
+		Progress: daemon.Progress{Phase: engine.PhaseScanning, Done: 7}})
+	if s := screen(m); !strings.Contains(s, "⠋ scanning 7") {
+		t.Errorf("no spinner:\n%s", s)
+	}
+	send(t, m, spinMsg{})
+	if s := screen(m); !strings.Contains(s, "⠙ scanning 7") {
+		t.Errorf("the spinner did not turn:\n%s", s)
+	}
 	for _, p := range []struct {
 		p    daemon.Progress
 		want string
 	}{
-		{daemon.Progress{Phase: engine.PhaseScanning, Done: 1234}, "scanning 1234"},
-		{daemon.Progress{Phase: engine.PhaseComparing, Done: 2, Total: 5, RateDown: 1000}, "comparing 2/5 ↓ 1.0 kB/s"},
-		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 4}, "25%"},
-		{daemon.Progress{Phase: engine.PhaseSyncing}, "syncing"},
+		{daemon.Progress{Phase: engine.PhaseScanning, Done: 1234}, "⠙ scanning 1234"},
+		{daemon.Progress{Phase: engine.PhaseComparing, Done: 2, Total: 5, RateDown: 1000}, "⠙ comparing 2/5 ↓ 1.0 kB/s"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 4}, "━━──────  25%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 3}, "━━╸─────  33%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Bytes: 5, TotalBytes: 5}, "━━━━━━━━ 100%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing}, "⠙ syncing"},
 		{daemon.Progress{}, ""},
 	} {
-		if got := progress(&p.p); got != p.want {
+		if got := ansi.Strip(progress(&p.p, 1)); got != p.want {
 			t.Errorf("progress(%+v) = %q, want %q", p.p, got, p.want)
 		}
+		if got := spins(&p.p); got != strings.HasPrefix(p.want, "⠙") {
+			t.Errorf("spins(%+v) = %v", p.p, got)
+		}
+	}
+}
+
+// The spinners turn only while one shows: a run that copies shows a bar.
+func TestSpinsOnlyWhileShown(t *testing.T) {
+	m := start(t, newFake(), 140, 12)
+	m.every = time.Hour // as the program has it: spin() schedules, and the test does not wait
+	if m.spin() != nil {
+		t.Error("spins with nothing running")
+	}
+	copying := daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 4}
+	if _, cmd := m.Update(changedMsg{Name: "docs", State: daemon.StateRunning, Progress: copying}); cmd == nil {
+		t.Fatal("no command after a change")
+	}
+	if m.spinning {
+		t.Error("spins for a bar")
+	}
+	m.Update(changedMsg{Name: "docs", State: daemon.StateRunning, Progress: daemon.Progress{Phase: engine.PhaseScanning}})
+	if !m.spinning {
+		t.Error("does not spin while scanning")
+	}
+	if m.spin() != nil {
+		t.Error("a second spinner tick is scheduled")
+	}
+	m.Update(changedMsg{Name: "docs", State: daemon.StateIdle})
+	if _, cmd := m.Update(spinMsg{}); cmd != nil || m.spinning {
+		t.Error("still spinning after the run")
 	}
 }
 
@@ -456,6 +506,11 @@ func TestTabsAndHelp(t *testing.T) {
 	press(t, m, "?")
 	if s := screen(m); !strings.Contains(s, "pause or resume every shuttle") {
 		t.Errorf("help:\n%s", s)
+	}
+	// Below what this terminal shows: the tree's keys are on both steps.
+	if s := strings.Join(helpLines(), "\n"); !strings.Contains(s, "on the share and on this computer:") ||
+		!strings.Contains(s, "type the folder's path") {
+		t.Errorf("help on the tree:\n%s", s)
 	}
 	press(t, m, "s") // keys of the tab do nothing under the help
 	press(t, m, "esc")

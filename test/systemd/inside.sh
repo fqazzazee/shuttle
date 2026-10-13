@@ -236,13 +236,13 @@ echo "added a shuttle, survived a broken edit and its fix, all in process $pid"
 step "shuttle disable and enable: saved in the config, applied without a restart"
 "$shuttle" disable n
 grep -q '^enabled = false$' ~/.config/shuttle/config.toml || fail "disable did not write the config"
-wait_for "n disabled in shuttle status" 10 sh -c "\"$shuttle\" status | grep -q '^n  *disabled'"
+wait_for "n disabled in shuttle status" 10 sh -c "\"$shuttle\" status | grep -qE '^n +[^ ]+ [a-z]+ +disabled'"
 "$shuttle" sync n 2>/dev/null && fail "a disabled shuttle synced"
 "$shuttle" enable n
 grep -q '^enabled' ~/.config/shuttle/config.toml && fail "enable left the enabled key"
 [ "$(sha256sum <~/good.toml)" = "$(sha256sum <~/.config/shuttle/config.toml)" ] ||
 	fail "disable and enable changed more than the enabled key"
-wait_for "n enabled in shuttle status" 10 sh -c "\"$shuttle\" status | grep -q '^n  *idle'"
+wait_for "n enabled in shuttle status" 10 sh -c "\"$shuttle\" status | grep -qE '^n +[^ ]+ [a-z]+ +idle'"
 [ "$(prop MainPID)" = "$pid" ] || fail "the daemon restarted for enable or disable"
 echo "disabled and enabled n, config back byte for byte"
 

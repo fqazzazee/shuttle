@@ -3,6 +3,7 @@
 package tui
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -161,10 +162,11 @@ const (
 	modeWidth     = 8
 	arrowWidth    = 3 // MODE as its arrow alone, in a narrow terminal
 	stateWidth    = 10
+	shareWidth    = 9
 	sizeWidth     = 10
 	filesWidth    = 10
 	lastRunWidth  = 10
-	progressWidth = 24
+	progressWidth = 26
 	detailsMin    = 20 // what DETAILS keeps before columns go
 )
 
@@ -192,7 +194,7 @@ func (m *model) shuttlesTable(room int) []string {
 	// PROGRESS can shrink to what it shows now.
 	progressLeast := len("PROGRESS") + 2
 	for i := range m.shuttles {
-		progressLeast = max(progressLeast, lipgloss.Width(progress(&m.shuttles[i].Progress))+2)
+		progressLeast = max(progressLeast, lipgloss.Width(progress(&m.shuttles[i].Progress, m.frame))+2)
 	}
 	cols := []column{
 		{"NAME", nameWidth, 0, func(st *daemon.Status) string { return st.Name }},
@@ -205,11 +207,17 @@ func (m *model) shuttlesTable(room int) []string {
 			}
 			return string(st.State)
 		}},
+		{"SHARE", shareWidth, 0, func(st *daemon.Status) string {
+			if st.Share == daemon.ShareOffline && st.Name != m.selected {
+				return badStyle.Render(st.Share)
+			}
+			return cmp.Or(st.Share, "—")
+		}},
 		{"SIZE", sizeWidth, 0, func(st *daemon.Status) string { size, _ := present.Synced(st); return size }},
 		{"FILES", filesWidth, 0, func(st *daemon.Status) string { _, files := present.Synced(st); return files }},
 		{"LAST RUN", lastRunWidth, 0, func(st *daemon.Status) string { return present.Ago(st.LastRun, now) }},
 		{"PROGRESS", progressWidth, min(progressLeast, progressWidth), func(st *daemon.Status) string {
-			return progress(&st.Progress)
+			return progress(&st.Progress, m.frame)
 		}},
 	}
 	cols = fitColumns(cols, m.width)
@@ -222,8 +230,14 @@ func (m *model) shuttlesTable(room int) []string {
 	}
 	lines := []string{headStyle.Render(row(func(c *column) string { return c.title }, "DETAILS"))}
 
-	// Scroll so the selected shuttle shows.
+	// The selected shuttle in full, under the table, when there is room
+	// for it and a few rows: the table comes first.
 	rows := room - 1
+	panel := m.panel()
+	if len(m.shuttles)+len(panel) > rows {
+		rows = max(rows-len(panel), min(len(m.shuttles), 3))
+	}
+	// Scroll so the selected shuttle shows.
 	first := 0
 	if i := m.index(); i >= rows {
 		first = i - rows + 1
@@ -232,17 +246,19 @@ func (m *model) shuttlesTable(room int) []string {
 		st := &m.shuttles[i]
 		line := row(func(c *column) string { return c.cell(st) }, present.Attention(st))
 		if st.Name == m.selected {
-			line = selected.Render(ansi.Truncate(pad(line, m.width), m.width, "…"))
+			// Without the bar's colors: their resets would end the
+			// highlight halfway along the row.
+			line = selected.Render(ansi.Truncate(pad(ansi.Strip(line), m.width), m.width, "…"))
 		}
 		lines = append(lines, line)
 	}
-	return lines
+	return append(lines, panel...)
 }
 
 // fitColumns leaves DETAILS at least detailsMin columns of width, as far
 // as it can: FILES goes first, then SIZE; then MODE keeps only its arrow,
-// and PROGRESS shrinks to what it shows; then LAST RUN goes. NAME, STATE
-// and PROGRESS stay.
+// and PROGRESS shrinks to what it shows; then SHARE goes, whose offline
+// STATE also says, then LAST RUN. NAME, STATE and PROGRESS stay.
 func fitColumns(cols []column, width int) []column {
 	used := func() int {
 		n := 0
@@ -251,7 +267,7 @@ func fitColumns(cols []column, width int) []column {
 		}
 		return n
 	}
-	for _, step := range []string{"FILES", "SIZE", "MODE", "PROGRESS", "LAST RUN"} {
+	for _, step := range []string{"FILES", "SIZE", "MODE", "PROGRESS", "SHARE", "LAST RUN"} {
 		if width-used() >= detailsMin {
 			break
 		}
@@ -350,23 +366,24 @@ func explain(it *item) string {
 }
 
 // progress is a run's progress in a few characters: "45% ↑ 2.1 MB/s".
-func progress(p *daemon.Progress) string {
+func progress(p *daemon.Progress, frame int) string {
 	var s string
+	spinner := spinnerFrames[frame%len(spinnerFrames)]
 	switch p.Phase {
 	case "":
 		return ""
 	case engine.PhaseScanning:
-		s = fmt.Sprintf("scanning %d", p.Done)
+		s = fmt.Sprintf("%s scanning %d", spinner, p.Done)
 	case engine.PhaseComparing:
-		s = fmt.Sprintf("comparing %d/%d", p.Done, p.Total)
+		s = fmt.Sprintf("%s comparing %d/%d", spinner, p.Done, p.Total)
 	default:
 		switch {
 		case p.TotalBytes > 0:
-			s = fmt.Sprintf("%d%%", p.Bytes*100/p.TotalBytes)
+			s = bar(float64(p.Bytes)/float64(p.TotalBytes)) + fmt.Sprintf(" %3d%%", p.Bytes*100/p.TotalBytes)
 		case p.Total > 0:
-			s = fmt.Sprintf("%d%%", p.Done*100/p.Total)
+			s = bar(float64(p.Done)/float64(p.Total)) + fmt.Sprintf(" %3d%%", p.Done*100/p.Total)
 		default:
-			s = "syncing"
+			s = spinner + " syncing"
 		}
 	}
 	if p.RateUp > 0 {
@@ -376,6 +393,35 @@ func progress(p *daemon.Progress) string {
 		s += " ↓ " + present.Size(p.RateDown) + "/s"
 	}
 	return s
+}
+
+// spinnerFrames turn while a run's length is not known yet.
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+// spins says whether a run's progress shows a spinner rather than a bar.
+func spins(p *daemon.Progress) bool {
+	switch p.Phase {
+	case "":
+		return false
+	case engine.PhaseScanning, engine.PhaseComparing:
+		return true
+	}
+	return p.TotalBytes == 0 && p.Total == 0
+}
+
+// barWidth is a progress bar's length, in columns: two steps each.
+const barWidth = 8
+
+// bar is done, a fraction, as a progress bar: ━ done, ╸ half a column, ─ to
+// go. The shapes say it without the colors, which a selected row has not.
+func bar(done float64) string {
+	steps := min(max(int(done*2*barWidth), 0), 2*barWidth)
+	full, half := steps/2, steps%2
+	s := strings.Repeat("━", full)
+	if half == 1 {
+		s += "╸"
+	}
+	return busyStyle.Render(s) + faint.Render(strings.Repeat("─", barWidth-full-half))
 }
 
 // statusLine says what needs saying most: a broken config, the last
@@ -580,12 +626,14 @@ func helpLines() []string {
 		"  up/down, pgup/pgdown  scroll; home/end, g/G: the newest, the oldest",
 		"  f                     show one shuttle, then the next, then every shuttle again",
 		"",
-		"  Adding or editing a shuttle, on the share:",
+		"  Adding or editing a shuttle, on the share and on this computer:",
 		"  right/left, l/h       open or close a folder; left on a top row goes up a folder",
 		"  o, backspace          make the chosen folder the shuttle's folder; go up a folder",
+		"  t                     type the folder's path instead; on this computer, ~ is your home",
 		"  m                     sync everything, only what is marked, or all but what is marked",
 		"  space                 mark a file or folder, or unmark it; unmarking one thing in a",
-		"                        marked folder marks the rest of the folder instead",
+		"                        marked folder marks the rest of the folder instead; a mark made",
+		"                        on one side shows on the other",
 		"",
 		"  On the Profiles tab:",
 		"  n, e or enter, c, x   add a profile, edit it, copy it, delete it (only when no shuttle uses it)",

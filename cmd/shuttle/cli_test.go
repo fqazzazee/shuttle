@@ -24,11 +24,20 @@ func TestDetails(t *testing.T) {
 		Note:          "polling instead",
 	}
 	want := "share nas: connection refused; 2 conflicts waiting for you; 1 deletion held by the guard; a run is waiting; polling instead"
-	if got := details(st); got != want {
+	now := time.Now()
+	if got := details(st, now); got != want {
 		t.Errorf("details =\n%q\nwant\n%q", got, want)
 	}
-	if got := details(&daemon.Status{}); got != "" {
+	if got := details(&daemon.Status{}, now); got != "" {
 		t.Errorf("details of a quiet shuttle = %q", got)
+	}
+	next := now.Add(45 * time.Minute)
+	if got := details(&daemon.Status{State: daemon.StateIdle, NextRun: next}, now); got != "next run in 45m" {
+		t.Errorf("details of a scheduled shuttle = %q", got)
+	}
+	// A run in progress says how far it is, not when the next one is.
+	if got := details(&daemon.Status{State: daemon.StateRunning, NextRun: next}, now); got != "" {
+		t.Errorf("details of a scheduled shuttle that is running = %q", got)
 	}
 }
 
@@ -87,7 +96,7 @@ func TestStatusSyncPauseResume(t *testing.T) {
 	}
 
 	code, out, _ := cli(t, "status")
-	if code != 0 || !strings.HasPrefix(out, "NAME") || !strings.Contains(out, "a     idle") || !strings.Contains(out, "never") ||
+	if code != 0 || !strings.HasPrefix(out, "NAME") || !strings.Contains(out, "a     ↑ push  idle") || !strings.Contains(out, "never") ||
 		!strings.Contains(out, "SIZE  FILES") || !strings.Contains(out, "—     —") {
 		t.Errorf("status (%d):\n%s", code, out)
 	}
@@ -123,7 +132,7 @@ func TestStatusSyncPauseResume(t *testing.T) {
 	if code, out, _ := cli(t, "pause", "b"); code != 0 || out != "paused b\n" {
 		t.Errorf("pause b = %d %q", code, out)
 	}
-	if _, out, _ := cli(t, "status"); !strings.Contains(out, "b     paused") || strings.Contains(out, "All shuttles") {
+	if _, out, _ := cli(t, "status"); !strings.Contains(out, "b     ↑ push  paused") || strings.Contains(out, "All shuttles") {
 		t.Errorf("status with b paused:\n%s", out)
 	}
 }
@@ -164,11 +173,11 @@ func TestEnableDisable(t *testing.T) {
 	if code, out, stderr := cli(t, "disable", "b"); code != 0 || out != "disabled b\n" {
 		t.Errorf("disable b = %d %q %q", code, out, stderr)
 	}
-	waitForStatus(t, "b     disabled")
+	waitForStatus(t, "b     ↑ push  disabled")
 	if code, out, stderr := cli(t, "enable", "b"); code != 0 || out != "enabled b\n" {
 		t.Errorf("enable b = %d %q %q", code, out, stderr)
 	}
-	waitForStatus(t, "b     idle")
+	waitForStatus(t, "b     ↑ push  idle")
 }
 
 // Without a daemon, enable and disable edit the config file themselves.

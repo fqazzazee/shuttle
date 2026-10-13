@@ -40,15 +40,15 @@ test('attention, most pressing first', () => {
 });
 
 test('mode arrows', () => {
-    equal(modeArrow('push'), '→');
-    equal(modeArrow('pull'), '←');
-    equal(modeArrow('sync'), '↔');
+    equal(modeArrow('push'), '↑');
+    equal(modeArrow('pull'), '↓');
+    equal(modeArrow('sync'), '⇅');
     equal(modeArrow(''), '?');
 });
 
 test('a row: name, when, and what is going on', () => {
     const idle = row('docs', {State: 'idle', Mode: 'push', LastRun: unix(300)}, now);
-    equal(idle.title, 'docs  →', 'title');
+    equal(idle.title, 'docs  ↑', 'title');
     equal(idle.when, '5m ago', 'when');
     equal(idle.detail, '', 'detail');
     const busy = row('docs', {State: 'running', Mode: 'sync', LastRun: unix(300), Phase: 'syncing', Done: 1, Total: 2,
