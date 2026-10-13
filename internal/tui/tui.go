@@ -72,10 +72,12 @@ func Run(ctx context.Context, c Client, o Options) error {
 }
 
 // callTimeout bounds one request to the daemon, refreshEvery how often the
-// whole picture is asked for again. keyringTimeout bounds what may wait for
-// the user to unlock the keyring, or for a share's server.
+// whole picture is asked for again, spinEvery how often a spinner turns.
+// keyringTimeout bounds what may wait for the user to unlock the keyring,
+// or for a share's server.
 const (
 	callTimeout    = 5 * time.Second
 	refreshEvery   = 2 * time.Second
+	spinEvery      = 100 * time.Millisecond
 	keyringTimeout = 2 * time.Minute
 )
