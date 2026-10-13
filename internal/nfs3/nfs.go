@@ -22,6 +22,7 @@ const (
 	procRmdir       = 13
 	procRename      = 14
 	procReadDirPlus = 17
+	procFSStat      = 18
 	procFSInfo      = 19
 	procCommit      = 21
 )
@@ -416,6 +417,26 @@ func (c *Client) ReadDir(ctx context.Context, dir FH, fn func(Entry) error) erro
 			return errors.New("nfs readdirplus: the server's listing does not move on")
 		}
 	}
+}
+
+// FSStat is how much room the file system of a handle has, in bytes
+// (FSSTAT): Avail is what this user may still write, Free what is left
+// counting the reserve this user cannot use.
+type FSStat struct {
+	Total, Free, Avail uint64
+}
+
+// FSStat asks the server how much room fh's file system has.
+func (c *Client) FSStat(ctx context.Context, fh FH) (FSStat, error) {
+	d, err := c.call(ctx, "fsstat", procFSStat, func(e *encoder) { e.opaque(fh) })
+	if err != nil {
+		return FSStat{}, err
+	}
+	var f FSStat
+	postOpAttr(d)
+	f.Total, f.Free, f.Avail = d.u64(), d.u64(), d.u64()
+	// The counts of files and how long the answer holds are not used.
+	return f, done("fsstat", d)
 }
 
 // FSInfo is what the server says about transfer sizes (FSINFO).

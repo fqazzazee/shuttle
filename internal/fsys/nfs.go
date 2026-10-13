@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"path"
 	"slices"
 	"strings"
@@ -349,6 +350,19 @@ func (n *NFS) Chtimes(ctx context.Context, name string, mtime time.Time) error {
 		return err
 	}
 	return pathErr("chtimes", name, n.c.SetMtime(ctx, fh, mtime))
+}
+
+// Space asks the server how much room the export's file system has for
+// this user.
+func (n *NFS) Space(ctx context.Context) (Space, error) {
+	if err := ctx.Err(); err != nil {
+		return Space{}, err
+	}
+	st, err := n.c.FSStat(ctx, n.root)
+	if err != nil {
+		return Space{}, pathErr("statfs", ".", err)
+	}
+	return Space{Free: int64(min(st.Avail, math.MaxInt64)), Total: int64(min(st.Total, math.MaxInt64))}, nil //nolint:gosec // clamped on this line
 }
 
 func (n *NFS) Close() error { return n.c.Close() }

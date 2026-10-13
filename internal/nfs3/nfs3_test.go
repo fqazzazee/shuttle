@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -196,5 +197,22 @@ func TestNFSv4OnlyServer(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "NFSv4-only") || !strings.Contains(err.Error(), "mount it") {
 		t.Errorf("Dial = %v; want it to say the server is NFSv4-only and to mount it", err)
+	}
+}
+
+// FSSTAT says how big the served folder's disk is, as statfs does here.
+func TestFSStat(t *testing.T) {
+	c, dir := dial(t)
+	got, err := c.FSStat(t.Context(), c.Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(dir, &st); err != nil {
+		t.Fatal(err)
+	}
+	if want := st.Blocks * uint64(st.Bsize); got.Total != want || got.Avail == 0 || got.Avail > got.Free ||
+		got.Free > got.Total {
+		t.Errorf("FSStat = %+v, want a total of %d and some room", got, want)
 	}
 }

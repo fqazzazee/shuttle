@@ -306,6 +306,7 @@ func FuzzReplies(f *testing.F) {
 		c.Rename(ctx, fh, "x", fh, "y")
 		c.ReadDir(ctx, fh, func(Entry) error { return nil })
 		c.FSInfo(ctx, fh)
+		c.FSStat(ctx, fh)
 		mnt(ctx, nc, "/")
 		getPort(ctx, nc, nfsProg)
 		if ctx.Err() != nil {
