@@ -159,8 +159,8 @@ out again.
 
 ## Use
 
-Run `shuttle` on its own for the terminal interface: every shuttle live, with its progress and
-transfer rates, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it, and to
+Run `shuttle` on its own for the terminal interface: every shuttle live, with its progress,
+transfer rates and whether its share is online, and keys to sync (`s`), pause (`p`, or `P` for all) and disable (`d`) it, and to
 add (`n`), edit (`e`) and delete (`x`) shuttles: a few steps that browse the share's folders and
 yours, choose a profile, and set what the shuttle does differently from it. On the share and on
 this computer, the folder opens as a tree of what is in it, where `m` chooses to sync everything,

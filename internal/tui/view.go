@@ -3,6 +3,7 @@
 package tui
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -127,6 +128,7 @@ func withBus(text ...string) []string {
 const (
 	modeWidth     = 8
 	stateWidth    = 10
+	shareWidth    = 9
 	sizeWidth     = 10
 	filesWidth    = 10
 	lastRunWidth  = 10
@@ -145,11 +147,13 @@ func (m *model) shuttlesTable(room int) []string {
 		nameWidth = max(nameWidth, lipgloss.Width(m.shuttles[i].Name))
 	}
 	nameWidth += 2
-	row := func(name, mode, state, size, files, lastRun, progress, details string) string {
-		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) + pad(size, sizeWidth) +
-			pad(files, filesWidth) + pad(lastRun, lastRunWidth) + pad(progress, progressWidth) + details
+	row := func(name, mode, state, share, size, files, lastRun, progress, details string) string {
+		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) + pad(share, shareWidth) +
+			pad(size, sizeWidth) + pad(files, filesWidth) + pad(lastRun, lastRunWidth) + pad(progress, progressWidth) +
+			details
 	}
-	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SIZE", "FILES", "LAST RUN", "PROGRESS", "DETAILS"))}
+	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SHARE", "SIZE", "FILES", "LAST RUN", "PROGRESS",
+		"DETAILS"))}
 
 	// Scroll so the selected shuttle shows.
 	rows := room - 1
@@ -160,12 +164,17 @@ func (m *model) shuttlesTable(room int) []string {
 	now := m.now()
 	for i := first; i < len(m.shuttles) && i < first+rows; i++ {
 		st := &m.shuttles[i]
-		state := string(st.State)
-		if style, ok := stateStyles[st.State]; ok && st.Name != m.selected {
-			state = style.Render(state)
+		state, share := string(st.State), cmp.Or(st.Share, "—")
+		if st.Name != m.selected {
+			if style, ok := stateStyles[st.State]; ok {
+				state = style.Render(state)
+			}
+			if st.Share == daemon.ShareOffline {
+				share = badStyle.Render(share)
+			}
 		}
 		size, files := present.Synced(st)
-		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state, size, files,
+		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state, share, size, files,
 			present.Ago(st.LastRun, now), progress(&st.Progress), present.Attention(st))
 		if st.Name == m.selected {
 			line = selected.Render(ansi.Truncate(pad(line, m.width), m.width, "…"))
