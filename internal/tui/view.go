@@ -24,10 +24,10 @@ func (m *model) View() tea.View {
 	return v
 }
 
-// render lays out the screen: tabs, the tab's content, a status line and
-// the keys.
+// render lays out the screen: the header, the tab's content, a status
+// line and the keys.
 func (m *model) render() string {
-	header := m.header()
+	header := m.headerLines()
 	status, keys := m.statusLine(), m.keyLines()
 	room := m.room(len(keys))
 	var body []string
@@ -39,7 +39,7 @@ func (m *model) render() string {
 	if len(body) > room {
 		body = body[:room]
 	}
-	lines := append([]string{header, ""}, body...)
+	lines := append(append(header, ""), body...)
 	for len(lines) < m.height-1-len(keys) {
 		lines = append(lines, "")
 	}
@@ -67,36 +67,43 @@ func (m *model) keyLines() []string {
 // room is how many lines a tab has: all but the header and a blank line,
 // the status line and the keys below.
 func (m *model) room(keys int) int {
-	return max(m.height-3-keys, 1)
+	header := 1
+	if m.tall() {
+		header = len(smallBus)
+	}
+	return max(m.height-header-2-keys, 1)
 }
 
-// header is the tabs. In a narrow terminal, the tabs but the open one are
-// their numbers alone.
-func (m *model) header() string {
-	tabs := func(short bool) string {
-		parts := []string{titleStyle.Render("shuttle") + " "}
-		for i, name := range tabNames {
-			if short && i != m.tab {
-				name = ""
-			}
-			label := strings.TrimRight(fmt.Sprintf(" %d %s", i+1, name), " ")
-			if i == tabConflicts {
-				if n := m.heldConflicts(); n > 0 {
-					label += fmt.Sprintf(" (%d)", n)
-				}
-			}
-			label += " "
-			if i == m.tab {
-				label = activeTab.Render(label)
-			}
-			parts = append(parts, label)
-		}
-		return strings.Join(parts, "")
-	}
-	if h := tabs(false); lipgloss.Width(h) <= m.width {
+// tabsLine is the tabs after prefix. In a narrow terminal, the tabs but
+// the open one are their numbers alone.
+func (m *model) tabsLine(prefix string) string {
+	if h := m.tabs(prefix, false); lipgloss.Width(h) <= m.width {
 		return h
 	}
-	return tabs(true)
+	return m.tabs(prefix, true)
+}
+
+// tabs is the tabs after prefix; short, the tabs but the open one by
+// their numbers alone.
+func (m *model) tabs(prefix string, short bool) string {
+	parts := []string{prefix}
+	for i, name := range tabNames {
+		if short && i != m.tab {
+			name = ""
+		}
+		label := strings.TrimRight(fmt.Sprintf(" %d %s", i+1, name), " ")
+		if i == tabConflicts {
+			if n := m.heldConflicts(); n > 0 {
+				label += fmt.Sprintf(" (%d)", n)
+			}
+		}
+		label += " "
+		if i == m.tab {
+			label = activeTab.Render(label)
+		}
+		parts = append(parts, label)
+	}
+	return strings.Join(parts, "")
 }
 
 func (m *model) heldConflicts() int {

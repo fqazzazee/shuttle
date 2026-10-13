@@ -105,8 +105,10 @@ func TestActivityFollowsAndScrolls(t *testing.T) {
 	if !strings.Contains(screen(m), "track29.flac") {
 		t.Errorf("the oldest is not in view:\n%s", screen(m))
 	}
+	// A page is the entries the screen shows: 12 rows but the header, a
+	// blank line, the title and a blank line, the status line and the keys.
 	press(t, m, "pgup")
-	if m.scroll != len(m.entries)-1-(12-7) {
+	if m.scroll != len(m.entries)-1-(12-6) {
 		t.Errorf("scroll = %d after a page up from the end", m.scroll)
 	}
 	for range 10 {

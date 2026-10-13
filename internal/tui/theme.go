@@ -19,8 +19,10 @@ type palette struct {
 	dim     color.Color // what matters less: descriptions, what is paused
 	bright  color.Color // text on the selection
 	surface color.Color // the selection
-	yellow  color.Color // the chosen tab, a bus-yellow fill
+	yellow  color.Color // the chosen tab, a bus-yellow fill; the bus's sync arrows
 	ink     color.Color // text on yellow
+	sign    color.Color // the bus's destination sign, behind its arrows in yellow
+	glass   color.Color // the bus's windscreen
 	amber   color.Color // shuttle itself: the title, the keys
 	sky     color.Color // headings, the bus
 	coral   color.Color // errors, an offline share
@@ -38,6 +40,8 @@ var (
 		surface: lipgloss.Color("#3a4252"),
 		yellow:  lipgloss.Color("#f5c451"),
 		ink:     lipgloss.Color("#1b1e26"),
+		sign:    lipgloss.Color("#13151b"),
+		glass:   lipgloss.Color("#cde3fb"),
 		amber:   lipgloss.Color("#f5c451"),
 		sky:     lipgloss.Color("#61afef"),
 		coral:   lipgloss.Color("#f7848d"),
@@ -51,6 +55,8 @@ var (
 		surface: lipgloss.Color("#dfe6f0"),
 		yellow:  lipgloss.Color("#f6d32d"),
 		ink:     lipgloss.Color("#1b1e26"),
+		sign:    lipgloss.Color("#241f31"),
+		glass:   lipgloss.Color("#4787d6"),
 		amber:   lipgloss.Color("#8a5b00"),
 		sky:     lipgloss.Color("#1c64c8"),
 		coral:   lipgloss.Color("#c8303f"),
@@ -72,9 +78,13 @@ var (
 	busyStyle   lipgloss.Style
 	goodStyle   lipgloss.Style
 	busStyle    lipgloss.Style
+	signStyle   lipgloss.Style
+	glassStyle  lipgloss.Style
+	lightStyle  lipgloss.Style
 	keyStyle    lipgloss.Style
 	stateStyles map[daemon.State]lipgloss.Style
 	kindStyles  map[activity.Kind]lipgloss.Style
+	wordColors  []color.Color // the wordmark's, a column each; nil for the terminal's own
 )
 
 // Tests see the dark palette; Run picks one for the terminal.
@@ -117,7 +127,11 @@ func useTheme(p *palette) {
 		busyStyle = s.Foreground(lipgloss.Color("6"))
 		goodStyle = s.Foreground(lipgloss.Color("2"))
 		busStyle = s.Foreground(lipgloss.Color("4"))
+		signStyle = s.Bold(true).Reverse(true)
+		glassStyle = busStyle
+		lightStyle = heldStyle
 		keyStyle = s.Bold(true)
+		wordColors = nil
 	} else {
 		titleStyle = s.Bold(true).Foreground(p.amber)
 		activeTab = s.Bold(true).Foreground(p.ink).Background(p.yellow)
@@ -129,7 +143,11 @@ func useTheme(p *palette) {
 		busyStyle = s.Foreground(p.teal)
 		goodStyle = s.Foreground(p.mint)
 		busStyle = s.Foreground(p.sky)
+		signStyle = s.Bold(true).Foreground(p.yellow).Background(p.sign)
+		glassStyle = s.Foreground(p.glass)
+		lightStyle = s.Foreground(p.amber)
 		keyStyle = s.Bold(true).Foreground(p.amber)
+		wordColors = lipgloss.Blend1D(lipgloss.Width(wordmark[0]), p.sky, p.teal, p.mint, p.amber)
 	}
 	stateStyles = map[daemon.State]lipgloss.Style{
 		daemon.StateError:    badStyle,
