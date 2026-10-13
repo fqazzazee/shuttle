@@ -32,7 +32,7 @@ type wizard struct {
 	share    int
 	profiles []string // "" first: no profile
 	profile  int
-	remote   *browser
+	remote   *tree
 	local    *browser
 	settings *settingsForm
 	remoteFS fsys.FS
@@ -125,20 +125,29 @@ func (m *model) opened(msg openedMsg) tea.Cmd {
 		return nil
 	}
 	w.busy, w.remoteFS, w.fsShare = "", msg.fs, msg.share
+	old := w.remote
+	if old != nil && old.where != "on "+msg.share {
+		old = nil // marks on another share mean nothing here
+	}
 	dir := "/"
-	if w.remote != nil && w.remote.where == "on "+msg.share {
-		dir = w.remote.dir
+	if old != nil {
+		dir = old.dir()
 	} else if w.was != nil && w.was.Share == msg.share {
 		dir = w.dirs[0]
 	}
 	if msg.err != nil {
 		openErr := msg.err
-		w.remote = newBrowser("on "+msg.share, "/", dir, func(context.Context, string) ([]string, error) { return nil, openErr },
-			func(d, n string) string { return d }, func(d string) string { return d })
+		w.remote = newTree("on "+msg.share, dir, func(context.Context, string) ([]entry, error) { return nil, openErr })
 	} else {
-		w.remote = remoteBrowser("on "+msg.share, msg.fs, dir)
+		w.remote = remoteTree("on "+msg.share, msg.fs, dir)
 	}
-	return w.remote.load(m.ctx)
+	switch {
+	case old != nil:
+		w.remote.pick, w.remote.marks = old.pick, old.marks
+	case w.was != nil && w.was.Share == msg.share:
+		w.remote.setSelection(w.was.Settings.Include, w.was.Settings.Exclude)
+	}
+	return w.remote.load(m.ctx, w.remote.root)
 }
 
 func (m *model) wizardKey(msg tea.KeyPressMsg) tea.Cmd {
@@ -182,12 +191,14 @@ func (m *model) wizardKey(msg tea.KeyPressMsg) tea.Cmd {
 		updated, cmd := w.name.Update(msg)
 		*w.name = updated
 		return cmd
-	case stepRemote, stepLocal:
-		b := w.remote
-		if w.step == stepLocal {
-			b = w.local
+	case stepRemote:
+		cmd, chosen := w.remote.key(m.ctx, msg)
+		if chosen {
+			return tea.Batch(cmd, m.next())
 		}
-		cmd, chosen := b.key(m.ctx, msg)
+		return cmd
+	case stepLocal:
+		cmd, chosen := w.local.key(m.ctx, msg)
 		if chosen {
 			return m.next()
 		}
@@ -239,7 +250,10 @@ func (m *model) next() tea.Cmd {
 		w.step = stepRemote
 		return m.connect()
 	case stepRemote:
-		w.dirs[0] = cleanSlash(w.remote.dir)
+		if w.remote.pick == pickInclude && len(w.remote.inside()) == 0 {
+			return w.fail("nothing is marked to sync: space marks a file or folder, or m syncs everything")
+		}
+		w.dirs[0] = w.remote.dir()
 		w.step = stepLocal
 		if w.local == nil {
 			w.local = localBrowser(w.dirs[1])
@@ -286,6 +300,7 @@ func (m *model) saveWizard() tea.Cmd {
 		name = strings.TrimSpace(w.name.Value())
 	}
 	remote, local := share+":"+w.dirs[0], w.dirs[1]
+	include, exclude := w.remote.selection()
 	save := func() tea.Cmd {
 		w.busy = "saving…"
 		path, home, before, f := m.o.Config, m.o.Home, m.cfgData, w.settings
@@ -310,6 +325,16 @@ func (m *model) saveWizard() tea.Cmd {
 				}
 				if err := d.Set(table, "remote", remote); err != nil {
 					return err
+				}
+				for key, paths := range map[string][]string{"include": include, "exclude": exclude} {
+					if len(paths) == 0 {
+						err = d.Delete(table, key)
+					} else {
+						err = d.Set(table, key, paths)
+					}
+					if err != nil {
+						return err
+					}
 				}
 				return f.apply(d, table)
 			})
@@ -384,7 +409,7 @@ func (w *wizard) lines(m *model, room int) []string {
 		}
 	case stepRemote:
 		if w.remote != nil {
-			body = w.remote.lines(room)
+			body = w.remote.lines(room, m.width)
 		}
 	case stepLocal:
 		body = w.local.lines(room)
@@ -424,12 +449,17 @@ func (w *wizard) keys() [][2]string {
 	switch w.step {
 	case stepName:
 		return [][2]string{{"tab", "name/share"}, {"↑↓", "share"}, {"enter", "next"}, {"esc", "cancel"}}
-	case stepRemote, stepLocal:
-		b := w.remote
-		if w.step == stepLocal {
-			b = w.local
+	case stepRemote:
+		if w.remote != nil && w.remote.typing {
+			return [][2]string{{"enter", "use this path"}, {"esc", "back to the list"}}
 		}
-		if b != nil && b.typing {
+		keys := [][2]string{{"↑↓", "choose"}, {"→←", "open/close"}, {"o", "use as folder"}, {"⌫", "up"}, {"m", "what to sync"}}
+		if w.remote != nil && w.remote.pick != pickAll {
+			keys = append(keys, [2]string{"space", "mark"})
+		}
+		return append(keys, [2]string{"enter", "next"}, [2]string{"t", "type a path"}, [2]string{"esc", "back"})
+	case stepLocal:
+		if w.local != nil && w.local.typing {
 			return [][2]string{{"enter", "use this path"}, {"esc", "back to the list"}}
 		}
 		return [][2]string{{"↑↓", "choose"}, {"→", "open"}, {"←", "up"}, {"enter", "use the folder shown"}, {"t", "type a path"}, {"esc", "back"}}

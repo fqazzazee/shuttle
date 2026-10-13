@@ -88,21 +88,24 @@ func TestNewShuttle(t *testing.T) {
 	// On the share: its folders, not the versions folder.
 	s := screen(m)
 	if !strings.Contains(s, "Folder on nas: /") || !strings.Contains(s, "docs/") || !strings.Contains(s, "music/") ||
-		strings.Contains(s, ".shuttle-versions") {
+		strings.Contains(s, ".shuttle-versions") || !strings.Contains(s, "Sync:  everything ") {
 		t.Fatalf("on the share:\n%s", s)
 	}
-	key(t, m, tea.KeyRight) // into docs
-	if s := screen(m); !strings.Contains(s, "Folder on nas: /docs") || !strings.Contains(s, "2026/") {
-		t.Fatalf("in docs:\n%s", s)
+	key(t, m, tea.KeyRight) // docs opens in place
+	if s := screen(m); !strings.Contains(s, "Folder on nas: /\n") || !strings.Contains(s, "› ▾ docs/\n    ▸ 2026/") {
+		t.Fatalf("docs open:\n%s", s)
 	}
-	key(t, m, tea.KeyLeft)     // up to the top, docs selected
+	key(t, m, tea.KeyLeft)     // and closes
 	press(t, m, "G", "g", "G") // music, the last
-	key(t, m, tea.KeyRight)
-	key(t, m, tea.KeyLeft) // and out again: music stays selected
-	if s := screen(m); !strings.Contains(s, "▸ music/") {
+	press(t, m, "o")           // the shuttle's folder
+	if s := screen(m); !strings.Contains(s, "Folder on nas: /music") || !strings.Contains(s, "Nothing inside") {
+		t.Fatalf("in music:\n%s", s)
+	}
+	key(t, m, tea.KeyBackspace) // up: music stays open and selected
+	if s := screen(m); !strings.Contains(s, "Folder on nas: /\n") || !strings.Contains(s, "› ▾ music/\n      empty") {
 		t.Fatalf("not back on music:\n%s", s)
 	}
-	key(t, m, tea.KeyRight) // into music
+	press(t, m, "o")        // music again
 	key(t, m, tea.KeyEnter) // music it is
 
 	// Here: the home's folders, the hidden ones left out.
@@ -180,9 +183,9 @@ func TestEditShuttle(t *testing.T) {
 	before = configFile(t, m)
 	press(t, m, "e")
 	key(t, m, tea.KeyEnter)
-	key(t, m, tea.KeyLeft) // up to the top
-	press(t, m, "down")    // music
-	key(t, m, tea.KeyRight)
+	key(t, m, tea.KeyLeft)      // up to the top, docs open in it
+	press(t, m, "down", "down") // past 2026, to music
+	press(t, m, "o")
 	key(t, m, tea.KeyEnter)
 	key(t, m, tea.KeyEnter)
 	key(t, m, tea.KeyEnter)
@@ -320,6 +323,113 @@ func TestShuttleWithoutItsProfile(t *testing.T) {
 	got := configFile(t, m)
 	if strings.Contains(got, "profile = ") || !strings.Contains(got, "mode = \"push\"\ntriggers = []\n") {
 		t.Errorf("config:\n%s", got)
+	}
+}
+
+// Marking what to sync: only what is marked, then all but what is marked,
+// then everything again, each saved as the shuttle's include or exclude.
+func TestMarkWhatToSync(t *testing.T) {
+	w := newWizardSetup(t, nil)
+	m := w.m
+	for _, f := range []string{"docs/2026/a.txt", "docs/2026/b.txt", "docs/notes.txt", "docs/old/x.txt"} {
+		mkdirs(t, filepath.Dir(filepath.Join(w.share, f)))
+		if err := os.WriteFile(filepath.Join(w.share, f), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	press(t, m, "e") // docs
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyBackspace) // up a folder: docs open in it, folders first
+	if s := screen(m); !strings.Contains(s, "Folder on nas: /\n") ||
+		!strings.Contains(s, "› ▾ docs/\n    ▸ 2026/\n    ▸ old/\n      notes.txt\n  ▸ music/") {
+		t.Fatalf("docs open:\n%s", s)
+	}
+	key(t, m, tea.KeySpace)
+	if s := screen(m); !strings.Contains(s, "everything is synced: m chooses") {
+		t.Errorf("space with everything synced:\n%s", s)
+	}
+
+	press(t, m, "m") // only what is marked
+	if s := screen(m); !strings.Contains(s, " only what is marked ") || !strings.Contains(s, "Nothing marked yet") ||
+		!strings.Contains(s, "[ ] docs/") {
+		t.Fatalf("only what is marked:\n%s", s)
+	}
+	key(t, m, tea.KeyEnter)
+	if s := screen(m); !strings.Contains(s, "nothing is marked to sync") {
+		t.Fatalf("went on with nothing marked:\n%s", s)
+	}
+	press(t, m, "down") // 2026
+	key(t, m, tea.KeySpace)
+	key(t, m, tea.KeyRight)
+	if s := screen(m); !strings.Contains(s, "[~] docs/") || !strings.Contains(s, "[✓] 2026/") ||
+		!strings.Contains(s, "[✓] a.txt") || !strings.Contains(s, "[ ] old/") || !strings.Contains(s, "[ ] music/") {
+		t.Fatalf("2026 marked:\n%s", s)
+	}
+	press(t, m, "down") // a.txt: unmarking it marks b.txt instead of 2026
+	key(t, m, tea.KeySpace)
+	if s := screen(m); !strings.Contains(s, "[~] 2026/") || !strings.Contains(s, "[ ] a.txt") || !strings.Contains(s, "[✓] b.txt") {
+		t.Fatalf("a.txt unmarked:\n%s", s)
+	}
+	press(t, m, "down", "down", "down") // notes.txt
+	key(t, m, tea.KeySpace)
+	if s := screen(m); !strings.Contains(s, "Synced only: docs/2026/b.txt, docs/notes.txt") {
+		t.Fatalf("marks:\n%s", s)
+	}
+	key(t, m, tea.KeyLeft) // to docs
+	press(t, m, "o")       // its folder again: the marks are inside it
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	ctrl(t, m, 's')
+	if got := configFile(t, m); !strings.Contains(got, "remote = \"nas:/docs\"\ninclude = [\"2026/b.txt\", \"notes.txt\"]\n") {
+		t.Fatalf("config:\n%s", got)
+	}
+
+	// Edited: the marks are back; all but them is synced now.
+	press(t, m, "e")
+	key(t, m, tea.KeyEnter)
+	if s := screen(m); !strings.Contains(s, "Folder on nas: /docs") || !strings.Contains(s, " only what is marked ") ||
+		!strings.Contains(s, "Synced only: 2026/b.txt, notes.txt") {
+		t.Fatalf("marks not back:\n%s", s)
+	}
+	press(t, m, "m")
+	if s := screen(m); !strings.Contains(s, "Left out: 2026/b.txt, notes.txt") || !strings.Contains(s, "[✓] old/") ||
+		!strings.Contains(s, "[~] 2026/") || !strings.Contains(s, "[ ] notes.txt") {
+		t.Fatalf("all but what is marked:\n%s", s)
+	}
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	ctrl(t, m, 's')
+	got := configFile(t, m)
+	if !strings.Contains(got, "exclude = [\"2026/b.txt\", \"notes.txt\"]\n") || strings.Contains(got, "include") {
+		t.Fatalf("config:\n%s", got)
+	}
+
+	// And everything again: neither is left.
+	press(t, m, "e")
+	key(t, m, tea.KeyEnter)
+	press(t, m, "m")
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	ctrl(t, m, 's')
+	if got := configFile(t, m); strings.Contains(got, "include") || strings.Contains(got, "exclude") {
+		t.Errorf("config:\n%s", got)
+	}
+}
+
+// A listing that comes back for a folder no longer shown is dropped.
+func TestTreeDropsStaleListings(t *testing.T) {
+	tr := newTree("on nas", "/docs", nil)
+	tr.listed(treeListedMsg{id: tr.id, dir: "/elsewhere", entries: []entry{{name: "stale"}}})
+	tr.listed(treeListedMsg{id: tr.id + 1, dir: "/docs", entries: []entry{{name: "other tree"}}})
+	if len(tr.root.kids) != 0 {
+		t.Errorf("kids = %v", tr.root.kids)
+	}
+	tr.listed(treeListedMsg{id: tr.id, dir: "/docs", entries: []entry{{name: "fresh"}}})
+	if len(tr.root.kids) != 1 || tr.root.kids[0].path != "/docs/fresh" {
+		t.Errorf("kids = %v", tr.root.kids)
 	}
 }
 

@@ -58,7 +58,7 @@ grep -q '^conflicts = "ask"$' "$HOME/.config/shuttle/config.toml" || fail "the p
 step "shuttles: add one, with a setting of its own"
 keys 1 n; typed docs; keys Enter
 shows "Folder on disk: /"
-keys Right; shows "Folder on disk: /docs"; keys Enter
+keys o; shows "Folder on disk: /docs"; keys Enter
 shows "Folder here: $HOME"
 keys Right; shows "Folder here: $HOME/Documents"; keys Enter
 shows "▸ none"
@@ -100,6 +100,29 @@ step "activity: what the shuttle did"
 keys 3
 shows "notes.txt: resolved: kept this computer's copy"
 shows "notes.txt: copied to the share"
+
+step "what to sync: leave a folder out by marking it on the share"
+mkdir -p "$share/docs/raw"
+echo "left out" >"$share/docs/raw/a.cr2"
+echo "kept" >"$share/docs/kept.txt"
+reloads=$(grep -c "config reloaded" "$tmp/daemon.log" || true)
+keys 1 e Enter
+shows "Folder on disk: /docs"
+shows "raw/"
+keys m m  # all but what is marked
+shows "Nothing marked yet"
+keys Space  # raw, the first: folders come first
+shows "Left out: raw/"
+shows "[ ] raw/"
+keys Enter Enter Enter C-s
+shows "saved the shuttle docs"
+grep -q '^exclude = \["raw"\]$' "$HOME/.config/shuttle/config.toml" || fail "the mark is not in the config"
+for _ in $(seq 50); do [ "$(grep -c "config reloaded" "$tmp/daemon.log")" -gt "$reloads" ] && break; sleep 0.2; done
+keys s
+for _ in $(seq 50); do [ -f "$HOME/Documents/kept.txt" ] && break; sleep 0.2; done
+[ -f "$HOME/Documents/kept.txt" ] || fail "kept.txt was not synced"
+[ -e "$HOME/Documents/raw" ] && fail "the folder left out was synced"
+[ -f "$share/docs/raw/a.cr2" ] || fail "the folder left out was touched on the share"
 
 step "quit: the daemon carries on"
 keys q

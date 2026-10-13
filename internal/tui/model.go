@@ -206,12 +206,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := m.opened(msg)
 		return m, cmd
 	case listedMsg:
-		if w := m.wizard; w != nil {
-			for _, b := range []*browser{w.remote, w.local} {
-				if b != nil {
-					b.listed(msg)
-				}
-			}
+		if w := m.wizard; w != nil && w.local != nil {
+			w.local.listed(msg)
+		}
+	case treeListedMsg:
+		if w := m.wizard; w != nil && w.remote != nil {
+			w.remote.listed(msg)
 		}
 	case testedMsg:
 		m.gotTest(msg)
