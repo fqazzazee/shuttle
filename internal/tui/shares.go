@@ -210,6 +210,20 @@ func where(sh *config.Share) string {
 	return sh.Path
 }
 
+// lastTestWidth is what the Shares tab keeps for LAST TEST: "failed, 14:05".
+const lastTestWidth = 16
+
+// cutMiddle cuts s to width columns, if it is wider, by leaving out its
+// middle: a path's start and end say more than either alone.
+func cutMiddle(s string, width int) string {
+	w := ansi.StringWidth(s)
+	if w <= width || width < 3 {
+		return s
+	}
+	head := (width - 1) / 2
+	return ansi.Truncate(s, head, "") + "…" + ansi.TruncateLeft(s, w-(width-1-head), "")
+}
+
 func (m *model) sharesLines(room int) []string {
 	switch {
 	case m.form != nil:
@@ -235,8 +249,18 @@ func (m *model) sharesLines(room int) []string {
 	}
 	nameWidth += 2
 	whereWidth = min(whereWidth, 50) + 2
+	// In a narrow terminal, WHERE gives up its middle so FREE and LAST TEST
+	// still show; USED BY first gives up a little of its end.
+	usersWidth := 22
+	rest := m.width - nameWidth - 6 - usersWidth - 20 - lastTestWidth
+	if rest < whereWidth {
+		usersWidth -= 6
+		rest += 6
+	}
+	whereWidth = max(min(whereWidth, rest), 12)
 	row := func(name, typ, at, users, free, test string) string {
-		return pad(name, nameWidth) + pad(typ, 6) + pad(at, whereWidth) + pad(users, 22) + pad(free, 20) + test
+		return pad(name, nameWidth) + pad(typ, 6) + pad(cutMiddle(at, whereWidth-1), whereWidth) + pad(users, usersWidth) +
+			pad(free, 20) + test
 	}
 	lines := []string{headStyle.Render(row("NAME", "TYPE", "WHERE", "USED BY", "FREE", "LAST TEST"))}
 	now := m.now()

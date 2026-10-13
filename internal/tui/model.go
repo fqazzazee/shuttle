@@ -38,6 +38,7 @@ type model struct {
 	width, height int
 	tab           int
 	help          bool
+	helpScroll    int // the first line of the help shown
 
 	loaded    bool  // the daemon has answered once
 	down      error // why the daemon cannot be reached; nil when it can
@@ -346,7 +347,7 @@ func (m *model) key(k string) tea.Cmd {
 	case "ctrl+c", "q":
 		return tea.Quit
 	case "?":
-		m.help = !m.help
+		m.help, m.helpScroll = !m.help, 0
 		return nil
 	case "esc":
 		m.help = false
@@ -364,6 +365,7 @@ func (m *model) key(k string) tea.Cmd {
 	}
 	switch {
 	case m.help:
+		m.helpKey(k)
 	case m.tab == tabShuttles:
 		return m.shuttlesKey(k)
 	case m.tab == tabConflicts:
