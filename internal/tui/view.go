@@ -155,8 +155,14 @@ func (m *model) shuttlesTable(room int) []string {
 	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SHARE", "SIZE", "FILES", "LAST RUN", "PROGRESS",
 		"DETAILS"))}
 
-	// Scroll so the selected shuttle shows.
+	// The selected shuttle in full, under the table, when there is room
+	// for it and a few rows: the table comes first.
 	rows := room - 1
+	panel := m.panel()
+	if len(m.shuttles)+len(panel) > rows {
+		rows = max(rows-len(panel), min(len(m.shuttles), 3))
+	}
+	// Scroll so the selected shuttle shows.
 	first := 0
 	if i := m.index(); i >= rows {
 		first = i - rows + 1
@@ -183,7 +189,7 @@ func (m *model) shuttlesTable(room int) []string {
 		}
 		lines = append(lines, line)
 	}
-	return lines
+	return append(lines, panel...)
 }
 
 // waiting is what a tab shows until the daemon answers.
