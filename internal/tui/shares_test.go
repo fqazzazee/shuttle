@@ -15,6 +15,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
@@ -63,14 +64,14 @@ type tests struct {
 	seen []string
 }
 
-func (ts *tests) test(_ context.Context, sh *config.Share, password string, _ secrets.Store) error {
+func (ts *tests) test(_ context.Context, sh *config.Share, password string, _ secrets.Store) (fsys.Space, error) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 	ts.seen = append(ts.seen, sh.Name+" "+password)
 	if sh.Name == "bad" {
-		return errors.New("share bad: dial tcp: connection refused")
+		return fsys.Space{}, errors.New("share bad: dial tcp: connection refused")
 	}
-	return nil
+	return fsys.Space{Free: 1_200_000_000_000, Total: 4_000_000_000_000}, nil
 }
 
 func testOptions(t *testing.T) Options {
@@ -414,5 +415,63 @@ func TestSharesWithoutAConfig(t *testing.T) {
 	press(t, m, "n")
 	if s := screen(m); !strings.Contains(s, "The config file has an error") || m.form != nil {
 		t.Errorf("a broken config:\n%s", s)
+	}
+}
+
+// The FREE column: a mounted folder's room as measured here; another
+// share's from its last test or its shuttles' last run, whichever is later,
+// amber when less than a tenth is left. Under the table, this computer's.
+func TestSharesFreeSpace(t *testing.T) {
+	m, _, _ := sharesTab(t, sharesConfig)
+	if s := screen(m); !strings.Contains(s, "USED BY               FREE") || !strings.Contains(s, "docs                  —") {
+		t.Fatalf("nothing known yet:\n%s", s)
+	}
+	send(t, m, disksMsg{
+		"/mnt/usb":          {Free: 50_000_000_000, Total: 1_000_000_000_000},
+		"/home/u/Documents": {Free: 120_300_000_000, Total: 511_000_000_000},
+	})
+	st := m.shuttles[0] // docs, on nas, ran 5m ago
+	st.RemoteSpace = fsys.Space{Free: 300_000_000_000, Total: 4_000_000_000_000}
+	send(t, m, changedMsg(st))
+	press(t, m, "down") // usb: nas's amber is not hidden by the selection
+	s := screen(m)
+	for _, want := range []string{
+		"docs                  300.0 GB of 4.0 TB",
+		"-                     50.0 GB of 1.0 TB",
+		"This computer: 120.3 GB free of 511.0 GB",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("screen lacks %q:\n%s", want, s)
+		}
+	}
+	if !strings.Contains(m.View().Content, heldStyle.Render("300.0 GB of 4.0 TB")) {
+		t.Error("under a tenth free is not amber")
+	}
+
+	// A test now is later than the run: it wins.
+	press(t, m, "up", "t")
+	if s := screen(m); !strings.Contains(s, "docs                  1.2 TB of 4.0 TB") ||
+		!strings.Contains(s, "nas works: 1.2 TB free of 4.0 TB") {
+		t.Errorf("after a test:\n%s", s)
+	}
+}
+
+// Folders that are not there are left out, not reported as empty.
+func TestMeasureDisks(t *testing.T) {
+	m, _, _ := sharesTab(t, "")
+	m.measuring = false
+	gone := filepath.Join(t.TempDir(), "gone")
+	m.o.Home = gone
+	msg := m.measureDisks()()
+	if got := msg.(disksMsg); len(got) != 0 {
+		t.Errorf("a missing home measured: %v", got)
+	}
+	m.measuring = false
+	m.o.Home = t.TempDir()
+	if got := m.measureDisks()().(disksMsg); got[m.o.Home].Total <= 0 {
+		t.Errorf("home not measured: %v", got)
+	}
+	if m.measureDisks() != nil {
+		t.Error("a second asking went out while one was out")
 	}
 }

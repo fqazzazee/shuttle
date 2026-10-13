@@ -306,10 +306,11 @@ func ptr[T any](v T) *T { return &v }
 func TestTestAPathShare(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	if err := Test(ctx, &config.Share{Name: "usb", Type: config.SharePath, Path: dir}, "", memStore{t: t}); err != nil {
-		t.Errorf("a mounted folder: %v", err)
+	if space, err := Test(ctx, &config.Share{Name: "usb", Type: config.SharePath, Path: dir}, "", memStore{t: t}); err != nil ||
+		space.Total <= 0 {
+		t.Errorf("a mounted folder: %+v, %v", space, err)
 	}
-	err := Test(ctx, &config.Share{Name: "usb", Type: config.SharePath, Path: filepath.Join(dir, "gone")}, "", memStore{t: t})
+	_, err := Test(ctx, &config.Share{Name: "usb", Type: config.SharePath, Path: filepath.Join(dir, "gone")}, "", memStore{t: t})
 	if err == nil || !strings.Contains(err.Error(), "is the share mounted?") {
 		t.Errorf("a folder that is not there: %v", err)
 	}
@@ -318,11 +319,11 @@ func TestTestAPathShare(t *testing.T) {
 func TestTestAnNFSShare(t *testing.T) {
 	ctx := context.Background()
 	share := nfsShare(t)
-	if err := Test(ctx, &share, "", memStore{t: t}); err != nil {
+	if _, err := Test(ctx, &share, "", memStore{t: t}); err != nil {
 		t.Errorf("a served export: %v", err)
 	}
 	share.Port, share.MountPort = 1, 1
-	if err := Test(ctx, &share, "", memStore{t: t}); err == nil {
+	if _, err := Test(ctx, &share, "", memStore{t: t}); err == nil {
 		t.Error("a closed port answered")
 	}
 }
@@ -330,7 +331,7 @@ func TestTestAnNFSShare(t *testing.T) {
 // A password typed in the form is tried as it is: the keyring is not asked.
 func TestTestWithATypedPassword(t *testing.T) {
 	share := &config.Share{Name: "nas", Type: config.ShareSMB, Host: "127.0.0.1", Port: 1, Share: "test", User: "user"}
-	if err := Test(context.Background(), share, "typed", memStore{t: t}); err == nil {
+	if _, err := Test(context.Background(), share, "typed", memStore{t: t}); err == nil {
 		t.Error("a closed port answered")
 	}
 }
@@ -343,17 +344,17 @@ func TestTestAnSMBShare(t *testing.T) {
 	k, _ := Key(share)
 	ctx := context.Background()
 
-	if err := Test(ctx, share, fsystest.SambaPassword, memStore{t: t}); err != nil {
-		t.Errorf("the right password, typed: %v", err)
+	if space, err := Test(ctx, share, fsystest.SambaPassword, memStore{t: t}); err != nil || space.Total <= 0 {
+		t.Errorf("the right password, typed: %+v, %v", space, err)
 	}
-	if err := Test(ctx, share, "wr0ng-s3cret", memStore{t: t}); err == nil {
+	if _, err := Test(ctx, share, "wr0ng-s3cret", memStore{t: t}); err == nil {
 		t.Error("a wrong password, typed, passed")
 	}
 	stored := memStore{t: t, pw: map[string]string{k.Account(): fsystest.SambaPassword}}
-	if err := Test(ctx, share, "", stored); err != nil {
+	if _, err := Test(ctx, share, "", stored); err != nil {
 		t.Errorf("the stored password: %v", err)
 	}
-	if err := Test(ctx, share, "", memStore{t: t, pw: map[string]string{}}); !errors.Is(err, secrets.ErrNotFound) {
+	if _, err := Test(ctx, share, "", memStore{t: t, pw: map[string]string{}}); !errors.Is(err, secrets.ErrNotFound) {
 		t.Errorf("no password stored: %v", err)
 	}
 }

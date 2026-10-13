@@ -7,6 +7,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
 // State is what a shuttle is doing, as the TUI and the GNOME extension show it.
@@ -46,6 +47,9 @@ type Status struct {
 	// of the last run or the daemon's start.
 	Files int
 	Size  int64
+	// How much room each side had at the end of the last run that could
+	// tell; zero until one could.
+	LocalSpace, RemoteSpace fsys.Space
 
 	Progress Progress // of the run in progress
 }

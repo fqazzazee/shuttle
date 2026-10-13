@@ -6,10 +6,12 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -29,6 +31,32 @@ func OpenLocal(dir string) (*Local, error) {
 		return nil, err
 	}
 	return &Local{root: root}, nil
+}
+
+// Space is what statfs says of the folder's file system.
+func (l *Local) Space(ctx context.Context) (Space, error) {
+	if err := ctx.Err(); err != nil {
+		return Space{}, err
+	}
+	return LocalSpace(l.root.Name())
+}
+
+// LocalSpace is how much room the file system dir is on has: what a user
+// can write, without root's reserve, out of the whole.
+func LocalSpace(dir string) (Space, error) {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(dir, &st); err != nil {
+		return Space{}, &fs.PathError{Op: "statfs", Path: dir, Err: err}
+	}
+	return Space{Free: clampInt64(st.Bavail, st.Bsize), Total: clampInt64(st.Blocks, st.Bsize)}, nil
+}
+
+// clampInt64 is blocks of size bytes, at most math.MaxInt64.
+func clampInt64(blocks uint64, size int64) int64 {
+	if size <= 0 || blocks > uint64(math.MaxInt64/size) { //nolint:gosec // size > 0, so the quotient is positive
+		return math.MaxInt64
+	}
+	return int64(blocks) * size //nolint:gosec // checked above that it fits
 }
 
 func (l *Local) Stat(ctx context.Context, name string) (FileInfo, error) {

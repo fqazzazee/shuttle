@@ -320,7 +320,30 @@ func (r *runner) sync(t *engine.Tracker) (*engine.Result, error) {
 	defer r.endOwnWrites()
 	o := r.options(local, remote)
 	o.AllowDeletions, o.Tracker = allow, t
-	return engine.Run(ctx, o)
+	res, err := engine.Run(ctx, o)
+	r.measure(local, remote)
+	return res, err
+}
+
+// spaceTimeout bounds asking a side how much room it has: a share that
+// stopped answering mid-run must not hold the run's end.
+const spaceTimeout = 5 * time.Second
+
+// measure records how much room each side has, while both are open. A
+// side that cannot tell keeps what it last told.
+func (r *runner) measure(local, remote fsys.FS) {
+	ctx, cancel := context.WithTimeout(context.Background(), spaceTimeout)
+	defer cancel()
+	l, lErr := fsys.SpaceOf(ctx, local)
+	rem, rErr := fsys.SpaceOf(ctx, remote)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if lErr == nil && l.Total > 0 {
+		r.st.LocalSpace = l
+	}
+	if rErr == nil && rem.Total > 0 {
+		r.st.RemoteSpace = rem
+	}
 }
 
 // isOffline tells "the share's server cannot be reached right now" apart

@@ -46,6 +46,8 @@ shows "it works"
 keys C-s
 shows "saved the share disk"
 grep -q "^path = \"$share\"$" "$HOME/.config/shuttle/config.toml" || fail "the share is not in the config"
+shows "This computer: "  # how much room is left here, under the shares
+screen | grep -qE "^disk +path .+ [0-9.]+ [kMGT]?B of [0-9.]+ [kMGT]?B" || fail "the mounted share's free space is not shown"
 
 step "profiles: add one"
 keys 4 n; typed live; keys Tab Right Right Right  # mode: sync

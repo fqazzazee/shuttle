@@ -82,6 +82,27 @@ func FoldsCase(f FS) bool {
 	return ok && c.FoldsCase()
 }
 
+// Space is how much room a file system has, in bytes: Free for the user
+// writing to it, out of Total. Zero is not known.
+type Space struct {
+	Free, Total int64
+}
+
+// SpaceReporter is implemented by file systems that can tell how much
+// space is left where they write.
+type SpaceReporter interface {
+	Space(ctx context.Context) (Space, error)
+}
+
+// SpaceOf is how much room f has; zero, with no error, when f cannot tell.
+func SpaceOf(ctx context.Context, f FS) (Space, error) {
+	r, ok := f.(SpaceReporter)
+	if !ok {
+		return Space{}, nil
+	}
+	return r.Space(ctx)
+}
+
 // ErrInvalidPath is returned for a path that is absolute, contains "..", empty
 // or "." elements, a trailing slash, or a NUL byte.
 var ErrInvalidPath = errors.New("invalid path")
