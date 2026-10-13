@@ -258,15 +258,15 @@ func TestNarrowShuttlesTab(t *testing.T) {
 // A narrow terminal shows the other tabs by number, and the keys on a
 // second line rather than cut short.
 func TestNarrowHeaderAndKeys(t *testing.T) {
-	m := start(t, newFake(), 64, 24)
+	m := start(t, newFake(), 64, 16)
 	lines := strings.Split(screen(m), "\n")
-	if lines[0] != "shuttle  1 Shuttles  2 (2)  3  4  5 " {
+	if lines[0] != " ⇄  shuttle  1 Shuttles  2 (2)  3  4  5 " {
 		t.Errorf("header %q", lines[0])
 	}
 	if keys := lines[len(lines)-2:]; !strings.HasPrefix(keys[0], "s sync") || !strings.HasSuffix(keys[1], "? help  q quit") {
 		t.Errorf("keys %q", keys)
 	}
-	if s := screen(start(t, newFake(), 120, 24)); !strings.Contains(s, "shuttle  1 Shuttles  2 Conflicts (2)  3 Activity") {
+	if s := screen(start(t, newFake(), 120, 16)); !strings.Contains(s, "shuttle  1 Shuttles  2 Conflicts (2)  3 Activity") {
 		t.Errorf("a wide terminal lost the tabs' names:\n%s", s)
 	}
 }

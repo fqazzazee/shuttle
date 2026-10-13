@@ -57,7 +57,7 @@ func same(a, b *activity.Entry) bool {
 }
 
 func (m *model) activityKey(k string) tea.Cmd {
-	page := max(m.height-7, 1)
+	page := max(m.room(len(m.keyLines()))-2, 1) // the title and a blank line above the entries
 	switch k {
 	case "up", "k":
 		m.scroll--

@@ -47,6 +47,14 @@ func TestPaletteContrast(t *testing.T) {
 			if r := contrast(p.ink, p.yellow); r < 4.5 {
 				t.Errorf("the chosen tab: %.1f:1, want 4.5", r)
 			}
+			if r := contrast(p.yellow, p.sign); r < 4.5 {
+				t.Errorf("the bus's sign: %.1f:1, want 4.5", r)
+			}
+			for _, bg := range tc.bgs {
+				if r := contrast(p.glass, lipgloss.Color(bg)); r < 3 {
+					t.Errorf("the bus's windscreen on %s: %.1f:1, want 3, as for graphics", bg, r)
+				}
+			}
 		})
 	}
 }
@@ -96,12 +104,12 @@ func TestThemeFor(t *testing.T) {
 // reverse matches an SGR sequence that turns reverse on.
 var reverse = regexp.MustCompile(`\x1b\[(\d+;)*7(;\d+)*m`)
 
-// Without colors (NO_COLOR), the selected row and the chosen tab still
-// show: in reverse.
+// Without colors (NO_COLOR), the selected row, the chosen tab and the
+// bus's sign still show: in reverse.
 func TestSelectionShowsWithoutColor(t *testing.T) {
 	t.Cleanup(func() { useTheme(&darkPalette) })
 	useTheme(nil)
-	for name, s := range map[string]lipgloss.Style{"selected": selected, "activeTab": activeTab} {
+	for name, s := range map[string]lipgloss.Style{"selected": selected, "activeTab": activeTab, "signStyle": signStyle} {
 		var b strings.Builder
 		w := &colorprofile.Writer{Forward: &b, Profile: colorprofile.ASCII}
 		if _, err := w.WriteString(s.Render("row")); err != nil {
