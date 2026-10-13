@@ -24,11 +24,20 @@ func TestDetails(t *testing.T) {
 		Note:          "polling instead",
 	}
 	want := "share nas: connection refused; 2 conflicts waiting for you; 1 deletion held by the guard; a run is waiting; polling instead"
-	if got := details(st); got != want {
+	now := time.Now()
+	if got := details(st, now); got != want {
 		t.Errorf("details =\n%q\nwant\n%q", got, want)
 	}
-	if got := details(&daemon.Status{}); got != "" {
+	if got := details(&daemon.Status{}, now); got != "" {
 		t.Errorf("details of a quiet shuttle = %q", got)
+	}
+	next := now.Add(45 * time.Minute)
+	if got := details(&daemon.Status{State: daemon.StateIdle, NextRun: next}, now); got != "next run in 45m" {
+		t.Errorf("details of a scheduled shuttle = %q", got)
+	}
+	// A run in progress says how far it is, not when the next one is.
+	if got := details(&daemon.Status{State: daemon.StateRunning, NextRun: next}, now); got != "" {
+		t.Errorf("details of a scheduled shuttle that is running = %q", got)
 	}
 }
 

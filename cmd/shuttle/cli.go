@@ -165,7 +165,7 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 		st := &all[i]
 		size, files := present.Synced(st)
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", st.Name, st.State, orElse(st.Share, "-"), size, files,
-			present.Ago(st.LastRun, now), details(st))
+			present.Ago(st.LastRun, now), details(st, now))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
@@ -177,13 +177,17 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 }
 
 // details is what a status line adds after the columns: the run in
-// progress, then whatever needs the user's attention.
-func details(st *daemon.Status) string {
+// progress, then whatever needs the user's attention, then when the
+// schedule runs it next.
+func details(st *daemon.Status, now time.Time) string {
 	var parts []string
 	for _, p := range []string{present.Progress(&st.Progress), present.Attention(st)} {
 		if p != "" {
 			parts = append(parts, p)
 		}
+	}
+	if next := present.Until(st.NextRun, now); next != "" && st.State != daemon.StateRunning {
+		parts = append(parts, "next run "+next)
 	}
 	return strings.Join(parts, "; ")
 }

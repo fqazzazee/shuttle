@@ -126,6 +126,21 @@ interval = "1m"`)
 	}
 }
 
+// The status says when the schedule runs a shuttle next: an interval after
+// the run it started with, as the shuttle had never run.
+func TestStatusSaysTheNextRun(t *testing.T) {
+	fast(t)
+	f := newFixture(t, "push", `triggers = ["schedule"]
+interval = "1h"`)
+	f.start()
+	st := f.waitFor("s", "the first run, and the next", func(st Status) bool {
+		return !st.LastRun.IsZero() && !st.NextRun.IsZero()
+	})
+	if d := st.NextRun.Sub(st.LastRun); d < 59*time.Minute || d > time.Hour {
+		t.Errorf("next run %v after the last, want about an hour", d)
+	}
+}
+
 // A nightly push that was due while the machine was off runs at start.
 func TestMissedScheduleRunsAtStart(t *testing.T) {
 	fast(t)
