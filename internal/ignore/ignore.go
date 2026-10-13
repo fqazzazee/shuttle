@@ -13,6 +13,8 @@
 // As with git, nothing inside an ignored folder can be re-included: the
 // scanner never descends into it.
 //
+// A Matcher can also leave out what a shuttle does not select: see Select.
+//
 // This package must stay free of desktop-specific imports; see the
 // portability rule in SPEC.md.
 package ignore
@@ -31,7 +33,9 @@ type rule struct {
 
 // Matcher decides which paths are ignored. The zero value ignores nothing.
 type Matcher struct {
-	rules []rule
+	rules   []rule
+	include []string
+	exclude []string
 }
 
 // Compile builds a Matcher from patterns, in order.
@@ -52,6 +56,9 @@ func Compile(patterns []string) (*Matcher, error) {
 // Match reports whether the slash-separated path p is ignored. isDir says
 // whether p is a folder.
 func (m *Matcher) Match(p string, isDir bool) bool {
+	if m.unselected(p, isDir) {
+		return true
+	}
 	ignored := false
 	for _, r := range m.rules {
 		if r.dirOnly && !isDir {
@@ -62,6 +69,40 @@ func (m *Matcher) Match(p string, isDir bool) bool {
 		}
 	}
 	return ignored
+}
+
+// Select also ignores what a shuttle does not select. include and exclude
+// are slash paths, taken literally, not as patterns: with include set,
+// only those paths are kept, with what is inside them and the folders that
+// lead to them; exclude leaves out those paths and what is inside them.
+// Empty lists select everything.
+func (m *Matcher) Select(include, exclude []string) {
+	m.include, m.exclude = include, exclude
+}
+
+func (m *Matcher) unselected(p string, isDir bool) bool {
+	for _, x := range m.exclude {
+		if within(p, x) {
+			return true
+		}
+	}
+	if len(m.include) == 0 {
+		return false
+	}
+	for _, x := range m.include {
+		// A folder on the way to an included path is kept, so the scanner
+		// goes in; the rest of what is in it is not.
+		if within(p, x) || isDir && within(x, p) {
+			return false
+		}
+	}
+	return true
+}
+
+// within reports whether p is the path top or inside it.
+func within(p, top string) bool {
+	rest, ok := strings.CutPrefix(p, top)
+	return ok && (rest == "" || rest[0] == '/')
 }
 
 // compile turns one pattern into a rule; ok is false for blank lines and

@@ -116,6 +116,9 @@ func TestExampleConfig(t *testing.T) {
 		if !s.Settings.Notify.Completed {
 			t.Error("completion notices should default on for a scheduled shuttle")
 		}
+		if !slices.Equal(s.Settings.Exclude, []string{"raw", "screenshots"}) || s.Settings.Include != nil {
+			t.Errorf("include = %q, exclude = %q", s.Settings.Include, s.Settings.Exclude)
+		}
 	})
 
 	t.Run("archive replaces versioning as a unit", func(t *testing.T) {
@@ -167,7 +170,8 @@ func settingsEqual(a, b *Settings) bool {
 	return a.Mode == b.Mode && slices.Equal(a.Triggers, b.Triggers) && a.PollInterval == b.PollInterval &&
 		a.Interval == b.Interval && slices.Equal(a.At, b.At) && a.Conflicts == b.Conflicts &&
 		a.ConflictHold == b.ConflictHold && a.Deletions == b.Deletions && a.DeletionGuard == b.DeletionGuard &&
-		a.Versioning == b.Versioning && slices.Equal(a.Ignore, b.Ignore) && a.Bandwidth == b.Bandwidth &&
+		a.Versioning == b.Versioning && slices.Equal(a.Ignore, b.Ignore) && slices.Equal(a.Include, b.Include) &&
+		slices.Equal(a.Exclude, b.Exclude) && a.Bandwidth == b.Bandwidth &&
 		a.Notify == b.Notify
 }
 
@@ -397,6 +401,29 @@ remote = "nas:/docs"
 mode = "push"
 local = "/b"
 remote = "nas:"`, "folders overlap"},
+		{"include and exclude", minimalShare + `
+[shuttles.s]
+mode = "sync"
+local = "/d"
+remote = "nas:"
+include = ["a"]
+exclude = ["a/b"]`, "set include or exclude, not both"},
+		{"include outside the folder", minimalShare + `
+[shuttles.s]
+mode = "sync"
+local = "/d"
+remote = "nas:"
+include = ["../etc"]`, `include: "../etc" is not a clean path`},
+		{"exclude the whole folder", minimalShare + `
+[shuttles.s]
+mode = "sync"
+local = "/d"
+remote = "nas:"
+exclude = ["/"]`, `exclude: "/" is not a clean path`},
+		{"include in a profile", minimalShare + `
+[profiles.p]
+mode = "sync"
+include = ["a"]`, `unknown key "profiles.p.include"`},
 		{"mounted share overlaps its own local", `
 [shares.m]
 type = "path"

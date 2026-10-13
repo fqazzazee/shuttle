@@ -45,8 +45,8 @@ type localWatcher struct {
 }
 
 // newLocalWatcher is a variable so tests can make watching fail.
-var newLocalWatcher = func(root string, patterns []string) (*localWatcher, error) {
-	ignored, err := ignore.Compile(patterns)
+var newLocalWatcher = func(root string, s *config.Settings) (*localWatcher, error) {
+	ignored, err := engine.Ignored(s)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (r *runner) realtime(quit <-chan struct{}) {
 	log := r.d.o.Log.With("shuttle", r.shuttle.Name)
 	var events <-chan fsnotify.Event
 	var watchErrs <-chan error
-	lw, err := newLocalWatcher(r.shuttle.Local, r.shuttle.Settings.Ignore)
+	lw, err := newLocalWatcher(r.shuttle.Local, &r.shuttle.Settings)
 	if err != nil {
 		r.setNote(fmt.Sprintf("not watching local changes (%v); checking every %v instead", err, r.shuttle.Settings.PollInterval))
 		log.Warn("not watching local changes", "err", err)

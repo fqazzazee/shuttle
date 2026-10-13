@@ -104,8 +104,12 @@ type Settings struct {
 	DeletionGuard int // percent of files gone at once that holds deletions; 0 is off
 	Versioning    Versioning
 	Ignore        []string
-	Bandwidth     Bandwidth
-	Notify        Notify
+	// Include and Exclude are what a shuttle selects of its folder: slash
+	// paths inside it, taken literally (ignore.Matcher.Select). A shuttle
+	// sets one or neither; a profile, neither.
+	Include, Exclude []string
+	Bandwidth        Bandwidth
+	Notify           Notify
 }
 
 // Has reports whether t is one of the settings' automatic triggers.

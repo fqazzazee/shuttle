@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
 
@@ -166,6 +167,28 @@ func TestIgnoredAndInternalChangesDoNotTrigger(t *testing.T) {
 	}
 }
 
+// A shuttle that includes only some paths runs for changes there, not for
+// changes to what it leaves out.
+func TestChangesOutsideTheIncludedPathsDoNotTrigger(t *testing.T) {
+	f := realtimeFixture(t, "push", `include = ["docs"]`)
+	before := f.runCount()
+	write(t, f.local, "other.txt", "x")
+	os.MkdirAll(filepath.Join(f.local, "music", "a"), 0o755)
+	write(t, filepath.Join(f.local, "music", "a"), "song", "s")
+	quiet()
+	if got := f.runCount() - before; got != 0 {
+		t.Errorf("%d runs for changes that are not included, want 0", got)
+	}
+	os.MkdirAll(filepath.Join(f.local, "docs", "sub"), 0o755)
+	write(t, filepath.Join(f.local, "docs", "sub"), "a.txt", "a")
+	f.waitFor("s", "the included file to be pushed", func(Status) bool {
+		return exists(filepath.Join(f.mount, "docs", "sub"), "a.txt")
+	})
+	if exists(f.mount, "other.txt") {
+		t.Error("a file that is not included was pushed")
+	}
+}
+
 // Changes on the share have no events here: polling picks them up.
 func TestPollingPicksUpShareChanges(t *testing.T) {
 	fast(t)
@@ -183,7 +206,7 @@ func TestPollingPicksUpShareChanges(t *testing.T) {
 func TestWatchFailureFallsBackToPolling(t *testing.T) {
 	fast(t)
 	old := newLocalWatcher
-	newLocalWatcher = func(string, []string) (*localWatcher, error) { return nil, errTooManyWatches }
+	newLocalWatcher = func(string, *config.Settings) (*localWatcher, error) { return nil, errTooManyWatches }
 	t.Cleanup(func() { newLocalWatcher = old })
 
 	f := newFixture(t, "push", `triggers = ["realtime"]`)

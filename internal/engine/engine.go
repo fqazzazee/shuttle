@@ -169,9 +169,20 @@ func onlyConflicts(actions []Action) []Action {
 	return out
 }
 
+// Ignored is what a run of a shuttle with settings s leaves out of both
+// scans: its ignore patterns, and what it does not select.
+func Ignored(s *config.Settings) (*ignore.Matcher, error) {
+	m, err := ignore.Compile(s.Ignore)
+	if err != nil {
+		return nil, err
+	}
+	m.Select(s.Include, s.Exclude)
+	return m, nil
+}
+
 // Preview scans both sides and returns the plan without carrying it out.
 func Preview(ctx context.Context, o *Options) ([]Action, error) {
-	ignored, err := ignore.Compile(o.Settings.Ignore)
+	ignored, err := Ignored(o.Settings)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +202,7 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 // with single paths are reported in the Result and the run carries on.
 func Run(ctx context.Context, o *Options) (*Result, error) {
 	res := &Result{}
-	ignored, err := ignore.Compile(o.Settings.Ignore)
+	ignored, err := Ignored(o.Settings)
 	if err != nil {
 		return res, err
 	}

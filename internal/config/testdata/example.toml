@@ -54,6 +54,7 @@ profile = "backup"
 local = "~/Pictures"
 remote = "backup:/photos"
 bandwidth = { down = "5MB/s" }
+exclude = ["raw/", "/screenshots"]
 
 [shuttles.archive]
 profile = "manual"
