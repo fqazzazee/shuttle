@@ -45,6 +45,8 @@ type model struct {
 	selected  string // the selected shuttle, by name: it stays put as the list changes
 	pausedAll bool
 	configErr string
+	frame     int    // the spinners' frame
+	spinning  bool   // a spinMsg is on its way
 	message   string // what the last action did, or why it failed
 	failed    bool
 	messageAt time.Time
@@ -97,6 +99,7 @@ type (
 	}
 	changedMsg daemon.Status
 	tickMsg    struct{}
+	spinMsg    struct{}
 	doneMsg    struct {
 		text string
 		err  error
@@ -153,6 +156,21 @@ func (m *model) tick() tea.Cmd {
 	return tea.Tick(m.every, func(time.Time) tea.Msg { return tickMsg{} })
 }
 
+// spin turns the spinners while a shuttle shows one, and stops with the
+// last: a run that only copies shows a bar, which needs no turning.
+func (m *model) spin() tea.Cmd {
+	if m.spinning || m.every == 0 {
+		return nil
+	}
+	for i := range m.shuttles {
+		if spins(&m.shuttles[i].Progress) {
+			m.spinning = true
+			return tea.Tick(spinEvery, func(time.Time) tea.Msg { return spinMsg{} })
+		}
+	}
+	return nil
+}
+
 // do runs an action against the daemon and reports it as done.
 func (m *model) do(text string, f func(ctx context.Context) error) tea.Cmd {
 	return func() tea.Msg {
@@ -177,6 +195,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.down = nil
 		m.shuttles, m.pausedAll, m.configErr = msg.shuttles, msg.pausedAll, msg.configErr
 		m.keepSelection()
+		cmd := m.spin()
+		return m, cmd
 	case subscribedMsg:
 		if msg.err == nil {
 			m.changes = msg.changes
@@ -187,7 +207,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		defer m.listChanged(before)
 		st := daemon.Status(msg)
 		m.changed(&st)
-		return m, next(m.changes)
+		return m, tea.Batch(next(m.changes), m.spin())
+	case spinMsg:
+		m.spinning = false
+		m.frame++
+		cmd := m.spin()
+		return m, cmd
 	case tickMsg:
 		cmds := []tea.Cmd{m.refresh(), m.tick(), m.measureDisks()}
 		if m.tab == tabActivity {

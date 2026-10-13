@@ -210,10 +210,10 @@ func TestShuttlesTab(t *testing.T) {
 	s := screen(m)
 	for _, want := range []string{
 		"shuttle  1 Shuttles  2 Conflicts (2)  3 Activity",
-		"NAME    MODE    STATE     SIZE      FILES     LAST RUN  PROGRESS                DETAILS",
+		"NAME    MODE    STATE     SIZE      FILES     LAST RUN  PROGRESS                  DETAILS",
 		"docs    ↔ sync  idle      48.2 GB   31,204    5m ago",
 		"music   ← pull  disabled  —         —         never",
-		"photos  → push  held      1.5 GB    120       3h ago                            2 conflicts waiting for you",
+		"photos  → push  held      1.5 GB    120       3h ago                              2 conflicts waiting for you",
 		"s sync  p pause  d disable  n new  e edit  x delete  P pause all  1-5 tabs  ? help  q quit",
 	} {
 		if !strings.Contains(s, want) {
@@ -296,25 +296,72 @@ func TestLiveProgress(t *testing.T) {
 		Progress: daemon.Progress{Phase: engine.PhaseSyncing, Done: 3, Total: 10, Bytes: 450, TotalBytes: 1000,
 			RateUp: 2_100_000, Path: "a.pdf"}})
 	s := screen(m)
-	if !strings.Contains(s, "docs    ↔ sync  running") || !strings.Contains(s, "45% ↑ 2.1 MB/s") {
+	if !strings.Contains(s, "docs    ↔ sync  running") || !strings.Contains(s, "━━━╸────  45% ↑ 2.1 MB/s") {
 		t.Errorf("progress not shown:\n%s", s)
 	}
 	if !strings.Contains(s, "↑ 2.1 MB/s  ↓ 0 B/s") {
 		t.Errorf("overall rates not shown:\n%s", s)
 	}
+	// The selected row is highlighted to its end: the bar's colors would
+	// reset the highlight.
+	if row := strings.Split(m.View().Content, "\n")[3]; strings.Count(row, "\x1b[") != 2 {
+		t.Errorf("the selected row has colors inside its highlight: %q", row)
+	}
+	// A scan's length is not known: a spinner turns instead of a bar.
+	send(t, m, changedMsg{Name: "docs", Mode: config.ModeSync, State: daemon.StateRunning,
+		Progress: daemon.Progress{Phase: engine.PhaseScanning, Done: 7}})
+	if s := screen(m); !strings.Contains(s, "⠋ scanning 7") {
+		t.Errorf("no spinner:\n%s", s)
+	}
+	send(t, m, spinMsg{})
+	if s := screen(m); !strings.Contains(s, "⠙ scanning 7") {
+		t.Errorf("the spinner did not turn:\n%s", s)
+	}
 	for _, p := range []struct {
 		p    daemon.Progress
 		want string
 	}{
-		{daemon.Progress{Phase: engine.PhaseScanning, Done: 1234}, "scanning 1234"},
-		{daemon.Progress{Phase: engine.PhaseComparing, Done: 2, Total: 5, RateDown: 1000}, "comparing 2/5 ↓ 1.0 kB/s"},
-		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 4}, "25%"},
-		{daemon.Progress{Phase: engine.PhaseSyncing}, "syncing"},
+		{daemon.Progress{Phase: engine.PhaseScanning, Done: 1234}, "⠙ scanning 1234"},
+		{daemon.Progress{Phase: engine.PhaseComparing, Done: 2, Total: 5, RateDown: 1000}, "⠙ comparing 2/5 ↓ 1.0 kB/s"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 4}, "━━──────  25%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 3}, "━━╸─────  33%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Bytes: 5, TotalBytes: 5}, "━━━━━━━━ 100%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing}, "⠙ syncing"},
 		{daemon.Progress{}, ""},
 	} {
-		if got := progress(&p.p); got != p.want {
+		if got := ansi.Strip(progress(&p.p, 1)); got != p.want {
 			t.Errorf("progress(%+v) = %q, want %q", p.p, got, p.want)
 		}
+		if got := spins(&p.p); got != strings.HasPrefix(p.want, "⠙") {
+			t.Errorf("spins(%+v) = %v", p.p, got)
+		}
+	}
+}
+
+// The spinners turn only while one shows: a run that copies shows a bar.
+func TestSpinsOnlyWhileShown(t *testing.T) {
+	m := start(t, newFake(), 140, 12)
+	m.every = time.Hour // as the program has it: spin() schedules, and the test does not wait
+	if m.spin() != nil {
+		t.Error("spins with nothing running")
+	}
+	copying := daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 4}
+	if _, cmd := m.Update(changedMsg{Name: "docs", State: daemon.StateRunning, Progress: copying}); cmd == nil {
+		t.Fatal("no command after a change")
+	}
+	if m.spinning {
+		t.Error("spins for a bar")
+	}
+	m.Update(changedMsg{Name: "docs", State: daemon.StateRunning, Progress: daemon.Progress{Phase: engine.PhaseScanning}})
+	if !m.spinning {
+		t.Error("does not spin while scanning")
+	}
+	if m.spin() != nil {
+		t.Error("a second spinner tick is scheduled")
+	}
+	m.Update(changedMsg{Name: "docs", State: daemon.StateIdle})
+	if _, cmd := m.Update(spinMsg{}); cmd != nil || m.spinning {
+		t.Error("still spinning after the run")
 	}
 }
 
