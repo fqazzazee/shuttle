@@ -64,7 +64,7 @@ remote = "usb:."
 
 	s := screen(m)
 	for _, want := range []string{
-		"docs  ↔ sync · profile live",
+		"docs  ⇅ sync · profile live",
 		"  This computer   ~/Documents\n",
 		"  The share       nas:/docs  ·  1.2 TB free of 4.0 TB",
 		"  Syncs           all but raw",
@@ -83,7 +83,7 @@ remote = "usb:."
 	press(t, m, "down")
 	s = screen(m)
 	for _, want := range []string{
-		"photos  → push\n",
+		"photos  ↑ push\n",
 		"  The share       usb:/\n",
 		"  Runs            only when you ask (s)",
 		"  Details         2 conflicts waiting for you",
@@ -105,15 +105,15 @@ func TestShuttlePanelMakesRoom(t *testing.T) {
 	m := start(t, f, 120, 24)
 	press(t, m, "G")
 	s := screen(m)
-	if !strings.Contains(s, "s19  → push\n") || !strings.Contains(s, "  Runs") {
+	if !strings.Contains(s, "s19  ↑ push\n") || !strings.Contains(s, "  Runs") {
 		t.Errorf("no room for the panel, or the selection is out of view:\n%s", s)
 	}
-	if rows := strings.Count(s, "→ push  disabled"); rows < 3 {
+	if rows := strings.Count(s, "↑ push  disabled"); rows < 3 {
 		t.Errorf("the table has %d rows left", rows)
 	}
 	// Too short for both: the table keeps three rows.
 	send(t, m, tea.WindowSizeMsg{Width: 120, Height: 9})
-	if s := screen(m); strings.Count(s, "→ push  disabled") != 3 || !strings.Contains(s, "s19 ") {
+	if s := screen(m); strings.Count(s, "↑ push  disabled") != 3 || !strings.Contains(s, "s19 ") {
 		t.Errorf("a short terminal:\n%s", s)
 	}
 }

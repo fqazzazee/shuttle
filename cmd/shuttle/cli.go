@@ -159,13 +159,13 @@ func status(ctx context.Context, c *bus.Client, w io.Writer) error {
 		return nil
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tSTATE\tSHARE\tSIZE\tFILES\tLAST RUN\tDETAILS")
+	fmt.Fprintln(tw, "NAME\tMODE\tSTATE\tSHARE\tSIZE\tFILES\tLAST RUN\tDETAILS")
 	now := time.Now()
 	for i := range all {
 		st := &all[i]
 		size, files := present.Synced(st)
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", st.Name, st.State, orElse(st.Share, "-"), size, files,
-			present.Ago(st.LastRun, now), details(st, now))
+		fmt.Fprintf(tw, "%s\t%s %s\t%s\t%s\t%s\t%s\t%s\t%s\n", st.Name, present.ModeArrow(st.Mode), st.Mode, st.State,
+			orElse(st.Share, "-"), size, files, present.Ago(st.LastRun, now), details(st, now))
 	}
 	if err := tw.Flush(); err != nil {
 		return err

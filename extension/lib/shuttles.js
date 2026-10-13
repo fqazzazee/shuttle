@@ -6,9 +6,10 @@
 
 import {size} from './format.js';
 
-// modeArrow is a mode as an arrow: → push, ← pull, ↔ sync.
+// modeArrow is a mode as an arrow: ↑ push, ↓ pull, ⇅ sync, as the TUI has
+// them.
 export function modeArrow(mode) {
-    return {push: '→', pull: '←', sync: '↔'}[mode] ?? '?';
+    return {push: '↑', pull: '↓', sync: '⇅'}[mode] ?? '?';
 }
 
 // plural is n things: "1 file", "3 files".
