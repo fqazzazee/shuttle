@@ -44,8 +44,10 @@ func newFake() *fake {
 	changes := make(chan daemon.Status)
 	close(changes)
 	return &fake{changes: changes, shuttles: []daemon.Status{
-		{Name: "docs", Mode: config.ModeSync, State: daemon.StateIdle, LastRun: now.Add(-5 * time.Minute)},
+		{Name: "docs", Mode: config.ModeSync, State: daemon.StateIdle, LastRun: now.Add(-5 * time.Minute),
+			Files: 31204, Size: 48_200_000_000},
 		{Name: "photos", Mode: config.ModePush, State: daemon.StateHeld, LastRun: now.Add(-3 * time.Hour),
+			Files: 120, Size: 1_500_000_000,
 			Conflicts: []engine.Issue{{Path: "a.jpg", Outcome: "held"}, {Path: "b.jpg", Outcome: "held"}}},
 		{Name: "music", Mode: config.ModePull, State: daemon.StateDisabled},
 	}}
@@ -208,10 +210,10 @@ func TestShuttlesTab(t *testing.T) {
 	s := screen(m)
 	for _, want := range []string{
 		"shuttle  1 Shuttles  2 Conflicts (2)  3 Activity",
-		"NAME    MODE    STATE     LAST RUN  PROGRESS                DETAILS",
-		"docs    ↔ sync  idle      5m ago",
-		"music   ← pull  disabled  never",
-		"photos  → push  held      3h ago                            2 conflicts waiting for you",
+		"NAME    MODE    STATE     SIZE      FILES     LAST RUN  PROGRESS                DETAILS",
+		"docs    ↔ sync  idle      48.2 GB   31,204    5m ago",
+		"music   ← pull  disabled  —         —         never",
+		"photos  → push  held      1.5 GB    120       3h ago                            2 conflicts waiting for you",
 		"s sync  p pause  d disable  n new  e edit  x delete  P pause all  1-5 tabs  ? help  q quit",
 	} {
 		if !strings.Contains(s, want) {

@@ -87,6 +87,8 @@ func encode(st *daemon.Status) map[string]dbus.Variant {
 		"HeldDeletions": dbus.MakeVariant(u32(st.HeldDeletions)),
 		"Conflicts":     dbus.MakeVariant(conflicts(st.Conflicts)),
 		"Errors":        dbus.MakeVariant(issues(st.Errors)),
+		"Files":         dbus.MakeVariant(u32(st.Files)),
+		"Size":          dbus.MakeVariant(u64(st.Size)),
 		// The run in progress; zero when not running.
 		"Phase":      dbus.MakeVariant(string(st.Progress.Phase)),
 		"Done":       dbus.MakeVariant(u32(st.Progress.Done)),
@@ -120,7 +122,8 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	}
 	var state, mode string
 	var lastRun, lastOK int64
-	var copied, deleted, held uint32
+	var copied, deleted, held, files uint32
+	var size uint64
 	var conflicts []conflict
 	var errs []issue
 	get("State", &state)
@@ -137,6 +140,8 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	get("HeldDeletions", &held)
 	get("Conflicts", &conflicts)
 	get("Errors", &errs)
+	get("Files", &files)
+	get("Size", &size)
 	var phase string
 	var done, total uint32
 	var bytes, totalBytes, rateUp, rateDown uint64
@@ -160,6 +165,7 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 		st.LastOK = time.Unix(lastOK, 0)
 	}
 	st.Copied, st.Deleted, st.HeldDeletions = int(copied), int(deleted), int(held)
+	st.Files, st.Size = int(files), s64(size)
 	for _, i := range conflicts {
 		st.Conflicts = append(st.Conflicts, engine.Issue{Path: i.Path, Reason: i.Reason, Outcome: i.Outcome, Op: engine.OpConflict,
 			Local: fromSide(i.Path, i.Local), Remote: fromSide(i.Path, i.Remote)})

@@ -42,6 +42,11 @@ type Status struct {
 	HeldDeletions   int            // deletions the guard is holding back
 	Errors          []engine.Issue // paths the last run could not handle
 
+	// What is synced: the files in the state database and their size, as
+	// of the last run or the daemon's start.
+	Files int
+	Size  int64
+
 	Progress Progress // of the run in progress
 }
 

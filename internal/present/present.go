@@ -6,6 +6,7 @@ package present
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -115,6 +116,28 @@ func Size(n int64) string {
 		f, unit = f/1000, u
 	}
 	return fmt.Sprintf("%.1f %s", f, unit)
+}
+
+// Count is a number with its thousands grouped: "31,204".
+func Count(n int) string {
+	s := strconv.Itoa(n)
+	start := 0
+	if n < 0 {
+		start = 1
+	}
+	for i := len(s) - 3; i > start; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
+}
+
+// Synced is what a shuttle has synced: its size and its number of files,
+// "48.2 GB" and "31,204"; "—" for both until it has run or synced anything.
+func Synced(st *daemon.Status) (size, files string) {
+	if st.Files == 0 && st.LastRun.IsZero() {
+		return "—", "—"
+	}
+	return Size(st.Size), Count(st.Files)
 }
 
 // Plural is n things: "1 file", "3 files".

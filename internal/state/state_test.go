@@ -144,6 +144,22 @@ func TestAll(t *testing.T) {
 	}
 }
 
+// Totals counts files only: a folder has no size of its own.
+func TestTotals(t *testing.T) {
+	db, _ := openTemp(t)
+	if files, bytes, err := db.Totals(); files != 0 || bytes != 0 || err != nil {
+		t.Errorf("empty: %d files, %d bytes, %v", files, bytes, err)
+	}
+	for _, r := range []*Record{file("a/x", 10), file("b", 5<<30), {Path: "a", Kind: fsys.KindDir}} {
+		if err := db.Put(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if files, bytes, err := db.Totals(); files != 2 || bytes != 10+5<<30 || err != nil {
+		t.Errorf("%d files, %d bytes, %v; want 2 files, %d bytes", files, bytes, err, 10+5<<30)
+	}
+}
+
 func TestDeleteTreeStopsAtPrefixBoundary(t *testing.T) {
 	db, _ := openTemp(t)
 	// "a-b" and "a.txt" sort between "a" and "a/..." bytewise, and "ab" after;

@@ -44,6 +44,7 @@ func (r *runner) openState() error {
 		r.markAttempt(last)
 	}
 	r.db = db
+	r.countSynced()
 	r.openActivity()
 	return nil
 }

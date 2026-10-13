@@ -168,6 +168,24 @@ func (d *DB) All() (map[string]Record, error) {
 	return out, nil
 }
 
+// Totals counts the files synced and their bytes, as of their last sync.
+func (d *DB) Totals() (files int, bytes int64, err error) {
+	err = d.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketFiles).ForEach(func(k, v []byte) error {
+			r, err := decode(string(k), v)
+			if err != nil {
+				return err
+			}
+			if r.Kind == fsys.KindFile {
+				files++
+				bytes += r.Local.Size
+			}
+			return nil
+		})
+	})
+	return files, bytes, err
+}
+
 // Update runs fn in a single read-write transaction. Everything fn writes is
 // committed together, or not at all if fn returns an error.
 func (d *DB) Update(fn func(tx *Tx) error) error {
