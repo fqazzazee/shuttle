@@ -67,7 +67,7 @@ func TestProgress(t *testing.T) {
 }
 
 func TestModeArrow(t *testing.T) {
-	for m, want := range map[config.Mode]string{config.ModePush: "→", config.ModePull: "←", config.ModeSync: "↔", "": "?"} {
+	for m, want := range map[config.Mode]string{config.ModePush: "↑", config.ModePull: "↓", config.ModeSync: "⇅", "": "?"} {
 		if got := ModeArrow(m); got != want {
 			t.Errorf("ModeArrow(%q) = %q, want %q", m, got, want)
 		}

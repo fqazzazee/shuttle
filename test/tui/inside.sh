@@ -76,13 +76,14 @@ shows "saved the shuttle docs"
 grep -q '^notify = { completed = false }$' "$HOME/.config/shuttle/config.toml" || fail "the override is not in the config"
 
 step "the dashboard: the daemon follows the new config; sync from the TUI"
-shows "docs  ↔ sync"
+shows "docs  ⇅ sync"
 keys s
 shows "syncing docs"
 for _ in $(seq 50); do [ -f "$share/docs/notes.txt" ] && break; sleep 0.2; done
 [ "$(cat "$share/docs/notes.txt" 2>/dev/null)" = first ] || fail "notes.txt was not synced"
 shows "just now"
 shows "6 B       1         just now"  # what docs syncs: notes.txt, "first\n"
+shows "idle      online"  # its share, a mounted folder, is there
 
 step "conflicts: one waits for the user, who keeps this computer's copy"
 echo "mine" >"$HOME/Documents/notes.txt"

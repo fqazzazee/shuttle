@@ -28,15 +28,17 @@ var Bus = []string{
 	"  '-[]----[]-'",
 }
 
-// ModeArrow is a mode as an arrow: → push, ← pull, ↔ sync.
+// ModeArrow is a mode as an arrow: ↑ push, ↓ pull, ⇅ sync. Up and down,
+// as for uploads and downloads and the transfer rates beside them: left and
+// right would leave which side is which to guess.
 func ModeArrow(m config.Mode) string {
 	switch m {
 	case config.ModePush:
-		return "→"
+		return "↑"
 	case config.ModePull:
-		return "←"
+		return "↓"
 	case config.ModeSync:
-		return "↔"
+		return "⇅"
 	}
 	return "?"
 }

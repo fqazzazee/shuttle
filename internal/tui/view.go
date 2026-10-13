@@ -3,6 +3,7 @@
 package tui
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -127,10 +128,11 @@ func withBus(text ...string) []string {
 const (
 	modeWidth     = 8
 	stateWidth    = 10
+	shareWidth    = 9
 	sizeWidth     = 10
 	filesWidth    = 10
 	lastRunWidth  = 10
-	progressWidth = 24
+	progressWidth = 26
 )
 
 func (m *model) shuttlesTable(room int) []string {
@@ -145,11 +147,13 @@ func (m *model) shuttlesTable(room int) []string {
 		nameWidth = max(nameWidth, lipgloss.Width(m.shuttles[i].Name))
 	}
 	nameWidth += 2
-	row := func(name, mode, state, size, files, lastRun, progress, details string) string {
-		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) + pad(size, sizeWidth) +
-			pad(files, filesWidth) + pad(lastRun, lastRunWidth) + pad(progress, progressWidth) + details
+	row := func(name, mode, state, share, size, files, lastRun, progress, details string) string {
+		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) + pad(share, shareWidth) +
+			pad(size, sizeWidth) + pad(files, filesWidth) + pad(lastRun, lastRunWidth) + pad(progress, progressWidth) +
+			details
 	}
-	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SIZE", "FILES", "LAST RUN", "PROGRESS", "DETAILS"))}
+	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SHARE", "SIZE", "FILES", "LAST RUN", "PROGRESS",
+		"DETAILS"))}
 
 	// Scroll so the selected shuttle shows.
 	rows := room - 1
@@ -160,15 +164,22 @@ func (m *model) shuttlesTable(room int) []string {
 	now := m.now()
 	for i := first; i < len(m.shuttles) && i < first+rows; i++ {
 		st := &m.shuttles[i]
-		state := string(st.State)
-		if style, ok := stateStyles[st.State]; ok && st.Name != m.selected {
-			state = style.Render(state)
+		state, share := string(st.State), cmp.Or(st.Share, "—")
+		if st.Name != m.selected {
+			if style, ok := stateStyles[st.State]; ok {
+				state = style.Render(state)
+			}
+			if st.Share == daemon.ShareOffline {
+				share = badStyle.Render(share)
+			}
 		}
 		size, files := present.Synced(st)
-		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state, size, files,
-			present.Ago(st.LastRun, now), progress(&st.Progress), present.Attention(st))
+		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state, share, size, files,
+			present.Ago(st.LastRun, now), progress(&st.Progress, m.frame), present.Attention(st))
 		if st.Name == m.selected {
-			line = selected.Render(ansi.Truncate(pad(line, m.width), m.width, "…"))
+			// Without the bar's colors: their resets would end the
+			// highlight halfway along the row.
+			line = selected.Render(ansi.Truncate(pad(ansi.Strip(line), m.width), m.width, "…"))
 		}
 		lines = append(lines, line)
 	}
@@ -256,23 +267,24 @@ func explain(it *item) string {
 }
 
 // progress is a run's progress in a few characters: "45% ↑ 2.1 MB/s".
-func progress(p *daemon.Progress) string {
+func progress(p *daemon.Progress, frame int) string {
 	var s string
+	spinner := spinnerFrames[frame%len(spinnerFrames)]
 	switch p.Phase {
 	case "":
 		return ""
 	case engine.PhaseScanning:
-		s = fmt.Sprintf("scanning %d", p.Done)
+		s = fmt.Sprintf("%s scanning %d", spinner, p.Done)
 	case engine.PhaseComparing:
-		s = fmt.Sprintf("comparing %d/%d", p.Done, p.Total)
+		s = fmt.Sprintf("%s comparing %d/%d", spinner, p.Done, p.Total)
 	default:
 		switch {
 		case p.TotalBytes > 0:
-			s = fmt.Sprintf("%d%%", p.Bytes*100/p.TotalBytes)
+			s = bar(float64(p.Bytes)/float64(p.TotalBytes)) + fmt.Sprintf(" %3d%%", p.Bytes*100/p.TotalBytes)
 		case p.Total > 0:
-			s = fmt.Sprintf("%d%%", p.Done*100/p.Total)
+			s = bar(float64(p.Done)/float64(p.Total)) + fmt.Sprintf(" %3d%%", p.Done*100/p.Total)
 		default:
-			s = "syncing"
+			s = spinner + " syncing"
 		}
 	}
 	if p.RateUp > 0 {
@@ -282,6 +294,35 @@ func progress(p *daemon.Progress) string {
 		s += " ↓ " + present.Size(p.RateDown) + "/s"
 	}
 	return s
+}
+
+// spinnerFrames turn while a run's length is not known yet.
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+// spins says whether a run's progress shows a spinner rather than a bar.
+func spins(p *daemon.Progress) bool {
+	switch p.Phase {
+	case "":
+		return false
+	case engine.PhaseScanning, engine.PhaseComparing:
+		return true
+	}
+	return p.TotalBytes == 0 && p.Total == 0
+}
+
+// barWidth is a progress bar's length, in columns: two steps each.
+const barWidth = 8
+
+// bar is done, a fraction, as a progress bar: ━ done, ╸ half a column, ─ to
+// go. The shapes say it without the colors, which a selected row has not.
+func bar(done float64) string {
+	steps := min(max(int(done*2*barWidth), 0), 2*barWidth)
+	full, half := steps/2, steps%2
+	s := strings.Repeat("━", full)
+	if half == 1 {
+		s += "╸"
+	}
+	return busyStyle.Render(s) + faint.Render(strings.Repeat("─", barWidth-full-half))
 }
 
 // statusLine says what needs saying most: a broken config, the last
@@ -401,12 +442,14 @@ func helpLines() []string {
 		"  up/down, pgup/pgdown  scroll; home/end, g/G: the newest, the oldest",
 		"  f                     show one shuttle, then the next, then every shuttle again",
 		"",
-		"  Adding or editing a shuttle, on the share:",
+		"  Adding or editing a shuttle, on the share and on this computer:",
 		"  right/left, l/h       open or close a folder; left on a top row goes up a folder",
 		"  o, backspace          make the chosen folder the shuttle's folder; go up a folder",
+		"  t                     type the folder's path instead; on this computer, ~ is your home",
 		"  m                     sync everything, only what is marked, or all but what is marked",
 		"  space                 mark a file or folder, or unmark it; unmarking one thing in a",
-		"                        marked folder marks the rest of the folder instead",
+		"                        marked folder marks the rest of the folder instead; a mark made",
+		"                        on one side shows on the other",
 		"",
 		"  On the Profiles tab:",
 		"  n, e or enter, c, x   add a profile, edit it, copy it, delete it (only when no shuttle uses it)",

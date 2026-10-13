@@ -74,7 +74,7 @@ var defaults = func() map[string]string {
 
 var settings = []setting{
 	{key: "mode", label: "Mode", choices: []string{"push", "pull", "sync"}, def: "none: each shuttle must say",
-		hint: "push: this computer to the share; pull: the share to this computer; sync: both ways"},
+		hint: "↑ push: this computer to the share; ↓ pull: the share to this computer; ⇅ sync: both ways"},
 	{key: "triggers", label: "Triggers", list: true, def: "manual only",
 		hint: "any of realtime, schedule, share-available"},
 	{key: "interval", label: "Every", def: "-", hint: "with the schedule trigger: run this often, e.g. 6h",
