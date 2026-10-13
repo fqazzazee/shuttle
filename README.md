@@ -27,7 +27,7 @@ an in-process test server. Still to come:
 1. NFS tested against the Linux kernel server: NFSv3 directly, NFSv4 through a mount
 2. Packages: RPM (Fedora COPR), DEB, extensions.gnome.org
 
-### Not planned
+### Not planned as of right now but could be an addition in the future if requested
 
 - Cloud storage (S3, Google Drive, OneDrive, ...): use rclone
 - Peer-to-peer sync between machines without a share in between: use Syncthing
@@ -42,7 +42,7 @@ git clone https://github.com/fqazzazee/shuttle.git
 cd shuttle && make install
 ```
 
-Or as a package, built from the clone (none are published yet):
+Or as a package, built from the clone (**none are published yet**):
 
 ```bash
 make packages                                      # RPM, DEB and tarballs in dist/
