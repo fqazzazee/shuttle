@@ -202,6 +202,8 @@ func (r *runner) runOnce(requested bool) {
 	stopFollowing := r.followProgress(t)
 	res, err := r.sync(t)
 	stopFollowing()
+	// Even a failed run may have synced some files.
+	r.countSynced()
 	now := r.d.o.Now()
 
 	r.mu.Lock()
@@ -256,6 +258,18 @@ func (r *runner) runOnce(requested bool) {
 		log.Info("run ended", "state", state, "copied", res.Copied, "deleted", res.Deleted,
 			"conflicts", len(res.Conflicts), "errors", len(res.Errors))
 	}
+}
+
+// countSynced counts what the shuttle has synced, for its status.
+func (r *runner) countSynced() {
+	files, size, err := r.db.Totals()
+	if err != nil {
+		r.d.o.Log.Warn("cannot count the synced files", "shuttle", r.shuttle.Name, "err", err)
+		return
+	}
+	r.mu.Lock()
+	r.st.Files, r.st.Size = files, size
+	r.mu.Unlock()
 }
 
 // open opens both sides of the shuttle. The caller closes them.

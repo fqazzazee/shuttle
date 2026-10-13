@@ -87,7 +87,8 @@ func TestStatusSyncPauseResume(t *testing.T) {
 	}
 
 	code, out, _ := cli(t, "status")
-	if code != 0 || !strings.HasPrefix(out, "NAME") || !strings.Contains(out, "a     idle") || !strings.Contains(out, "never") {
+	if code != 0 || !strings.HasPrefix(out, "NAME") || !strings.Contains(out, "a     idle") || !strings.Contains(out, "never") ||
+		!strings.Contains(out, "SIZE  FILES") || !strings.Contains(out, "—     —") {
 		t.Errorf("status (%d):\n%s", code, out)
 	}
 
@@ -106,6 +107,9 @@ func TestStatusSyncPauseResume(t *testing.T) {
 	// The file is there before the run is over: it still saves its state,
 	// which can take a while on a slow disk.
 	waitForStatus(t, "just now")
+	if _, out, _ := cli(t, "status"); !strings.Contains(out, "1 B   1      just now") {
+		t.Errorf("status after the run:\n%s", out)
+	}
 
 	if code, out, _ := cli(t, "pause"); code != 0 || out != "paused all shuttles\n" {
 		t.Errorf("pause = %d %q", code, out)

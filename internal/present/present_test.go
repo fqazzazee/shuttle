@@ -58,3 +58,26 @@ func TestModeArrow(t *testing.T) {
 		}
 	}
 }
+
+func TestCount(t *testing.T) {
+	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 31204: "31,204", 1234567: "1,234,567", -1234: "-1,234"} {
+		if got := Count(n); got != want {
+			t.Errorf("Count(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
+
+func TestSynced(t *testing.T) {
+	for _, tc := range []struct {
+		st          daemon.Status
+		size, files string
+	}{
+		{daemon.Status{}, "—", "—"},
+		{daemon.Status{LastRun: time.Unix(1, 0)}, "0 B", "0"},
+		{daemon.Status{Files: 31204, Size: 48_200_000_000}, "48.2 GB", "31,204"},
+	} {
+		if size, files := Synced(&tc.st); size != tc.size || files != tc.files {
+			t.Errorf("Synced(%d files, %d bytes) = %q, %q; want %q, %q", tc.st.Files, tc.st.Size, size, files, tc.size, tc.files)
+		}
+	}
+}

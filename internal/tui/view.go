@@ -127,6 +127,8 @@ func withBus(text ...string) []string {
 const (
 	modeWidth     = 8
 	stateWidth    = 10
+	sizeWidth     = 10
+	filesWidth    = 10
 	lastRunWidth  = 10
 	progressWidth = 24
 )
@@ -143,11 +145,11 @@ func (m *model) shuttlesTable(room int) []string {
 		nameWidth = max(nameWidth, lipgloss.Width(m.shuttles[i].Name))
 	}
 	nameWidth += 2
-	row := func(name, mode, state, lastRun, progress, details string) string {
-		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) +
-			pad(lastRun, lastRunWidth) + pad(progress, progressWidth) + details
+	row := func(name, mode, state, size, files, lastRun, progress, details string) string {
+		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) + pad(size, sizeWidth) +
+			pad(files, filesWidth) + pad(lastRun, lastRunWidth) + pad(progress, progressWidth) + details
 	}
-	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "LAST RUN", "PROGRESS", "DETAILS"))}
+	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SIZE", "FILES", "LAST RUN", "PROGRESS", "DETAILS"))}
 
 	// Scroll so the selected shuttle shows.
 	rows := room - 1
@@ -162,7 +164,8 @@ func (m *model) shuttlesTable(room int) []string {
 		if style, ok := stateStyles[st.State]; ok && st.Name != m.selected {
 			state = style.Render(state)
 		}
-		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state,
+		size, files := present.Synced(st)
+		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state, size, files,
 			present.Ago(st.LastRun, now), progress(&st.Progress), present.Attention(st))
 		if st.Name == m.selected {
 			line = selected.Render(ansi.Truncate(pad(line, m.width), m.width, "…"))

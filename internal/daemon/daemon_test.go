@@ -428,3 +428,24 @@ func TestDefaultPaths(t *testing.T) {
 		t.Errorf("DefaultPaths = %+v, %v", p, err)
 	}
 }
+
+// What a shuttle has synced is in its status after a run, and from the
+// start once the daemon restarts, before any run.
+func TestStatusCountsWhatIsSynced(t *testing.T) {
+	f := newFixture(t, "push", "")
+	write(t, f.local, "a.txt", "aaa")
+	write(t, f.local, "b.txt", "bb")
+	f.start()
+	if st := f.d.Statuses()[0]; st.Files != 0 || st.Size != 0 {
+		t.Errorf("before the first run: %d files, %d bytes", st.Files, st.Size)
+	}
+	if st := f.syncNow(); st.Files != 2 || st.Size != 5 {
+		t.Errorf("after a run: %d files, %d bytes; want 2, 5", st.Files, st.Size)
+	}
+	f.stop()
+
+	f.start()
+	if st := f.d.Statuses()[0]; st.Files != 2 || st.Size != 5 || !st.LastRun.IsZero() {
+		t.Errorf("after a restart: %d files, %d bytes, last run %v; want 2, 5, none yet", st.Files, st.Size, st.LastRun)
+	}
+}

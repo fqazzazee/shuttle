@@ -135,7 +135,7 @@ func TestListAndSyncOverTheBus(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := f.waitFor(changes, "the run's result", ran)
-	if st.State != daemon.StateIdle || st.Copied != 1 {
+	if st.State != daemon.StateIdle || st.Copied != 1 || st.Files != 1 || st.Size != 1 {
 		t.Errorf("status over the bus = %+v", st)
 	}
 	if _, err := os.Stat(filepath.Join(f.mount, "a.txt")); err != nil {
@@ -431,6 +431,7 @@ func TestStatusRoundTrip(t *testing.T) {
 				Local: &fsys.FileInfo{Name: "Readme", Kind: fsys.KindFile, Size: 1 << 40, ModTime: time.Unix(4000, 0)}},
 		},
 		Errors: []engine.Issue{{Path: "x", Reason: "denied"}},
+		Files:  31_204, Size: 48 << 30,
 		Progress: daemon.Progress{Phase: engine.PhaseSyncing, Done: 4, Total: 9, Bytes: 5 << 30,
 			TotalBytes: 7 << 30, Path: "big.iso", RateUp: 2_100_000, RateDown: 1},
 	}
