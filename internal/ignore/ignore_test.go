@@ -99,6 +99,60 @@ func TestZeroValueIgnoresNothing(t *testing.T) {
 	}
 }
 
+func TestSelect(t *testing.T) {
+	tests := []struct {
+		name             string
+		include, exclude []string
+		path             string
+		isDir            bool
+		want             bool
+	}{
+		{"everything", nil, nil, "a/b.txt", false, false},
+		{"excluded folder", nil, []string{"raw"}, "raw", true, true},
+		{"inside an excluded folder", nil, []string{"raw"}, "raw/a.jpg", false, true},
+		{"excluded file", nil, []string{"docs/notes.txt"}, "docs/notes.txt", false, true},
+		{"next to an excluded file", nil, []string{"docs/notes.txt"}, "docs/other.txt", false, false},
+		{"same prefix, other name", nil, []string{"raw"}, "rawer", true, false},
+		{"included folder", []string{"photos/2024"}, nil, "photos/2024", true, false},
+		{"inside an included folder", []string{"photos/2024"}, nil, "photos/2024/a/b.jpg", false, false},
+		{"folder on the way", []string{"photos/2024"}, nil, "photos", true, false},
+		{"file named like the way", []string{"photos/2024"}, nil, "photos", false, true},
+		{"next to an included folder", []string{"photos/2024"}, nil, "photos/2023", true, true},
+		{"file next to the way", []string{"photos/2024"}, nil, "photos/a.jpg", false, true},
+		{"top-level, not included", []string{"photos/2024"}, nil, "music", true, true},
+		{"same prefix, not included", []string{"photos/2024"}, nil, "photos/20245", true, true},
+		{"second include", []string{"photos/2024", "notes.txt"}, nil, "notes.txt", false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var m Matcher
+			m.Select(tt.include, tt.exclude)
+			if got := m.Match(tt.path, tt.isDir); got != tt.want {
+				t.Errorf("Match(%q, dir=%v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSelectWithPatterns checks that the patterns still apply inside what
+// is selected, and cannot re-include what is not.
+func TestSelectWithPatterns(t *testing.T) {
+	m, err := Compile([]string{"*.tmp", "!keep"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Select([]string{"docs"}, nil)
+	for path, want := range map[string]bool{
+		"docs/a.txt": false,
+		"docs/a.tmp": true,
+		"keep":       true,
+	} {
+		if got := m.Match(path, false); got != want {
+			t.Errorf("Match(%q) = %v, want %v", path, got, want)
+		}
+	}
+}
+
 func TestCompileErrors(t *testing.T) {
 	for _, p := range []string{"file[0-9", `trailing\`, "/", "!/"} {
 		if _, err := Compile([]string{"ok", p}); err == nil {

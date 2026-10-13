@@ -31,6 +31,48 @@ func TestIgnoredPathsAreNeverTouched(t *testing.T) {
 	}
 }
 
+// Only what a shuttle includes is synced; the rest is left alone on both
+// sides, even by mirror.
+func TestOnlyIncludedPathsAreSynced(t *testing.T) {
+	h := newHarness(t, config.ModePush, config.DeletionsMirror)
+	h.settings.Include = []string{"photos/2024", "notes.txt"}
+	h.settings.Ignore = []string{"*.tmp"}
+	write(t, h.localDir, "notes.txt", "n", t0)
+	write(t, h.localDir, "todo.txt", "not included", t0)
+	write(t, h.localDir, "photos/2024/a.jpg", "a", t0)
+	write(t, h.localDir, "photos/2024/scratch.tmp", "ignored inside an included folder", t0)
+	write(t, h.localDir, "photos/2023/b.jpg", "not included", t0)
+	write(t, h.localDir, "photos/c.jpg", "next to an included folder", t0)
+	write(t, h.remoteDir, "music/song.mp3", "not included: mirror leaves it", t0)
+
+	h.run()
+	want := "music/ music/song.mp3=not included: mirror leaves it notes.txt=n photos/ photos/2024/ photos/2024/a.jpg=a"
+	if got := listing(t, h.remoteDir); got != want {
+		t.Errorf("remote = %s\nwant     %s", got, want)
+	}
+	if res := h.run(); res.Planned != 0 {
+		t.Errorf("second run planned %d actions", res.Planned)
+	}
+}
+
+func TestExcludedPathsAreNeverTouched(t *testing.T) {
+	h := newHarness(t, config.ModePush, config.DeletionsMirror)
+	h.settings.Exclude = []string{"raw", "docs/draft.txt"}
+	write(t, h.localDir, "raw/a.cr2", "excluded", t0)
+	write(t, h.localDir, "docs/draft.txt", "excluded", t0)
+	write(t, h.localDir, "docs/final.txt", "f", t0)
+	write(t, h.remoteDir, "raw/b.cr2", "excluded: mirror leaves it", t0)
+
+	h.run()
+	want := "docs/ docs/final.txt=f raw/ raw/b.cr2=excluded: mirror leaves it"
+	if got := listing(t, h.remoteDir); got != want {
+		t.Errorf("remote = %s\nwant     %s", got, want)
+	}
+	if res := h.run(); res.Planned != 0 {
+		t.Errorf("second run planned %d actions", res.Planned)
+	}
+}
+
 // Ignoring a file that was already synced stops syncing it; it must not read
 // as a deletion on either side.
 func TestIgnoringASyncedFileDeletesNothing(t *testing.T) {

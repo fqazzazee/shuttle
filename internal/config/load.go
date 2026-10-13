@@ -76,6 +76,8 @@ type rawShuttle struct {
 	Remote    string   `toml:"remote"`
 	Enabled   *bool    `toml:"enabled"`
 	IgnoreAdd []string `toml:"ignore_add"`
+	Include   []string `toml:"include"`
+	Exclude   []string `toml:"exclude"`
 }
 
 type rawVersioning struct {
@@ -290,6 +292,11 @@ func (p *parser) shuttle(name string, r *rawShuttle, profiles map[string]rawSett
 		s.Settings.Ignore = append(slices.Clone(s.Settings.Ignore), r.IgnoreAdd...)
 		s.Sources["ignore_add"] = SourceShuttle
 	}
+	s.Settings.Include = p.selection(at+".include", r.Include)
+	s.Settings.Exclude = p.selection(at+".exclude", r.Exclude)
+	if len(r.Include) > 0 && len(r.Exclude) > 0 {
+		p.errorf("%s: set include or exclude, not both: a shuttle syncs only what it includes, or all but what it excludes", at)
+	}
 	// Completion notices default off for real-time shuttles, which finish a
 	// run every time a file is saved.
 	if s.Sources["notify.completed"] == SourceDefault {
@@ -446,6 +453,21 @@ func layerBandwidth(b Bandwidth, r *rawBandwidth, sources map[string]Source, src
 
 // versioning builds a Versioning from its table, filling per-kind defaults and
 // rejecting keys that do not apply to the kind.
+// selection checks a shuttle's include or exclude list: paths inside its
+// folder, as "photos/2024" or "/photos/2024/".
+func (p *parser) selection(at string, paths []string) []string {
+	var out []string
+	for _, raw := range paths {
+		x := strings.TrimSuffix(strings.TrimPrefix(raw, "/"), "/")
+		if x == "" || !fsys.ValidPath(x) {
+			p.errorf("%s: %q is not a clean path inside the shuttle's folder (no .., //, or ./)", at, raw)
+			continue
+		}
+		out = append(out, x)
+	}
+	return out
+}
+
 func (p *parser) versioning(at string, r *rawVersioning) Versioning {
 	v := Versioning{Kind: VersioningKind(r.Kind)}
 	if r.SizeCap != nil {
