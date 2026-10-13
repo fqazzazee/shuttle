@@ -238,6 +238,12 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 			return res, e.flush() // records of identical files found by compares
 		}
 	}
+	if err := checkRoom(ctx, o, actions); err != nil {
+		if ferr := e.flush(); ferr != nil {
+			return res, ferr
+		}
+		return res, err
+	}
 	o.Tracker.phase(PhaseSyncing, countOps(actions, counts), copyBytes(actions))
 	if err := e.run(actions); err != nil {
 		return res, err

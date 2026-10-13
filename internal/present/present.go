@@ -104,19 +104,7 @@ func Progress(p *daemon.Progress) string {
 }
 
 // Size is a byte count in decimal units, as GNOME shows them.
-func Size(n int64) string {
-	if n < 1000 {
-		return fmt.Sprintf("%d B", n)
-	}
-	f, unit := float64(n)/1000, "kB"
-	for _, u := range []string{"MB", "GB", "TB"} {
-		if f < 1000 {
-			break
-		}
-		f, unit = f/1000, u
-	}
-	return fmt.Sprintf("%.1f %s", f, unit)
-}
+func Size(n int64) string { return engine.Size(n) }
 
 // Count is a number with its thousands grouped: "31,204".
 func Count(n int) string {

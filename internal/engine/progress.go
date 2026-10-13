@@ -85,18 +85,8 @@ func countOps(actions []Action, ok func(*Action) bool) int {
 
 // copyBytes is what the planned copies hold.
 func copyBytes(actions []Action) int64 {
-	var n int64
-	for i := range actions {
-		a := &actions[i]
-		switch {
-		case a.skip:
-		case a.Op == OpCopyToRemote && a.Local != nil:
-			n += a.Local.Size
-		case a.Op == OpCopyToLocal && a.Remote != nil:
-			n += a.Remote.Size
-		}
-	}
-	return n
+	local, remote := copyBytesTo(actions)
+	return local + remote
 }
 
 // counted counts what passes through r as transferred, towards the share
