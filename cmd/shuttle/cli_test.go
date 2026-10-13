@@ -87,7 +87,7 @@ func TestStatusSyncPauseResume(t *testing.T) {
 	}
 
 	code, out, _ := cli(t, "status")
-	if code != 0 || !strings.HasPrefix(out, "NAME") || !strings.Contains(out, "a     idle") || !strings.Contains(out, "never") ||
+	if code != 0 || !strings.HasPrefix(out, "NAME") || !strings.Contains(out, "a     ↑ push  idle") || !strings.Contains(out, "never") ||
 		!strings.Contains(out, "SIZE  FILES") || !strings.Contains(out, "—     —") {
 		t.Errorf("status (%d):\n%s", code, out)
 	}
@@ -123,7 +123,7 @@ func TestStatusSyncPauseResume(t *testing.T) {
 	if code, out, _ := cli(t, "pause", "b"); code != 0 || out != "paused b\n" {
 		t.Errorf("pause b = %d %q", code, out)
 	}
-	if _, out, _ := cli(t, "status"); !strings.Contains(out, "b     paused") || strings.Contains(out, "All shuttles") {
+	if _, out, _ := cli(t, "status"); !strings.Contains(out, "b     ↑ push  paused") || strings.Contains(out, "All shuttles") {
 		t.Errorf("status with b paused:\n%s", out)
 	}
 }
@@ -164,11 +164,11 @@ func TestEnableDisable(t *testing.T) {
 	if code, out, stderr := cli(t, "disable", "b"); code != 0 || out != "disabled b\n" {
 		t.Errorf("disable b = %d %q %q", code, out, stderr)
 	}
-	waitForStatus(t, "b     disabled")
+	waitForStatus(t, "b     ↑ push  disabled")
 	if code, out, stderr := cli(t, "enable", "b"); code != 0 || out != "enabled b\n" {
 		t.Errorf("enable b = %d %q %q", code, out, stderr)
 	}
-	waitForStatus(t, "b     idle")
+	waitForStatus(t, "b     ↑ push  idle")
 }
 
 // Without a daemon, enable and disable edit the config file themselves.

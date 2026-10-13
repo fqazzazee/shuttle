@@ -3,6 +3,7 @@
 package tui
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -127,6 +128,7 @@ func withBus(text ...string) []string {
 const (
 	modeWidth     = 8
 	stateWidth    = 10
+	shareWidth    = 9
 	sizeWidth     = 10
 	filesWidth    = 10
 	lastRunWidth  = 10
@@ -145,11 +147,13 @@ func (m *model) shuttlesTable(room int) []string {
 		nameWidth = max(nameWidth, lipgloss.Width(m.shuttles[i].Name))
 	}
 	nameWidth += 2
-	row := func(name, mode, state, size, files, lastRun, progress, details string) string {
-		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) + pad(size, sizeWidth) +
-			pad(files, filesWidth) + pad(lastRun, lastRunWidth) + pad(progress, progressWidth) + details
+	row := func(name, mode, state, share, size, files, lastRun, progress, details string) string {
+		return pad(name, nameWidth) + pad(mode, modeWidth) + pad(state, stateWidth) + pad(share, shareWidth) +
+			pad(size, sizeWidth) + pad(files, filesWidth) + pad(lastRun, lastRunWidth) + pad(progress, progressWidth) +
+			details
 	}
-	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SIZE", "FILES", "LAST RUN", "PROGRESS", "DETAILS"))}
+	lines := []string{headStyle.Render(row("NAME", "MODE", "STATE", "SHARE", "SIZE", "FILES", "LAST RUN", "PROGRESS",
+		"DETAILS"))}
 
 	// Scroll so the selected shuttle shows.
 	rows := room - 1
@@ -160,12 +164,17 @@ func (m *model) shuttlesTable(room int) []string {
 	now := m.now()
 	for i := first; i < len(m.shuttles) && i < first+rows; i++ {
 		st := &m.shuttles[i]
-		state := string(st.State)
-		if style, ok := stateStyles[st.State]; ok && st.Name != m.selected {
-			state = style.Render(state)
+		state, share := string(st.State), cmp.Or(st.Share, "—")
+		if st.Name != m.selected {
+			if style, ok := stateStyles[st.State]; ok {
+				state = style.Render(state)
+			}
+			if st.Share == daemon.ShareOffline {
+				share = badStyle.Render(share)
+			}
 		}
 		size, files := present.Synced(st)
-		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state, size, files,
+		line := row(st.Name, present.ModeArrow(st.Mode)+" "+string(st.Mode), state, share, size, files,
 			present.Ago(st.LastRun, now), progress(&st.Progress, m.frame), present.Attention(st))
 		if st.Name == m.selected {
 			// Without the bar's colors: their resets would end the
@@ -433,12 +442,14 @@ func helpLines() []string {
 		"  up/down, pgup/pgdown  scroll; home/end, g/G: the newest, the oldest",
 		"  f                     show one shuttle, then the next, then every shuttle again",
 		"",
-		"  Adding or editing a shuttle, on the share:",
+		"  Adding or editing a shuttle, on the share and on this computer:",
 		"  right/left, l/h       open or close a folder; left on a top row goes up a folder",
 		"  o, backspace          make the chosen folder the shuttle's folder; go up a folder",
+		"  t                     type the folder's path instead; on this computer, ~ is your home",
 		"  m                     sync everything, only what is marked, or all but what is marked",
 		"  space                 mark a file or folder, or unmark it; unmarking one thing in a",
-		"                        marked folder marks the rest of the folder instead",
+		"                        marked folder marks the rest of the folder instead; a mark made",
+		"                        on one side shows on the other",
 		"",
 		"  On the Profiles tab:",
 		"  n, e or enter, c, x   add a profile, edit it, copy it, delete it (only when no shuttle uses it)",
