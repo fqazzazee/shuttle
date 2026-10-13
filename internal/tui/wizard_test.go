@@ -108,13 +108,17 @@ func TestNewShuttle(t *testing.T) {
 	press(t, m, "o")        // music again
 	key(t, m, tea.KeyEnter) // music it is
 
-	// Here: the home's folders, the hidden ones left out.
+	// Here: the home's folders, the hidden ones after the rest, as a tree
+	// like the share's.
 	s = screen(m)
-	if !strings.Contains(s, "Folder here: "+w.home) || !strings.Contains(s, "Documents/") || strings.Contains(s, ".hidden") {
+	if !strings.Contains(s, "Folder here: "+w.home) || !strings.Contains(s, "› ▸ Documents/\n  ▸ Papers/\n  ▸ .hidden/") ||
+		!strings.Contains(s, "Sync:  everything ") {
 		t.Fatalf("here:\n%s", s)
 	}
-	press(t, m, "down") // Papers
-	key(t, m, tea.KeyRight)
+	press(t, m, "down", "o") // Papers
+	if s := screen(m); !strings.Contains(s, "Folder here: "+filepath.Join(w.home, "Papers")) {
+		t.Fatalf("not in Papers:\n%s", s)
+	}
 	key(t, m, tea.KeyEnter)
 
 	// The profile.
@@ -433,16 +437,55 @@ func TestTreeDropsStaleListings(t *testing.T) {
 	}
 }
 
-// A listing that comes back for a folder no longer shown is dropped.
-func TestBrowserDropsStaleListings(t *testing.T) {
-	b := localBrowser(t.TempDir())
-	b.listed(listedMsg{id: b.id, dir: "/elsewhere", entries: []string{"stale"}})
-	b.listed(listedMsg{id: b.id + 1, dir: b.dir, entries: []string{"other browser"}})
-	if len(b.entries) != 0 {
-		t.Errorf("entries = %q", b.entries)
+// The shuttle has one list of marks for both sides: what is marked on the
+// share shows here, what is marked here shows on the share, and both are
+// saved, even what is only on one side.
+func TestMarksOnBothSides(t *testing.T) {
+	w := newWizardSetup(t, nil)
+	m := w.m
+	mkdirs(t, filepath.Join(w.share, "docs", "raw"), filepath.Join(w.home, "Documents", "raw"),
+		filepath.Join(w.home, "Documents", "scratch"))
+	press(t, m, "e") // docs
+	key(t, m, tea.KeyEnter)
+	press(t, m, "m", "m") // all but what is marked
+	press(t, m, "down")   // raw, after 2026
+	key(t, m, tea.KeySpace)
+	key(t, m, tea.KeyEnter)
+	if s := screen(m); !strings.Contains(s, "Folder here: "+filepath.Join(w.home, "Documents")) ||
+		!strings.Contains(s, " all but what is marked ") || !strings.Contains(s, "Left out: raw/") ||
+		!strings.Contains(s, "[ ] raw/") || !strings.Contains(s, "[✓] scratch/") {
+		t.Fatalf("the share's marks, here:\n%s", s)
 	}
-	b.listed(listedMsg{id: b.id, dir: b.dir, entries: []string{"fresh"}})
-	if len(b.entries) != 1 {
-		t.Errorf("entries = %q", b.entries)
+	press(t, m, "down") // scratch, only here
+	key(t, m, tea.KeySpace)
+	if s := screen(m); !strings.Contains(s, "Left out: raw/, scratch/") {
+		t.Fatalf("marked here:\n%s", s)
+	}
+	press(t, m, "esc")
+	if s := screen(m); !strings.Contains(s, "Folder on nas: /docs") || !strings.Contains(s, "Left out: raw/, scratch/") {
+		t.Fatalf("the marks made here, on the share:\n%s", s)
+	}
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	ctrl(t, m, 's')
+	if got := configFile(t, m); !strings.Contains(got, "exclude = [\"raw\", \"scratch\"]\n") {
+		t.Fatalf("config:\n%s", got)
+	}
+
+	// Only what is marked, with the marks undone here: it will not go on.
+	press(t, m, "e")
+	key(t, m, tea.KeyEnter)
+	press(t, m, "m", "m") // only what is marked, the same marks
+	key(t, m, tea.KeyEnter)
+	if s := screen(m); !strings.Contains(s, "› ▸ [✓] raw/\n  ▸ [✓] scratch/") {
+		t.Fatalf("only what is marked, here:\n%s", s)
+	}
+	key(t, m, tea.KeySpace)
+	press(t, m, "down")
+	key(t, m, tea.KeySpace)
+	key(t, m, tea.KeyEnter)
+	if s := screen(m); !strings.Contains(s, "nothing is marked to sync") {
+		t.Fatalf("went on with nothing marked:\n%s", s)
 	}
 }

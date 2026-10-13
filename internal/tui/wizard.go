@@ -33,7 +33,7 @@ type wizard struct {
 	profiles []string // "" first: no profile
 	profile  int
 	remote   *tree
-	local    *browser
+	local    *tree
 	settings *settingsForm
 	remoteFS fsys.FS
 	fsShare  string // the share remoteFS is open on
@@ -200,7 +200,7 @@ func (m *model) wizardKey(msg tea.KeyPressMsg) tea.Cmd {
 	case stepLocal:
 		cmd, chosen := w.local.key(m.ctx, msg)
 		if chosen {
-			return m.next()
+			return tea.Batch(cmd, m.next())
 		}
 		return cmd
 	case stepProfile:
@@ -227,6 +227,9 @@ func (m *model) back() tea.Cmd {
 	if w.step == stepName {
 		m.closeWizard()
 		return nil
+	}
+	if w.step == stepLocal {
+		w.remote.adopt(w.local) // what was marked here
 	}
 	w.step--
 	return nil
@@ -255,19 +258,22 @@ func (m *model) next() tea.Cmd {
 		}
 		w.dirs[0] = w.remote.dir()
 		w.step = stepLocal
+		var cmd tea.Cmd
 		if w.local == nil {
-			w.local = localBrowser(w.dirs[1])
-			return w.local.load(m.ctx)
+			w.local = localTree(w.dirs[1], m.o.Home)
+			cmd = w.local.load(m.ctx, w.local.root)
 		}
+		w.local.adopt(w.remote)
+		return cmd
 	case stepLocal:
-		dir := w.local.dir
-		if rest, ok := strings.CutPrefix(dir, "~"); ok {
-			dir = filepath.Join(m.o.Home, rest)
+		if w.local.pick == pickInclude && len(w.local.inside()) == 0 {
+			return w.fail("nothing is marked to sync: space marks a file or folder, or m syncs everything")
 		}
+		dir := w.local.dir()
 		if !filepath.IsAbs(dir) {
 			return w.fail("the folder here must be a full path, e.g. " + filepath.Join(m.o.Home, "Documents"))
 		}
-		w.local.dir, w.dirs[1] = filepath.Clean(dir), filepath.Clean(dir)
+		w.dirs[1] = dir
 		w.step = stepProfile
 	case stepProfile:
 		profile := w.profiles[w.profile]
@@ -300,7 +306,7 @@ func (m *model) saveWizard() tea.Cmd {
 		name = strings.TrimSpace(w.name.Value())
 	}
 	remote, local := share+":"+w.dirs[0], w.dirs[1]
-	include, exclude := w.remote.selection()
+	include, exclude := w.local.selection()
 	save := func() tea.Cmd {
 		w.busy = "saving…"
 		path, home, before, f := m.o.Config, m.o.Home, m.cfgData, w.settings
@@ -412,7 +418,7 @@ func (w *wizard) lines(m *model, room int) []string {
 			body = w.remote.lines(room, m.width)
 		}
 	case stepLocal:
-		body = w.local.lines(room)
+		body = w.local.lines(room, m.width)
 	case stepProfile:
 		body = []string{"Profile: the settings it shares with other shuttles", ""}
 		for i, p := range w.profiles {
@@ -449,20 +455,19 @@ func (w *wizard) keys() [][2]string {
 	switch w.step {
 	case stepName:
 		return [][2]string{{"tab", "name/share"}, {"↑↓", "share"}, {"enter", "next"}, {"esc", "cancel"}}
-	case stepRemote:
-		if w.remote != nil && w.remote.typing {
+	case stepRemote, stepLocal:
+		t := w.remote
+		if w.step == stepLocal {
+			t = w.local
+		}
+		if t != nil && t.typing {
 			return [][2]string{{"enter", "use this path"}, {"esc", "back to the list"}}
 		}
 		keys := [][2]string{{"↑↓", "choose"}, {"→←", "open/close"}, {"o", "use as folder"}, {"⌫", "up"}, {"m", "what to sync"}}
-		if w.remote != nil && w.remote.pick != pickAll {
+		if t != nil && t.pick != pickAll {
 			keys = append(keys, [2]string{"space", "mark"})
 		}
 		return append(keys, [2]string{"enter", "next"}, [2]string{"t", "type a path"}, [2]string{"esc", "back"})
-	case stepLocal:
-		if w.local != nil && w.local.typing {
-			return [][2]string{{"enter", "use this path"}, {"esc", "back to the list"}}
-		}
-		return [][2]string{{"↑↓", "choose"}, {"→", "open"}, {"←", "up"}, {"enter", "use the folder shown"}, {"t", "type a path"}, {"esc", "back"}}
 	case stepProfile:
 		return [][2]string{{"↑↓", "choose"}, {"enter", "next"}, {"esc", "back"}}
 	}

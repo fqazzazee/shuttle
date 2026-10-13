@@ -62,7 +62,7 @@ keys 1 n; typed docs; keys Enter
 shows "Folder on disk: /"
 keys o; shows "Folder on disk: /docs"; keys Enter
 shows "Folder here: $HOME"
-keys Right; shows "Folder here: $HOME/Documents"; keys Enter
+shows "› ▸ Documents/"; keys o; shows "Folder here: $HOME/Documents"; keys Enter
 shows "▸ none"
 keys Down Enter
 shows "from live: sync"
@@ -117,7 +117,10 @@ shows "Nothing marked yet"
 keys Space  # raw, the first: folders come first
 shows "Left out: raw/"
 shows "[ ] raw/"
-keys Enter Enter Enter C-s
+keys Enter
+shows "Folder here: $HOME/Documents"  # the same marks, on this computer
+shows "Left out: raw/"
+keys Enter Enter C-s
 shows "saved the shuttle docs"
 grep -q '^exclude = \["raw"\]$' "$HOME/.config/shuttle/config.toml" || fail "the mark is not in the config"
 for _ in $(seq 50); do [ "$(grep -c "config reloaded" "$tmp/daemon.log")" -gt "$reloads" ] && break; sleep 0.2; done
