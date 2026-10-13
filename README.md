@@ -13,7 +13,8 @@ folder pair (a *shuttle*) is a one-way push, a one-way pull, or a two-way sync, 
 real time, on a schedule, when the share comes online, or only when you ask. Settings such
 as conflict handling, deletions and file versioning come from reusable *profiles*, which a
 shuttle can override one setting at a time. It talks SMB and NFSv3 directly, so it needs no
-root, fstab entries or mounts.
+root, fstab entries or mounts. A run that would not fit on either side stops before it copies
+anything, and says how much room it needed.
 
 It is not a cloud sync client, a backup tool with deduplication, or a peer-to-peer system
 like Syncthing.
