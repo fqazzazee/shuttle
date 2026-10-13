@@ -83,6 +83,7 @@ for _ in $(seq 50); do [ -f "$share/docs/notes.txt" ] && break; sleep 0.2; done
 [ "$(cat "$share/docs/notes.txt" 2>/dev/null)" = first ] || fail "notes.txt was not synced"
 shows "just now"
 shows "6 B       1         just now"  # what docs syncs: notes.txt, "first\n"
+shows "idle      online"  # its share, a mounted folder, is there
 
 step "conflicts: one waits for the user, who keeps this computer's copy"
 echo "mine" >"$HOME/Documents/notes.txt"
