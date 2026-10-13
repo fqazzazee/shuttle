@@ -62,6 +62,14 @@ row() { is "(r => !!r && ($2))($indicator.shownRows.find(r => r.name === '$1'))"
 rows() { is "$indicator.shownRows.map(r => r.name).join(',')" "\"$1\""; }
 # item <name> <js on i>: the same for the Quick Settings toggle's menu.
 item() { is "(i => !!i && ($2))($toggle.shownItems.find(i => i.name === '$1'))" true; }
+# open_from <menu>: click Open shuttle in that menu, and wait for the app.
+open_from() {
+	rm -f "$tmp/opened"
+	is "$1.menu._getMenuItems().some(i => i.label?.text === 'Open shuttle')" true
+	ev "$1.menu._getMenuItems().find(i => i.label?.text === 'Open shuttle').activate(null)" >/dev/null
+	for _ in $(seq 50); do [ -f "$tmp/opened" ] && break; sleep 0.1; done
+	[ -f "$tmp/opened" ] || fail "Open shuttle did not open the app"
+}
 # status <name> <state>: wait until `shuttle status` gives that shuttle that state.
 status() {
 	for _ in $(seq 50); do "$shuttle" status | grep -qE "^$1 +$2 " && return 0; sleep 0.2; done
@@ -240,10 +248,50 @@ item pics "i.off && i.on"
 item pics "!i.off && i.on"
 
 step "Quick Settings: Open shuttle opens the app"
-is "$toggle.menu._getMenuItems().some(i => i.label?.text === 'Open shuttle')" true
-ev "$toggle._open()" >/dev/null
-for _ in $(seq 50); do [ -f "$tmp/opened" ] && break; sleep 0.1; done
-[ -f "$tmp/opened" ] || fail "Open shuttle did not open the app"
+open_from "$toggle"
+
+step "the dropdown: All shuttles pauses every shuttle, and resumes them"
+is "$indicator._all.visible && $indicator._all.state" true
+row docs "r.on && r.sensitive && !r.off"
+ev "$indicator._all.toggle()" >/dev/null
+shows paused
+status docs paused
+is "$toggle.checked" false
+row docs "!r.on && !r.sensitive"
+is "$indicator._all.state" false
+ev "$indicator._all.toggle()" >/dev/null
+shows idle
+status docs idle
+is "$toggle.checked" true
+row docs "r.on && r.sensitive"
+
+step "the dropdown: a switch pauses one shuttle, and resumes it"
+ev "$indicator._items.get('docs').toggle()" >/dev/null
+status docs paused
+row docs "!r.on"
+row pics "r.on"
+item docs "!i.on"
+is "$indicator._all.state" true
+snap dropdown
+ev "$indicator._items.get('docs').toggle()" >/dev/null
+status docs idle
+row docs "r.on"
+
+step "the dropdown: Sync now syncs"
+echo "b" >"$HOME/Documents/b.txt"
+ev "$indicator._items.get('docs')._button.emit('clicked', 1)" >/dev/null
+for _ in $(seq 50); do [ -f "$tmp/share/docs/b.txt" ] && break; sleep 0.1; done
+[ -f "$tmp/share/docs/b.txt" ] || fail "Sync now in the dropdown did not push"
+shows idle
+
+step "the dropdown: a shuttle turned off in the config has no switch"
+"$shuttle" disable pics >/dev/null
+row pics "r.off && r.state === 'disabled'"
+"$shuttle" enable pics >/dev/null
+row pics "!r.off && r.on"
+
+step "the dropdown: Open shuttle opens the app"
+open_from "$indicator"
 
 step "syncing: the icon pulses, and the upload rate shows beside it"
 head -c 200000 /dev/urandom >"$HOME/Documents/big.bin"
@@ -315,6 +363,7 @@ rows ""
 is "$indicator.shownMessage" '"The shuttle service is not running"'
 is "$toggle.checked" false
 is "$toggle.shownItems.length" 0
+is "$indicator._all.visible" false
 
 step "disabled leaves nothing behind; enabled again, it is back"
 gnome-extensions disable "$uuid"
