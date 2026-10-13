@@ -76,7 +76,7 @@ shows "saved the shuttle docs"
 grep -q '^notify = { completed = false }$' "$HOME/.config/shuttle/config.toml" || fail "the override is not in the config"
 
 step "the dashboard: the daemon follows the new config; sync from the TUI"
-shows "docs  ↔ sync"
+shows "docs  ⇅ sync"
 keys s
 shows "syncing docs"
 for _ in $(seq 50); do [ -f "$share/docs/notes.txt" ] && break; sleep 0.2; done

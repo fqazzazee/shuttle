@@ -211,9 +211,9 @@ func TestShuttlesTab(t *testing.T) {
 	for _, want := range []string{
 		"shuttle  1 Shuttles  2 Conflicts (2)  3 Activity",
 		"NAME    MODE    STATE     SHARE    SIZE      FILES     LAST RUN  PROGRESS                DETAILS",
-		"docs    ↔ sync  idle      online   48.2 GB   31,204    5m ago",
-		"music   ← pull  disabled  —        —         —         never",
-		"photos  → push  held      offline  1.5 GB    120       3h ago                            2 conflicts waiting for you",
+		"docs    ⇅ sync  idle      online   48.2 GB   31,204    5m ago",
+		"music   ↓ pull  disabled  —        —         —         never",
+		"photos  ↑ push  held      offline  1.5 GB    120       3h ago                            2 conflicts waiting for you",
 		"s sync  p pause  d disable  n new  e edit  x delete  P pause all  1-5 tabs  ? help  q quit",
 	} {
 		if !strings.Contains(s, want) {
@@ -299,7 +299,7 @@ func TestLiveProgress(t *testing.T) {
 		Progress: daemon.Progress{Phase: engine.PhaseSyncing, Done: 3, Total: 10, Bytes: 450, TotalBytes: 1000,
 			RateUp: 2_100_000, Path: "a.pdf"}})
 	s := screen(m)
-	if !strings.Contains(s, "docs    ↔ sync  running") || !strings.Contains(s, "45% ↑ 2.1 MB/s") {
+	if !strings.Contains(s, "docs    ⇅ sync  running") || !strings.Contains(s, "45% ↑ 2.1 MB/s") {
 		t.Errorf("progress not shown:\n%s", s)
 	}
 	if !strings.Contains(s, "↑ 2.1 MB/s  ↓ 0 B/s") {
@@ -388,6 +388,11 @@ func TestTabsAndHelp(t *testing.T) {
 	press(t, m, "?")
 	if s := screen(m); !strings.Contains(s, "pause or resume every shuttle") {
 		t.Errorf("help:\n%s", s)
+	}
+	// Below what this terminal shows: the tree's keys are on both steps.
+	if s := strings.Join(helpLines(), "\n"); !strings.Contains(s, "on the share and on this computer:") ||
+		!strings.Contains(s, "type the folder's path") {
+		t.Errorf("help on the tree:\n%s", s)
 	}
 	press(t, m, "s") // keys of the tab do nothing under the help
 	press(t, m, "esc")

@@ -72,7 +72,11 @@ open_from() {
 }
 # status <name> <state>: wait until `shuttle status` gives that shuttle that state.
 status() {
-	for _ in $(seq 50); do "$shuttle" status | grep -qE "^$1 +$2 " && return 0; sleep 0.2; done
+	# The columns: the name, the mode's arrow and word, the state.
+	for _ in $(seq 50); do
+		"$shuttle" status | awk -v n="$1" -v s="$2" '$1 == n && $4 == s { f = 1 } END { exit !f }' && return 0
+		sleep 0.2
+	done
 	fail "shuttle status never said $1 is $2: $("$shuttle" status)"
 }
 # snap <name> [<menus>]: with SHUTTLE_EXT_SCREENSHOTS set to a folder, a
@@ -183,14 +187,14 @@ is "$indicator._icon.gicon.get_file?.().query_exists(null) ?? false" true
 step "the dropdown: every shuttle by name, with its mode and when it last ran"
 rows "docs,pics"
 is "$indicator.shownMessage" '""'
-row docs "r.title === 'docs  →' && r.when === 'never' && r.detail === ''"
-row pics "r.title === 'pics  ↔'"
+row docs "r.title === 'docs  ↑' && r.when === 'never' && r.detail === ''"
+row pics "r.title === 'pics  ⇅'"
 
 step "Quick Settings: on, a switch per shuttle, and Sync now syncs"
 is "$toggle.checked" true
 is "$toggle.subtitle" '"Up to date"'
 is "$toggle.shownItems.map(i => i.name + ':' + i.on).join(',')" '"docs:true,pics:true"'
-item docs "i.label === 'docs  →'"
+item docs "i.label === 'docs  ↑'"
 ev "$toggle._items.get('docs')._button.emit('clicked', 1)" >/dev/null
 for _ in $(seq 50); do [ -f "$tmp/share/docs/a.txt" ] && break; sleep 0.1; done
 [ -f "$tmp/share/docs/a.txt" ] || fail "the sync did not push"
