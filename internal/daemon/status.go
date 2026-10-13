@@ -35,6 +35,7 @@ type Status struct {
 
 	LastRun time.Time // when the last run ended, however it ended
 	LastOK  time.Time // when a run last completed without errors
+	NextRun time.Time // when the schedule runs it next; zero without a schedule
 	Error   string    // why the last run failed, for StateError and StateOffline
 
 	// What the last run did.

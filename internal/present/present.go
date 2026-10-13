@@ -138,6 +138,25 @@ func Plural(n int, thing string) string {
 	return fmt.Sprintf("%d %ss", n, thing)
 }
 
+// Until is a short "how long until": "in 5m", "in 3h", "in 2d"; "soon"
+// within the minute, or once due; "" for no time.
+func Until(t, now time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := t.Sub(now)
+	switch {
+	case d < time.Minute:
+		return "soon"
+	case d < time.Hour:
+		return fmt.Sprintf("in %dm", int(d/time.Minute))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("in %dh", int(d/time.Hour))
+	default:
+		return fmt.Sprintf("in %dd", int(d/(24*time.Hour)))
+	}
+}
+
 // Ago is a short "how long ago": "just now", "5m ago", "3h ago", "2d ago".
 func Ago(t, now time.Time) string {
 	if t.IsZero() {
