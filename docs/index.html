@@ -31,7 +31,8 @@
       <a href="#features"><span class="n">3</span><span class="label">Features</span></a>
       <a href="#how"><span class="n">4</span><span class="label">How it works</span></a>
       <a href="#install"><span class="n">5</span><span class="label">Install</span></a>
-      <a href="#contribute"><span class="n">6</span><span class="label">Contribute</span></a>
+      <a href="#faq"><span class="n">6</span><span class="label">FAQ</span></a>
+      <a href="#contribute"><span class="n">7</span><span class="label">Contribute</span></a>
     </nav>
   </div>
 </header>
@@ -326,6 +327,67 @@
         building from source, NFS exports, the GNOME extension, every setting.</p>
       <p style="margin-top: 26px">shuttle is not:</p>
       <div class="not"><span>a cloud sync client</span><span>a backup tool with deduplication</span><span>peer-to-peer, like Syncthing</span></div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <p class="kicker">FAQ</p>
+      <h2>Questions people ask</h2>
+      <div class="faq">
+        <details>
+          <summary>How is it different from Syncthing?</summary>
+          <p>Syncthing syncs between machines that each run Syncthing. A NAS share is not one of them. shuttle talks to the share itself, over SMB or NFS, so there is nothing to install on the NAS. For syncing machines with each other, without a share in between, Syncthing is the right tool.</p>
+        </details>
+        <details>
+          <summary>Do I need to mount the share, or be root?</summary>
+          <p>No. shuttle speaks SMB 2/3 and NFSv3 itself, from a service that runs as you: no fstab entry, no sudo, no mount. A share that is already mounted works too, as a folder path.</p>
+        </details>
+        <details>
+          <summary>My NAS speaks NFS: what does it need?</summary>
+          <p>Running as you, shuttle connects from a port above 1024. Linux servers refuse that unless the export has <code>insecure</code> in <code>/etc/exports</code>; on a Synology, tick "Allow connections from non-privileged ports". A server that speaks only NFSv4: mount it as usual and add the mount point as a share of type <code>path</code>.</p>
+        </details>
+        <details>
+          <summary>Which file servers does it work with?</summary>
+          <p>Anything that serves SMB 2/3 or NFSv3: Samba, Windows, Synology, QNAP, TrueNAS. Its tests run against a real Samba server, the Linux kernel's NFS server, and an in-process NFS server.</p>
+        </details>
+        <details>
+          <summary>Both folders already have files. What does the first sync do?</summary>
+          <p>It joins them: what is on one side only is copied to the other. Files that exist on both sides but differ become conflicts, settled by the shuttle's conflict setting. Nothing is overwritten silently.</p>
+        </details>
+        <details>
+          <summary>What if a file changes on both sides?</summary>
+          <p>That is a conflict, settled your way. <em>Keep both</em> saves the older copy beside the newer one under a conflict name. <em>Newest wins</em> keeps the latest, and versions the other if versioning is on. <em>Ask</em> holds the file until you choose in the Conflicts tab, with both copies' size and time.</p>
+        </details>
+        <details>
+          <summary>Can it delete my files by accident?</summary>
+          <p>It is built not to. A scan that fails or stops partway never turns into deletions. If a run would delete more than half of a shuttle's files at once (and at least 10), it holds those deletions until you allow them; that threshold is a setting, and can be turned off. Push and pull can be set to add only, never delete. And versioning keeps what a sync replaces or deletes.</p>
+        </details>
+        <details>
+          <summary>What if the NAS goes offline, or I am away from home?</summary>
+          <p>Every share is checked every 30 seconds, and the dashboard and the top bar show it offline. A run that loses the share stops, with nothing half-written: files are written to a temporary name and renamed into place. With the <em>share available</em> trigger, the shuttle runs again as soon as the share is back.</p>
+        </details>
+        <details>
+          <summary>Where are my passwords kept?</summary>
+          <p>In the Secret Service: GNOME Keyring on a GNOME desktop. Never in the config file, the logs, D-Bus replies or process arguments.</p>
+        </details>
+        <details>
+          <summary>Do I need GNOME?</summary>
+          <p>Only for the top-bar indicator and the Quick Settings toggle, which need GNOME Shell 50. The service, the terminal interface and the command line run on any Linux desktop with systemd and a Secret Service.</p>
+        </details>
+        <details>
+          <summary>Can I edit the config by hand?</summary>
+          <p>Yes: it is <code>~/.config/shuttle/config.toml</code>. Save a change and it applies within a second, with no restart. A mistake keeps the previous settings running, and says what is wrong. The terminal interface edits the same file, keeping your comments and layout.</p>
+        </details>
+        <details>
+          <summary>Does it run on macOS or Windows, or sync to the cloud?</summary>
+          <p>No: it is Linux only, and it syncs with SMB and NFS shares. For cloud storage (S3, Google Drive, OneDrive), use rclone.</p>
+        </details>
+        <details>
+          <summary>Is it free?</summary>
+          <p>For personal, hobby and home-lab use, for charities, schools, public research and government, and for a company using it for its own internal operations: yes, under the PolyForm licenses. Using it to do work for someone else (consulting, contracting, managed services) needs a commercial license. The GNOME extension is GPL-2.0-or-later.</p>
+        </details>
+      </div>
     </div>
   </section>
 
