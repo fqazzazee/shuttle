@@ -44,6 +44,7 @@ type Status struct {
 	Conflicts       []engine.Issue // as settled or held by the conflict policy
 	HeldDeletions   int            // deletions the guard is holding back
 	Errors          []engine.Issue // paths the last run could not handle
+	Refused         []engine.Issue // names one side cannot hold: left out, never synced
 
 	// What is synced: the files in the state database and their size, as
 	// of the last run or the daemon's start.

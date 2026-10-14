@@ -24,6 +24,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
@@ -59,6 +60,10 @@ type Options struct {
 	// OnEvent, if set, is called with what is worth a desktop notification
 	// (see Event). Like OnChange, it must not block or keep the pointer.
 	OnEvent func(*Event)
+	// LocalNames, if set, gives the naming rules of the file system a
+	// shuttle's local folder is on, where Linux cannot tell: the Android app
+	// says which folders are in the phone's shared storage. nil: Linux's.
+	LocalNames func(dir string) fsys.Names
 	// KeyringTimeout bounds waiting for the keyring, including an unlock
 	// prompt the user has not answered. Zero means two minutes.
 	KeyringTimeout time.Duration

@@ -55,6 +55,10 @@ type runner struct {
 	allowDeletions bool       // the next run may pass the deletion guard
 	runMu          sync.Mutex // held by a run, and by Resolve: they never overlap
 	announced      announced
+
+	// refused are the names the last run left out, so that each is logged
+	// once, not every run. Under runMu.
+	refused map[string]bool
 }
 
 func newRunner(d *Daemon, cfg *config.Config, s *config.Shuttle) *runner {
@@ -244,6 +248,7 @@ func (r *runner) runOnce(requested bool) {
 	if res != nil {
 		st.Copied, st.Deleted = res.Copied, res.Deleted
 		st.Conflicts, st.Errors, st.HeldDeletions = res.Conflicts, res.Errors, len(res.HeldDeletions)
+		st.Refused = res.Refused
 	}
 	state := st.State
 	done := *st
@@ -289,7 +294,11 @@ func (r *runner) countSynced() {
 
 // open opens both sides of the shuttle. The caller closes them.
 func (r *runner) open(ctx context.Context) (local, remote fsys.FS, err error) {
-	l, err := fsys.OpenLocal(r.shuttle.Local)
+	var names fsys.Names
+	if r.d.o.LocalNames != nil {
+		names = r.d.o.LocalNames(r.shuttle.Local)
+	}
+	l, err := fsys.OpenLocalWith(r.shuttle.Local, names)
 	if err != nil {
 		// Never create it: a missing folder is often an unmounted drive, and
 		// syncing an empty stand-in would read as everything deleted.

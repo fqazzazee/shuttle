@@ -30,6 +30,7 @@ const (
 	KindSkipped  Kind = "skipped"  // left for the next run: it changed during this one
 	KindConflict Kind = "conflict" // Text says what was done about it
 	KindHeld     Kind = "held"     // deletions the deletion guard held back
+	KindLeftOut  Kind = "left-out" // a name the other side cannot hold: never synced
 	KindError    Kind = "error"
 )
 
