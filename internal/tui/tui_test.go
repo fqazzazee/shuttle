@@ -271,7 +271,7 @@ func TestNarrowHeaderAndKeys(t *testing.T) {
 	}
 }
 
-// The help wraps to the terminal and scrolls when it is longer.
+// The help wraps to its frame and scrolls in it when it is longer.
 func TestHelpScrolls(t *testing.T) {
 	m := start(t, newFake(), 60, 24)
 	press(t, m, "?")
@@ -279,10 +279,15 @@ func TestHelpScrolls(t *testing.T) {
 	if !strings.Contains(s, "  ↓ more") || strings.Contains(s, "q, ctrl+c") {
 		t.Errorf("the help's first page:\n%s", s)
 	}
-	// Wrapped under its description, not under its keys.
-	if !strings.Contains(s, "  p                     pause or resume the shuttle: a run\n"+
-		"                        in progress finishes its file") {
-		t.Errorf("a long line is not wrapped under its description:\n%s", s)
+	// Wrapped under its description, not under its keys; in the frame.
+	width, _ := m.helpSize()
+	if wrapped := strings.Join(m.helpWrapped(width), "\n"); !strings.Contains(wrapped,
+		"  p                     pause or resume the shuttle:\n"+
+			"                        a run in progress finishes") {
+		t.Errorf("a long line is not wrapped under its description:\n%s", wrapped)
+	}
+	if !strings.Contains(s, "│   p                     pause or resume the shuttle: │") {
+		t.Errorf("the help is not in its frame:\n%s", s)
 	}
 	press(t, m, "G")
 	if s := screen(m); strings.Contains(s, "↓ more") || !strings.Contains(s, "q, ctrl+c") {
@@ -504,7 +509,7 @@ func TestTabsAndHelp(t *testing.T) {
 		t.Errorf("tab = %d, want back to the first", m.tab)
 	}
 	press(t, m, "?")
-	if s := screen(m); !strings.Contains(s, "pause or resume every shuttle") {
+	if s := screen(m); !strings.Contains(s, "sync the shuttle now") {
 		t.Errorf("help:\n%s", s)
 	}
 	// Below what this terminal shows: the tree's keys are on both steps.

@@ -237,7 +237,7 @@ func TestShuttleFolders(t *testing.T) {
 	toRow(t, m, "mode")
 	key(t, m, tea.KeyRight) // push
 	ctrl(t, m, 's')
-	if !strings.Contains(screen(m), "There is no folder "+newDir+" here. Create it?") {
+	if !strings.Contains(framedText(m.questionBox()), "There is no folder "+newDir+" here. Create it?") {
 		t.Fatalf("no question:\n%s", screen(m))
 	}
 	press(t, m, "y")

@@ -386,7 +386,7 @@ func TestTestAndDeleteShares(t *testing.T) {
 	}
 	// One unused can, after a yes.
 	press(t, m, "g", "x")
-	if !strings.Contains(screen(m), "Delete the share bad from the config file? (y/n)") {
+	if !strings.Contains(screen(m), "│ Delete the share bad from the config file? │") {
 		t.Fatalf("no question:\n%s", screen(m))
 	}
 	press(t, m, "y")
