@@ -69,3 +69,21 @@ func TestWaitingStopsARunAfterItsFile(t *testing.T) {
 		t.Errorf("pushed %d of 3, status %+v; want the run stopped, the rest pending", pushed, st)
 	}
 }
+
+// The app keeps its foreground service while an enabled shuttle is
+// real-time, and only then.
+func TestTriggered(t *testing.T) {
+	f := newFixture(t, "push", `triggers = ["realtime", "schedule"]
+interval = "1h"`)
+	f.start()
+	if !f.d.Triggered(config.TriggerRealtime) || !f.d.Triggered(config.TriggerSchedule) || f.d.Triggered(config.TriggerShareAvailable) {
+		t.Error("triggers of the enabled shuttle not seen")
+	}
+	if err := f.d.SetEnabled("s", false); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("s", "disabled", func(st Status) bool { return st.State == StateDisabled })
+	if f.d.Triggered(config.TriggerRealtime) {
+		t.Error("a disabled shuttle's trigger counted")
+	}
+}

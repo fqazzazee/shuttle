@@ -426,6 +426,17 @@ func (d *Daemon) runner(name string) (*runner, error) {
 }
 
 // all returns the current runners, sorted by name.
+// Triggered reports whether an enabled shuttle has trigger t. The Android
+// app keeps its foreground service running while one is real-time.
+func (d *Daemon) Triggered(t config.Trigger) bool {
+	for _, r := range d.all() {
+		if r.shuttle.Enabled && r.shuttle.Settings.Has(t) {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *Daemon) all() []*runner {
 	d.runnersMu.RLock()
 	defer d.runnersMu.RUnlock()
