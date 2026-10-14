@@ -116,7 +116,7 @@ func (r *runner) pausedChanged() {
 		return
 	}
 	r.mu.Lock()
-	if !r.isPausedLocked() && r.pending {
+	if !r.isPausedLocked() && r.waitingLocked() == "" && r.pending {
 		r.mu.Unlock()
 		r.wake()
 	} else {
@@ -140,14 +140,23 @@ func (r *runner) meteredLocked() bool {
 	return r.shuttle.Settings.Metered == config.MeteredPause && r.d.isMetered()
 }
 
+// waitingLocked is why the shuttle cannot run now (Options.Waiting), or "".
+func (r *runner) waitingLocked() string {
+	if r.d.o.Waiting == nil {
+		return ""
+	}
+	return r.d.o.Waiting(r.cfg, r.shuttle)
+}
+
 // shouldStop is the engine's Stop: pausing or shutting down ends a run after
 // the file in progress; so does a metered connection, unless the user asked
-// for the run.
+// for the run, and a reason to wait, such as a permission taken back.
 func (r *runner) shouldStop() bool {
 	r.mu.Lock()
 	metered := r.meteredLocked() && !r.asked
+	waiting := r.waitingLocked() != ""
 	r.mu.Unlock()
-	return metered || r.isPaused() || r.isStopping()
+	return metered || waiting || r.isPaused() || r.isStopping()
 }
 
 func (r *runner) isStopping() bool {
@@ -163,7 +172,7 @@ func (r *runner) loop() {
 		}
 		r.mu.Lock()
 		requested := r.requested
-		run := r.pending && !r.isPausedLocked() && (requested || !r.meteredLocked())
+		run := r.pending && !r.isPausedLocked() && r.waitingLocked() == "" && (requested || !r.meteredLocked())
 		if run {
 			// Together, under one lock: in between, the status would claim
 			// "idle, nothing pending" while a run is about to start.
@@ -186,7 +195,10 @@ func (r *runner) status() Status {
 	st.Pending = r.pending
 	st.Paused = r.isPausedLocked()
 	st.Metered = r.meteredLocked() && st.State != StateRunning && st.State != StateDisabled
-	if (st.Paused || st.Metered) && st.State != StateRunning && st.State != StateDisabled {
+	if st.State != StateRunning && st.State != StateDisabled {
+		st.Waiting = r.waitingLocked()
+	}
+	if (st.Paused || st.Metered || st.Waiting != "") && st.State != StateRunning && st.State != StateDisabled {
 		st.State = StatePaused
 	}
 	return st

@@ -64,6 +64,13 @@ type Options struct {
 	// about a conflict. "" means the host name, which Android gives as
 	// "localhost": the app passes the device's name.
 	DeviceName string
+	// Waiting, if set, says why a shuttle cannot run now although nothing is
+	// wrong with it, or "" when it can: on Android, a permission the user has
+	// not given ("needs All files access"). A waiting shuttle starts no run,
+	// not even one the user asks for, and a run in progress stops after its
+	// file. It is asked often, under the runner's lock: it must be quick and
+	// must not call the daemon. Call Recheck when what it depends on changes.
+	Waiting func(cfg *config.Config, s *config.Shuttle) string
 	// LocalNames, if set, gives the naming rules of the file system a
 	// shuttle's local folder is on, where Linux cannot tell: the Android app
 	// says which folders are in the phone's shared storage. nil: Linux's.
@@ -314,6 +321,14 @@ func (d *Daemon) isMetered() bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.metered
+}
+
+// Recheck asks Options.Waiting again for every shuttle, after what it
+// depends on changed: shuttles that no longer wait run what was pending.
+func (d *Daemon) Recheck() {
+	for _, r := range d.all() {
+		r.pausedChanged()
+	}
 }
 
 // Paused reports whether every shuttle is paused (SetPaused("", true)).

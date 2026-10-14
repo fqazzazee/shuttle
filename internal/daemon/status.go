@@ -30,6 +30,7 @@ type Status struct {
 	State   State
 	Paused  bool   // paused by the user, itself or with all shuttles
 	Metered bool   // waiting for a connection that is not metered, as its settings ask
+	Waiting string // why it cannot run now, e.g. "needs All files access" (Options.Waiting)
 	Pending bool   // a run is waiting: triggered while paused or while running
 	Share   string // ShareOnline or ShareOffline; "" before the first check
 	Note    string // something degraded but working, e.g. polling instead of watching

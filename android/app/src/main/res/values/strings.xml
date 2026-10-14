@@ -4,4 +4,16 @@
     <string name="app_name">shuttle</string>
     <string name="not_set_up">No shuttles yet. Setting them up on the phone comes in a later version.</string>
     <string name="core_loaded">Sync engine loaded; no daemon running.</string>
+
+    <string name="perm_heading">Before you start</string>
+    <string name="perm_intro">shuttle needs three permissions to sync. You can give them now or later; until you do, the shuttles that need one wait and say which.</string>
+    <string name="perm_files">All files access</string>
+    <string name="perm_files_why">To read and write the folders you sync in the phone\'s storage. Without it, shuttles with a folder there wait, and nothing in them is synced or deleted.</string>
+    <string name="perm_network">Local network access</string>
+    <string name="perm_network_why">To reach your NAS or other computers on your network. Without it, Android lets those connections time out, and shuttles with a share there wait.</string>
+    <string name="perm_notifications">Notifications</string>
+    <string name="perm_notifications_why">To tell you about errors, conflicts and finished syncs, and to show while syncing runs. Without them, shuttle still syncs, silently.</string>
+    <string name="perm_allow">Allow</string>
+    <string name="perm_given">Allowed</string>
+    <string name="perm_continue">Continue</string>
 </resources>

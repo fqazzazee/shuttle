@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/fqazzazee/shuttle/internal/activity"
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/fsys"
@@ -82,6 +83,10 @@ func newFixture(t *testing.T) *fixture {
 		DeviceName: "Test Phone",
 		Passwords:  &passwords{m: map[string]string{}},
 		Listener:   f.listener,
+		// A "path" share in a temp folder needs neither permission; given
+		// anyway, as the app does once the user has.
+		FilesAccess:  true,
+		LocalNetwork: true,
 	}
 	doc := fmt.Sprintf("[shares.mnt]\ntype = \"path\"\npath = %q\n\n[shuttles.s]\nmode = \"push\"\nlocal = %q\nremote = \"mnt:\"\n",
 		f.share, f.local)
@@ -202,15 +207,15 @@ func TestStartFails(t *testing.T) {
 
 func TestDaemonOptions(t *testing.T) {
 	f := newFixture(t)
-	do := daemonOptions(&f.opts, nil)
+	do := daemonOptions(&f.opts, &access{}, nil)
 	if do.DeviceName != "Test Phone" || do.Paths.Config != f.opts.ConfigPath || do.Paths.StateDir != f.opts.StateDir {
 		t.Errorf("options = %+v", do)
 	}
-	if do.LocalNames == nil || do.OnChange == nil || do.OnEvent == nil {
-		t.Error("LocalNames, OnChange or OnEvent not set")
+	if do.LocalNames == nil || do.Waiting == nil || do.OnChange == nil || do.OnEvent == nil {
+		t.Error("LocalNames, Waiting, OnChange or OnEvent not set")
 	}
 	f.opts.Listener = nil
-	if do := daemonOptions(&f.opts, nil); do.OnChange != nil || do.OnEvent != nil {
+	if do := daemonOptions(&f.opts, &access{}, nil); do.OnChange != nil || do.OnEvent != nil {
 		t.Error("callbacks set without a listener")
 	}
 }
@@ -294,7 +299,7 @@ func TestJSON(t *testing.T) {
 		keys []string
 	}{
 		{daemon.Status{Conflicts: []engine.Issue{issue}},
-			[]string{`"Name"`, `"State"`, `"Paused"`, `"Metered"`, `"LastRun"`, `"Copied"`, `"Conflicts":[{"Path":"a.txt","Op":9,`,
+			[]string{`"Name"`, `"State"`, `"Paused"`, `"Metered"`, `"Waiting"`, `"LastRun"`, `"Copied"`, `"Conflicts":[{"Path":"a.txt","Op":9,`,
 				`"Local":{"Name":"a.txt","Kind":0,"Size":1,"ModTime":"1970-01-01T00:00:00Z"}`, `"Refused"`, `"Progress"`}},
 		{daemon.Event{Kind: daemon.EventCompleted, Shuttle: "s"}, []string{`"Kind":"completed"`, `"Shuttle":"s"`}},
 		{[]activity.Entry{{Kind: activity.KindLeftOut, Path: "a:b", Text: "t"}}, []string{`"kind":"left-out"`, `"path":"a:b"`, `"time"`}},
@@ -305,5 +310,67 @@ func TestJSON(t *testing.T) {
 				t.Errorf("%T as JSON lacks %s:\n%s", tt.v, k, got)
 			}
 		}
+	}
+}
+
+func TestWaiting(t *testing.T) {
+	cfg := &config.Config{Shares: map[string]config.Share{
+		"nas":  {Type: config.ShareSMB, Host: "nas.example"},
+		"nfs":  {Type: config.ShareNFS3, Host: "nas.example"},
+		"card": {Type: config.SharePath, Path: "/storage/1A2B-3C4D"},
+	}}
+	tests := []struct {
+		local, share   string
+		files, network bool
+		want           string
+	}{
+		{"/storage/emulated/0/Music", "nas", true, true, ""},
+		{"/storage/emulated/0/Music", "nas", false, true, NeedsFilesAccess},
+		{"/storage/emulated/0/Music", "nas", false, false, NeedsFilesAccess},
+		{"/storage/emulated/0/Music", "nas", true, false, NeedsLocalNetwork},
+		{"/storage/emulated/0/Music", "nfs", true, false, NeedsLocalNetwork},
+		{"/storage/emulated/0/Music", "card", true, false, ""},      // a path share is not on the network
+		{"/data/user/0/io.example/files/x", "nas", false, true, ""}, // private storage needs no permission
+	}
+	for _, tt := range tests {
+		a := &access{}
+		a.files.Store(tt.files)
+		a.network.Store(tt.network)
+		if got := a.waiting(cfg, &config.Shuttle{Local: tt.local, Share: tt.share}); got != tt.want {
+			t.Errorf("%s on %s, files %v, network %v: %q, want %q", tt.local, tt.share, tt.files, tt.network, got, tt.want)
+		}
+	}
+}
+
+// Through the binding: a shuttle waits for a permission, says so, and runs
+// what was asked once the app reports it given.
+func TestSetPermissions(t *testing.T) {
+	f := newFixture(t)
+	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// The fixture's share is a "path" one: make it one on the network, at a
+	// name that never resolves (RFC 2606), so the run that follows reaches
+	// no server.
+	doc, err := os.ReadFile(f.opts.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc = []byte(strings.Replace(string(doc), `type = "path"`+"\npath = ", `type = "nfs3"`+"\nhost = \"nas.invalid\"\nexport = ", 1))
+	if err := os.WriteFile(f.opts.ConfigPath, doc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.opts.LocalNetwork = false
+	m := f.start(t)
+	if err := m.SyncNow("s"); err != nil {
+		t.Fatal(err)
+	}
+	var all []daemon.Status
+	if err := json.Unmarshal([]byte(m.StatusesJSON()), &all); err != nil || all[0].Waiting != NeedsLocalNetwork || all[0].State != daemon.StatePaused {
+		t.Errorf("statuses = %s, want s waiting for local network access", m.StatusesJSON())
+	}
+	m.SetPermissions(true, true)
+	if err := json.Unmarshal([]byte(m.StatusesJSON()), &all); err != nil || all[0].Waiting != "" {
+		t.Errorf("after SetPermissions: %s", m.StatusesJSON())
 	}
 }

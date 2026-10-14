@@ -22,8 +22,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/secrets"
@@ -55,7 +57,17 @@ type Options struct {
 	DeviceName string
 	Passwords  Passwords
 	Listener   Listener // nil: none
+	// FilesAccess and LocalNetwork are the permissions the user has given:
+	// "All files access", and on Android 17 local network access. Without
+	// them, the shuttles that need them wait and say which (SetPermissions).
+	FilesAccess, LocalNetwork bool
 }
+
+// Why a shuttle waits for a permission, as its status says.
+const (
+	NeedsFilesAccess  = "needs All files access"
+	NeedsLocalNetwork = "needs Local network access"
+)
 
 // errRunning means this process already runs a daemon: two would fight over
 // the state databases (DECISIONS 2026-10-14, "Android: how shuttles run").
@@ -74,6 +86,27 @@ type Daemon struct {
 	cancel context.CancelFunc
 	done   chan error
 	log    *os.File
+	access *access
+}
+
+// access is the permissions the app last reported, read by the daemon's
+// Waiting under its runners' locks.
+type access struct {
+	files, network atomic.Bool
+}
+
+// waiting is the daemon's Waiting: a shuttle whose folder is in shared
+// storage needs All files access, and one whose share is reached over the
+// network (not a "path" share) needs local network access, without which
+// Android 17 lets connections to the LAN time out.
+func (a *access) waiting(cfg *config.Config, s *config.Shuttle) string {
+	if !a.files.Load() && localNames(s.Local).Fold != nil {
+		return NeedsFilesAccess
+	}
+	if sh, ok := cfg.Shares[s.Share]; ok && sh.Type != config.SharePath && !a.network.Load() {
+		return NeedsLocalNetwork
+	}
+	return ""
 }
 
 // maxLog is how large daemon.log may grow before Start sets it aside as
@@ -95,13 +128,16 @@ func Start(o *Options) (*Daemon, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, err := daemon.New(daemonOptions(o, slog.New(slog.NewTextHandler(logf, nil))))
+	acc := &access{}
+	acc.files.Store(o.FilesAccess)
+	acc.network.Store(o.LocalNetwork)
+	d, err := daemon.New(daemonOptions(o, acc, slog.New(slog.NewTextHandler(logf, nil))))
 	if err != nil {
 		logf.Close()
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	m := &Daemon{d: d, cancel: cancel, done: make(chan error, 1), log: logf}
+	m := &Daemon{d: d, cancel: cancel, done: make(chan error, 1), log: logf, access: acc}
 	go func() { m.done <- d.Run(ctx) }()
 	select {
 	case <-d.Ready():
@@ -122,13 +158,14 @@ func Running() *Daemon {
 	return running
 }
 
-func daemonOptions(o *Options, log *slog.Logger) *daemon.Options {
+func daemonOptions(o *Options, acc *access, log *slog.Logger) *daemon.Options {
 	do := &daemon.Options{
 		Paths:      daemon.Paths{Config: o.ConfigPath, StateDir: o.StateDir},
 		Store:      store{o.Passwords},
 		Log:        log,
 		DeviceName: o.DeviceName,
 		LocalNames: localNames,
+		Waiting:    acc.waiting,
 	}
 	if l := o.Listener; l != nil {
 		do.OnChange = func(st *daemon.Status) { l.OnStatus(toJSON(st)) }
@@ -202,6 +239,15 @@ func (m *Daemon) SetPaused(name string, paused bool) error { return m.d.SetPause
 
 // SetEnabled turns a shuttle on or off in the config.
 func (m *Daemon) SetEnabled(name string, on bool) error { return m.d.SetEnabled(name, on) }
+
+// SetPermissions says which permissions the user has given now, as the app
+// finds them each time it comes to the foreground: shuttles waiting for one
+// run what was pending, and ones that lost one stop after their file.
+func (m *Daemon) SetPermissions(filesAccess, localNetwork bool) {
+	m.access.files.Store(filesAccess)
+	m.access.network.Store(localNetwork)
+	m.d.Recheck()
+}
 
 // SetMetered says whether the phone's connection is metered.
 func (m *Daemon) SetMetered(metered bool) { m.d.SetMetered(metered) }
