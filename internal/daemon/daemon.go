@@ -281,22 +281,28 @@ func loadConfig(path string) (*config.Config, error) {
 // Paused reports whether every shuttle is paused (SetPaused("", true)).
 func (d *Daemon) Paused() bool { return d.isPausedAll() }
 
-// State is the state of the shuttles taken together, for one icon: the most
-// urgent of them, in the order error, held, offline, running, paused, idle.
-// A config file that did not load counts as an error.
+// State is the state of the shuttles taken together, for one icon; see
+// Overall.
 func (d *Daemon) State() State {
-	if d.ConfigError() != "" {
+	return Overall(d.Statuses(), d.isPausedAll(), d.ConfigError())
+}
+
+// Overall is the state of shuttles taken together: the most urgent of
+// them, in the order error, held, offline, running, paused, idle. A config
+// file that did not load counts as an error. Clients with the statuses
+// work it out themselves, as the daemon would, without asking.
+func Overall(all []Status, pausedAll bool, configErr string) State {
+	if configErr != "" {
 		return StateError
 	}
 	rank := map[State]int{StateError: 6, StateHeld: 5, StateOffline: 4, StateRunning: 3, StatePaused: 2, StateIdle: 1}
 	best := StateIdle
-	all := d.Statuses()
 	for i := range all {
 		if s := all[i].State; rank[s] > rank[best] {
 			best = s
 		}
 	}
-	if d.isPausedAll() && rank[best] < rank[StateRunning] {
+	if pausedAll && rank[best] < rank[StateRunning] {
 		best = StatePaused
 	}
 	return best
