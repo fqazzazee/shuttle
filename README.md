@@ -6,6 +6,11 @@ terminal UI, with a GNOME top-bar indicator and a Quick Settings toggle.
 [![CI](https://github.com/fqazzazee/shuttle/actions/workflows/ci.yaml/badge.svg)](https://github.com/fqazzazee/shuttle/actions/workflows/ci.yaml)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fqazzazee)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.svg">
+  <img alt="shuttle's terminal interface: five shuttles, two of them pushing to a NAS, under the bus and the wordmark; below, the selected one in full, its transfer rate drawn as a sparkline" src="docs/screenshots/dashboard-light.svg">
+</picture>
+
 ## What it does
 
 shuttle keeps folders on your machine and folders on a NAS or file server in step. Each
@@ -177,6 +182,11 @@ config file. Its FREE column shows how much room each share has (as of its last 
 under the table, this computer's. The Profiles tab adds (`n`), edits (`e`), copies (`c`) and deletes (`x`) profiles: a
 setting left empty is not written, and its default applies. `?` lists the keys.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/help-dark.svg">
+  <img alt="The keys, listed in a frame over the dimmed dashboard" src="docs/screenshots/help-light.svg">
+</picture>
+
 ```bash
 shuttle status            # one line per shuttle
 shuttle sync documents    # sync now
@@ -200,6 +210,7 @@ applies when the daemon starts.
 make test       # tests
 make lint       # gofmt check, go vet, golangci-lint
 make build      # binary in bin/
+make screenshots # the README's screenshots, from a scratch daemon with made-up data
 ```
 
 ## Contributing

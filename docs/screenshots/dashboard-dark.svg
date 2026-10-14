@@ -1,0 +1,259 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="872" height="572" viewBox="0 0 872 572">
+<rect width="100%" height="100%" rx="10" fill="#22252d"/>
+<g font-family="'JetBrains Mono', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" xml:space="preserve" shape-rendering="crispEdges">
+<path transform="translate(24.40 16) scale(8.4 18)" d="M1 .5Q.5 .5 .5 1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 16) scale(58.8 18)" d="M0 .5H1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(91.60 16) scale(8.4 18)" d="M0 .5Q.5 .5 .5 1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="133.60" y="16.00" width="8.40" height="18.00" fill="#61afef"/>
+<rect x="142.00" y="16.00" width="8.40" height="9.00" fill="#60b2eb"/>
+<rect x="150.40" y="16.00" width="8.40" height="9.00" fill="#5fb4e7"/>
+<rect x="167.20" y="16.00" width="8.40" height="18.00" fill="#5db9df"/>
+<rect x="184.00" y="16.00" width="8.40" height="18.00" fill="#5abed7"/>
+<rect x="200.80" y="16.00" width="8.40" height="18.00" fill="#56c2cf"/>
+<rect x="217.60" y="16.00" width="8.40" height="18.00" fill="#64c2c5"/>
+<rect x="234.40" y="16.00" width="8.40" height="9.00" fill="#79c2af"/>
+<rect x="242.80" y="16.00" width="8.40" height="18.00" fill="#81c3a5"/>
+<rect x="251.20" y="16.00" width="8.40" height="9.00" fill="#88c39a"/>
+<rect x="268.00" y="16.00" width="8.40" height="9.00" fill="#93c384"/>
+<rect x="276.40" y="16.00" width="8.40" height="18.00" fill="#98c379"/>
+<rect x="284.80" y="16.00" width="8.40" height="9.00" fill="#98c379"/>
+<rect x="301.60" y="16.00" width="8.40" height="18.00" fill="#b2c470"/>
+<rect x="335.20" y="16.00" width="8.40" height="18.00" fill="#e0c55c"/>
+<rect x="343.60" y="16.00" width="8.40" height="9.00" fill="#ebc456"/>
+<rect x="352.00" y="16.00" width="8.40" height="9.00" fill="#f5c451"/>
+<rect x="49.6" y="34" width="25.2" height="18" fill="#13151b"/>
+<path transform="translate(24.40 34) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="58.0" y="47" fill="#f5c451" font-weight="bold">⇄</text>
+<path transform="translate(91.60 34) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="133.60" y="34.00" width="8.40" height="9.00" fill="#61afef"/>
+<rect x="142.00" y="34.00" width="8.40" height="9.00" fill="#60b2eb"/>
+<rect x="150.40" y="34.00" width="8.40" height="18.00" fill="#5fb4e7"/>
+<rect x="167.20" y="34.00" width="8.40" height="18.00" fill="#5db9df"/>
+<rect x="175.60" y="34.00" width="8.40" height="9.00" fill="#5bbbdb"/>
+<rect x="184.00" y="34.00" width="8.40" height="18.00" fill="#5abed7"/>
+<rect x="200.80" y="34.00" width="8.40" height="18.00" fill="#56c2cf"/>
+<rect x="217.60" y="34.00" width="8.40" height="18.00" fill="#64c2c5"/>
+<rect x="242.80" y="34.00" width="8.40" height="18.00" fill="#81c3a5"/>
+<rect x="276.40" y="34.00" width="8.40" height="18.00" fill="#98c379"/>
+<rect x="301.60" y="34.00" width="8.40" height="18.00" fill="#b2c470"/>
+<rect x="335.20" y="34.00" width="8.40" height="18.00" fill="#e0c55c"/>
+<rect x="343.60" y="34.00" width="8.40" height="9.00" fill="#ebc456"/>
+<rect x="352.00" y="34.00" width="8.40" height="9.00" fill="#f5c451"/>
+<path transform="translate(16.00 52) scale(8.4 18)" d="M0 .5H1" fill="none" stroke="#56c2cf" stroke-width="2.6" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(24.40 52) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(24.40 52) scale(8.4 18)" d="M0 .5H.5" fill="none" stroke="#56c2cf" stroke-width="2.6" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="45.40" y="52.00" width="4.20" height="18.00" fill="#cde3fb"/>
+<rect x="49.60" y="52.00" width="8.40" height="18.00" fill="#cde3fb"/>
+<rect x="58.00" y="52.00" width="8.40" height="18.00" fill="#cde3fb"/>
+<rect x="66.40" y="52.00" width="8.40" height="18.00" fill="#cde3fb"/>
+<rect x="74.80" y="52.00" width="4.20" height="18.00" fill="#cde3fb"/>
+<path transform="translate(91.60 52) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(91.60 52) scale(8.4 18)" d="M.5 .5H1" fill="none" stroke="#56c2cf" stroke-width="2.6" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(100.00 52) scale(8.4 18)" d="M0 .5H1" fill="none" stroke="#56c2cf" stroke-width="2.6" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="133.60" y="52.00" width="8.40" height="9.00" fill="#61afef"/>
+<rect x="142.00" y="52.00" width="8.40" height="9.00" fill="#60b2eb"/>
+<rect x="150.40" y="52.00" width="8.40" height="9.00" fill="#5fb4e7"/>
+<rect x="167.20" y="52.00" width="8.40" height="9.00" fill="#5db9df"/>
+<rect x="184.00" y="52.00" width="8.40" height="9.00" fill="#5abed7"/>
+<rect x="200.80" y="52.00" width="8.40" height="9.00" fill="#56c2cf"/>
+<rect x="209.20" y="52.00" width="8.40" height="9.00" fill="#56c2cf"/>
+<rect x="217.60" y="52.00" width="8.40" height="9.00" fill="#64c2c5"/>
+<rect x="242.80" y="52.00" width="8.40" height="9.00" fill="#81c3a5"/>
+<rect x="276.40" y="52.00" width="8.40" height="9.00" fill="#98c379"/>
+<rect x="301.60" y="52.00" width="8.40" height="9.00" fill="#b2c470"/>
+<rect x="310.00" y="52.00" width="8.40" height="9.00" fill="#bec46b"/>
+<rect x="318.40" y="52.00" width="8.40" height="9.00" fill="#cac466"/>
+<rect x="335.20" y="52.00" width="8.40" height="9.00" fill="#e0c55c"/>
+<rect x="343.60" y="52.00" width="8.40" height="9.00" fill="#ebc456"/>
+<rect x="352.00" y="52.00" width="8.40" height="9.00" fill="#f5c451"/>
+<path transform="translate(24.40 70) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="41.2" y="83" fill="#8e97a9">●</text>
+<path transform="translate(58.00 70) scale(8.4 18)" d="M0 .35H1M0 .65H1" fill="none" stroke="#8e97a9" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="74.8" y="83" fill="#f5c451">●</text>
+<path transform="translate(91.60 70) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="133.6" y="83" fill="#c9ced8">5</text>
+<text x="150.4 158.8 167.2 175.6 184.0 192.4 200.8 209.2" y="83" fill="#c9ced8">shuttles</text>
+<text x="226.0" y="83" fill="#8e97a9">·</text>
+<text x="242.8" y="83" fill="#56c2cf">2</text>
+<text x="259.6 268.0 276.4 284.8 293.2 301.6 310.0" y="83" fill="#56c2cf">running</text>
+<text x="326.8" y="83" fill="#8e97a9">·</text>
+<text x="343.6" y="83" fill="#8e97a9">1</text>
+<text x="360.4 368.8 377.2 385.6 394.0 402.4 410.8 419.2" y="83" fill="#8e97a9">disabled</text>
+<rect x="133.6" y="88" width="100.8" height="18" fill="#f5c451"/>
+<path transform="translate(24.40 88) scale(8.4 18)" d="M.5 0Q.5 .5 1 .5" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 88) scale(8.4 18)" d="M0 .5H1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="41.20" y="88.00" width="8.40" height="9.00" fill="#8e97a9"/>
+<path transform="translate(49.60 88) scale(25.2 18)" d="M0 .5H1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="74.80" y="88.00" width="8.40" height="9.00" fill="#8e97a9"/>
+<path transform="translate(83.20 88) scale(8.4 18)" d="M0 .5H1" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(91.60 88) scale(8.4 18)" d="M.5 0Q.5 .5 0 .5" fill="none" stroke="#56c2cf" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="142.0" y="101" fill="#1b1e26" font-weight="bold">1</text>
+<text x="158.8 167.2 175.6 184.0 192.4 200.8 209.2 217.6" y="101" fill="#1b1e26" font-weight="bold">Shuttles</text>
+<text x="242.8" y="101" fill="#c9ced8">2</text>
+<text x="259.6 268.0 276.4 284.8 293.2 301.6 310.0 318.4 326.8" y="101" fill="#c9ced8">Conflicts</text>
+<text x="352.0" y="101" fill="#c9ced8">3</text>
+<text x="368.8 377.2 385.6 394.0 402.4 410.8 419.2 427.6" y="101" fill="#c9ced8">Activity</text>
+<text x="452.8" y="101" fill="#c9ced8">4</text>
+<text x="469.6 478.0 486.4 494.8 503.2 511.6 520.0 528.4" y="101" fill="#c9ced8">Profiles</text>
+<text x="553.6" y="101" fill="#c9ced8">5</text>
+<text x="570.4 578.8 587.2 595.6 604.0 612.4" y="101" fill="#c9ced8">Shares</text>
+<text x="16.0 24.4 32.8 41.2" y="137" fill="#61afef" font-weight="bold">NAME</text>
+<text x="108.4 116.8 125.2 133.6" y="137" fill="#61afef" font-weight="bold">MODE</text>
+<text x="175.6 184.0 192.4 200.8 209.2" y="137" fill="#61afef" font-weight="bold">STATE</text>
+<text x="259.6 268.0 276.4 284.8 293.2" y="137" fill="#61afef" font-weight="bold">SHARE</text>
+<text x="335.2 343.6 352.0 360.4" y="137" fill="#61afef" font-weight="bold">LAST</text>
+<text x="377.2 385.6 394.0" y="137" fill="#61afef" font-weight="bold">RUN</text>
+<text x="419.2 427.6 436.0 444.4 452.8 461.2 469.6 478.0" y="137" fill="#61afef" font-weight="bold">PROGRESS</text>
+<text x="637.6 646.0 654.4 662.8 671.2 679.6 688.0" y="137" fill="#61afef" font-weight="bold">DETAILS</text>
+<text x="16.0 24.4 32.8 41.2 49.6 58.0 66.4" y="155" fill="#c9ced8">archive</text>
+<text x="108.4" y="155" fill="#c9ced8">⇅</text>
+<text x="125.2 133.6 142.0 150.4" y="155" fill="#c9ced8">sync</text>
+<text x="175.6 184.0 192.4 200.8 209.2 217.6 226.0 234.4" y="155" fill="#8e97a9">disabled</text>
+<text x="259.6" y="155" fill="#c9ced8">—</text>
+<text x="335.2 343.6 352.0 360.4 368.8" y="155" fill="#c9ced8">never</text>
+<text x="16.0 24.4 32.8 41.2 49.6 58.0 66.4 74.8 83.2" y="173" fill="#c9ced8">documents</text>
+<text x="108.4" y="173" fill="#c9ced8">⇅</text>
+<text x="125.2 133.6 142.0 150.4" y="173" fill="#c9ced8">sync</text>
+<text x="175.6 184.0 192.4 200.8" y="173" fill="#c9ced8">idle</text>
+<text x="259.6 268.0 276.4 284.8 293.2 301.6" y="173" fill="#c9ced8">online</text>
+<text x="335.2 343.6 352.0 360.4" y="173" fill="#c9ced8">just</text>
+<text x="377.2 385.6 394.0" y="173" fill="#c9ced8">now</text>
+<rect x="419.2" y="178" width="67.2" height="18" fill="#3a4252"/>
+<text x="16.0 24.4 32.8 41.2 49.6" y="191" fill="#c9ced8">music</text>
+<text x="108.4" y="191" fill="#c9ced8">↑</text>
+<text x="125.2 133.6 142.0 150.4" y="191" fill="#c9ced8">push</text>
+<text x="175.6 184.0 192.4 200.8 209.2 217.6 226.0" y="191" fill="#56c2cf">running</text>
+<text x="259.6 268.0 276.4 284.8 293.2 301.6" y="191" fill="#c9ced8">online</text>
+<text x="335.2 343.6 352.0 360.4 368.8" y="191" fill="#c9ced8">never</text>
+<rect x="419.20" y="178.00" width="5.25" height="18.00" fill="#61afef"/>
+<text x="511.6 520.0" y="191" fill="#c9ced8">8%</text>
+<text x="536.8" y="191" fill="#c9ced8">↑</text>
+<text x="553.6 562.0 570.4" y="191" fill="#c9ced8">4.0</text>
+<text x="587.2 595.6 604.0 612.4" y="191" fill="#c9ced8">MB/s</text>
+<rect x="16.0" y="196" width="840.0" height="18" fill="#3a4252"/>
+<text x="16.0 24.4 32.8 41.2 49.6 58.0" y="209" fill="#eef1f6">photos</text>
+<text x="108.4" y="209" fill="#eef1f6">↑</text>
+<text x="125.2 133.6 142.0 150.4" y="209" fill="#eef1f6">push</text>
+<text x="175.6 184.0 192.4 200.8 209.2 217.6 226.0" y="209" fill="#eef1f6">running</text>
+<text x="259.6 268.0 276.4 284.8 293.2 301.6" y="209" fill="#eef1f6">online</text>
+<text x="335.2 343.6 352.0 360.4 368.8" y="209" fill="#eef1f6">never</text>
+<rect x="419.20" y="196.00" width="8.40" height="18.00" fill="#eef1f6"/>
+<rect x="427.60" y="196.00" width="4.20" height="18.00" fill="#eef1f6"/>
+<text x="503.2 511.6 520.0" y="209" fill="#eef1f6">19%</text>
+<text x="536.8" y="209" fill="#eef1f6">↑</text>
+<text x="553.6 562.0 570.4" y="209" fill="#eef1f6">4.0</text>
+<text x="587.2 595.6 604.0 612.4" y="209" fill="#eef1f6">MB/s</text>
+<text x="16.0 24.4 32.8 41.2 49.6 58.0 66.4 74.8" y="227" fill="#c9ced8">projects</text>
+<text x="108.4" y="227" fill="#c9ced8">⇅</text>
+<text x="125.2 133.6 142.0 150.4" y="227" fill="#c9ced8">sync</text>
+<text x="175.6 184.0 192.4 200.8" y="227" fill="#c9ced8">idle</text>
+<text x="259.6 268.0 276.4 284.8 293.2 301.6" y="227" fill="#c9ced8">online</text>
+<text x="335.2 343.6 352.0 360.4" y="227" fill="#c9ced8">just</text>
+<text x="377.2 385.6 394.0" y="227" fill="#c9ced8">now</text>
+<path transform="translate(16.00 232) scale(840.0 18)" d="M0 .5H1" fill="none" stroke="#8e97a9" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="16.0 24.4 32.8 41.2 49.6 58.0" y="263" fill="#f5c451" font-weight="bold">photos</text>
+<text x="83.2" y="263" fill="#8e97a9">↑</text>
+<text x="100.0 108.4 116.8 125.2" y="263" fill="#8e97a9">push</text>
+<text x="142.0" y="263" fill="#8e97a9">·</text>
+<text x="158.8 167.2 175.6 184.0 192.4 200.8 209.2" y="263" fill="#8e97a9">profile</text>
+<text x="226.0 234.4 242.8 251.2 259.6 268.0" y="263" fill="#8e97a9">backup</text>
+<text x="32.8 41.2 49.6 58.0" y="281" fill="#8e97a9">This</text>
+<text x="74.8 83.2 91.6 100.0 108.4 116.8 125.2 133.6" y="281" fill="#8e97a9">computer</text>
+<text x="167.2 175.6 184.0 192.4 200.8 209.2 217.6 226.0 234.4 242.8" y="281" fill="#c9ced8">~/Pictures</text>
+<text x="268.0" y="281" fill="#8e97a9">·</text>
+<text x="293.2 301.6 310.0" y="281" fill="#c9ced8">6.0</text>
+<text x="326.8 335.2" y="281" fill="#c9ced8">GB</text>
+<text x="352.0 360.4 368.8 377.2" y="281" fill="#c9ced8">free</text>
+<text x="394.0 402.4" y="281" fill="#c9ced8">of</text>
+<text x="419.2 427.6 436.0" y="281" fill="#c9ced8">8.2</text>
+<text x="452.8 461.2" y="281" fill="#c9ced8">GB</text>
+<text x="32.8 41.2 49.6" y="299" fill="#8e97a9">The</text>
+<text x="66.4 74.8 83.2 91.6 100.0" y="299" fill="#8e97a9">share</text>
+<text x="167.2 175.6 184.0 192.4 200.8 209.2 217.6 226.0 234.4 242.8 251.2" y="299" fill="#c9ced8">nas:/photos</text>
+<text x="276.4" y="299" fill="#8e97a9">·</text>
+<text x="301.6 310.0 318.4" y="299" fill="#c9ced8">6.0</text>
+<text x="335.2 343.6" y="299" fill="#c9ced8">GB</text>
+<text x="360.4 368.8 377.2 385.6" y="299" fill="#c9ced8">free</text>
+<text x="402.4 410.8" y="299" fill="#c9ced8">of</text>
+<text x="427.6 436.0 444.4" y="299" fill="#c9ced8">8.2</text>
+<text x="461.2 469.6" y="299" fill="#c9ced8">GB</text>
+<text x="32.8 41.2 49.6 58.0 66.4" y="317" fill="#8e97a9">Syncs</text>
+<text x="167.2 175.6 184.0 192.4 200.8 209.2 217.6 226.0 234.4 242.8" y="317" fill="#c9ced8">everything</text>
+<text x="32.8 41.2 49.6 58.0" y="335" fill="#8e97a9">Runs</text>
+<text x="167.2 175.6 184.0 192.4" y="335" fill="#c9ced8">only</text>
+<text x="209.2 217.6 226.0 234.4" y="335" fill="#c9ced8">when</text>
+<text x="251.2 259.6 268.0" y="335" fill="#c9ced8">you</text>
+<text x="284.8 293.2 301.6" y="335" fill="#c9ced8">ask</text>
+<text x="318.4 326.8 335.2" y="335" fill="#c9ced8">(s)</text>
+<text x="32.8 41.2 49.6" y="353" fill="#8e97a9">Now</text>
+<text x="167.2 175.6 184.0 192.4 200.8 209.2 217.6" y="353" fill="#c9ced8">syncing</text>
+<text x="234.4" y="353" fill="#c9ced8">0</text>
+<text x="251.2 259.6" y="353" fill="#c9ced8">of</text>
+<text x="276.4 284.8" y="353" fill="#c9ced8">1,</text>
+<text x="301.6 310.0 318.4 326.8" y="353" fill="#c9ced8">79.7</text>
+<text x="343.6 352.0" y="353" fill="#c9ced8">MB</text>
+<text x="368.8 377.2" y="353" fill="#c9ced8">of</text>
+<text x="394.0 402.4 410.8 419.2 427.6" y="353" fill="#c9ced8">419.4</text>
+<text x="444.4 452.8 461.2" y="353" fill="#c9ced8">MB,</text>
+<text x="478.0" y="353" fill="#c9ced8">↑</text>
+<text x="494.8 503.2 511.6" y="353" fill="#c9ced8">4.0</text>
+<text x="528.4 536.8 545.2 553.6 562.0" y="353" fill="#c9ced8">MB/s:</text>
+<text x="578.8 587.2 595.6 604.0 612.4 620.8 629.2 637.6 646.0 654.4 662.8" y="353" fill="#c9ced8">holiday.raw</text>
+<text x="32.8 41.2 49.6 58.0" y="371" fill="#8e97a9">Rate</text>
+<rect x="167.20" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="175.60" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="184.00" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="192.40" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="200.80" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="209.20" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="217.60" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="226.00" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="234.40" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="242.80" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="251.20" y="358.00" width="8.40" height="18.00" fill="#f5c451"/>
+<rect x="259.60" y="360.25" width="8.40" height="15.75" fill="#98c379"/>
+<rect x="268.00" y="362.50" width="8.40" height="13.50" fill="#98c379"/>
+<rect x="276.40" y="364.75" width="8.40" height="11.25" fill="#81c3a5"/>
+<rect x="284.80" y="364.75" width="8.40" height="11.25" fill="#81c3a5"/>
+<rect x="293.20" y="367.00" width="8.40" height="9.00" fill="#56c2cf"/>
+<rect x="301.60" y="367.00" width="8.40" height="9.00" fill="#56c2cf"/>
+<rect x="310.00" y="367.00" width="8.40" height="9.00" fill="#56c2cf"/>
+<rect x="318.40" y="367.00" width="8.40" height="9.00" fill="#56c2cf"/>
+<rect x="326.80" y="367.00" width="8.40" height="9.00" fill="#56c2cf"/>
+<rect x="335.20" y="367.00" width="8.40" height="9.00" fill="#56c2cf"/>
+<text x="360.4 368.8 377.2" y="371" fill="#c9ced8">4.0</text>
+<text x="394.0 402.4 410.8 419.2" y="371" fill="#c9ced8">MB/s</text>
+<text x="436.0" y="371" fill="#c9ced8">·</text>
+<text x="452.8 461.2" y="371" fill="#c9ced8">at</text>
+<text x="478.0 486.4 494.8 503.2" y="371" fill="#c9ced8">most</text>
+<text x="520.0 528.4 536.8" y="371" fill="#c9ced8">8.2</text>
+<text x="553.6 562.0 570.4 578.8" y="371" fill="#c9ced8">MB/s</text>
+<text x="696.4" y="533" fill="#c9ced8">↑</text>
+<text x="713.2 721.6 730.0" y="533" fill="#c9ced8">8.0</text>
+<text x="746.8 755.2 763.6 772.0" y="533" fill="#c9ced8">MB/s</text>
+<text x="797.2" y="533" fill="#c9ced8">↓</text>
+<text x="814.0" y="533" fill="#c9ced8">0</text>
+<text x="830.8 839.2 847.6" y="533" fill="#c9ced8">B/s</text>
+<text x="16.0" y="551" fill="#f5c451" font-weight="bold">s</text>
+<text x="32.8 41.2 49.6 58.0" y="551" fill="#8e97a9">sync</text>
+<text x="83.2" y="551" fill="#f5c451" font-weight="bold">p</text>
+<text x="100.0 108.4 116.8 125.2 133.6" y="551" fill="#8e97a9">pause</text>
+<text x="158.8" y="551" fill="#f5c451" font-weight="bold">d</text>
+<text x="175.6 184.0 192.4 200.8 209.2 217.6 226.0" y="551" fill="#8e97a9">disable</text>
+<text x="251.2" y="551" fill="#f5c451" font-weight="bold">n</text>
+<text x="268.0 276.4 284.8" y="551" fill="#8e97a9">new</text>
+<text x="310.0" y="551" fill="#f5c451" font-weight="bold">e</text>
+<text x="326.8 335.2 343.6 352.0" y="551" fill="#8e97a9">edit</text>
+<text x="377.2" y="551" fill="#f5c451" font-weight="bold">x</text>
+<text x="394.0 402.4 410.8 419.2 427.6 436.0" y="551" fill="#8e97a9">delete</text>
+<text x="461.2" y="551" fill="#f5c451" font-weight="bold">P</text>
+<text x="478.0 486.4 494.8 503.2 511.6" y="551" fill="#8e97a9">pause</text>
+<text x="528.4 536.8 545.2" y="551" fill="#8e97a9">all</text>
+<text x="570.4 578.8 587.2" y="551" fill="#f5c451" font-weight="bold">1-5</text>
+<text x="604.0 612.4 620.8 629.2" y="551" fill="#8e97a9">tabs</text>
+<text x="654.4" y="551" fill="#f5c451" font-weight="bold">?</text>
+<text x="671.2 679.6 688.0 696.4" y="551" fill="#8e97a9">help</text>
+<text x="721.6" y="551" fill="#f5c451" font-weight="bold">q</text>
+<text x="738.4 746.8 755.2 763.6" y="551" fill="#8e97a9">quit</text>
+</g>
+</svg>
