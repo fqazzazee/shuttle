@@ -3,7 +3,24 @@
 Push, pull and sync folders between SMB/NFS network shares and local storage, from a
 terminal UI, with a GNOME top-bar indicator and a Quick Settings toggle.
 
-[![CI](https://github.com/fqazzazee/shuttle/actions/workflows/ci.yaml/badge.svg)](https://github.com/fqazzazee/shuttle/actions/workflows/ci.yaml)
+[![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Bubble Tea v2](https://img.shields.io/badge/Bubble%20Tea-v2-FF5F87)](https://github.com/charmbracelet/bubbletea)
+[![Lip Gloss v2](https://img.shields.io/badge/Lip%20Gloss-v2-FF87D7)](https://github.com/charmbracelet/lipgloss)
+[![Bubbles v2](https://img.shields.io/badge/Bubbles-v2-6C50FF)](https://github.com/charmbracelet/bubbles)
+[![bbolt](https://img.shields.io/badge/state-bbolt-555555)](https://github.com/etcd-io/bbolt)
+[![D-Bus](https://img.shields.io/badge/IPC-D--Bus-2D6DB5)](https://github.com/godbus/dbus)
+[![Secret Service](https://img.shields.io/badge/passwords-Secret%20Service-4A86CF)](https://github.com/zalando/go-keyring)
+
+[![Linux](https://img.shields.io/badge/Linux-only-FCC624?logo=linux&logoColor=black)](#install)
+[![Fedora 44](https://img.shields.io/badge/Fedora-44-51A2DA?logo=fedora&logoColor=white)](https://fedoraproject.org)
+[![Debian stable](https://img.shields.io/badge/Debian-stable-A81D33?logo=debian&logoColor=white)](https://www.debian.org)
+[![GNOME Shell 50](https://img.shields.io/badge/GNOME%20Shell-50-4A86CF?logo=gnome&logoColor=white)](#gnome-extension)
+[![systemd user service](https://img.shields.io/badge/systemd-user%20service-30D475)](https://systemd.io)
+[![SMB 2 and 3](https://img.shields.io/badge/SMB-2%20%2F%203-6F42C1)](https://github.com/cloudsoda/go-smb2)
+[![NFSv3](https://img.shields.io/badge/NFS-v3-6F42C1)](https://www.rfc-editor.org/rfc/rfc1813)
+
+[![License: PolyForm Noncommercial or Internal Use](https://img.shields.io/badge/license-PolyForm%20Noncommercial%20%7C%20Internal%20Use-F5C451)](#license)
+[![Extension: GPL-2.0-or-later](https://img.shields.io/badge/extension-GPL--2.0--or--later-61AFEF)](extension/LICENSE)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fqazzazee)
 
 <picture>
