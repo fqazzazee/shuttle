@@ -318,7 +318,7 @@ func (e *executor) hash(f fsys.FS, p string) ([]byte, error) {
 	if f == e.o.Remote {
 		src = e.limit(r, false, false) // reading the share counts as download
 	}
-	if _, err := io.Copy(h, src); err != nil {
+	if _, err := fsys.Copy(h, src); err != nil {
 		return nil, err
 	}
 	return h.Sum(nil), nil

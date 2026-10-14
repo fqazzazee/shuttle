@@ -3,8 +3,10 @@
 package fsys
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -111,6 +113,35 @@ func TestWriteFileCancelled(t *testing.T) {
 	}
 	if got := listOS(t, dir); len(got) != 0 {
 		t.Errorf("directory holds %v, want nothing", got)
+	}
+}
+
+// readSizes records how much each Read asks for.
+type readSizes struct {
+	r     io.Reader
+	sizes []int
+}
+
+func (s *readSizes) Read(p []byte) (int, error) {
+	s.sizes = append(s.sizes, len(p))
+	return s.r.Read(p)
+}
+
+// Each read from a share is a round trip: reading 32 KB at a time, as
+// io.Copy does, made pulls over Wi-Fi five times slower.
+func TestWriteFileReadsInLargeChunks(t *testing.T) {
+	l, dir := newLocal(t)
+	data := bytes.Repeat([]byte("0123456789abcdef"), 3<<20/16)
+	src := &readSizes{r: bytes.NewReader(data)}
+
+	if _, err := WriteFile(context.Background(), l, "f", src, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got := slices.Max(src.sizes); got < 1<<20 {
+		t.Errorf("largest read asked for %d bytes, want 1 MB", got)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "f")); !bytes.Equal(b, data) {
+		t.Errorf("content differs: %d bytes, want %d", len(b), len(data))
 	}
 }
 
