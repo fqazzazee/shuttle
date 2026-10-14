@@ -1,0 +1,311 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="872" height="572" viewBox="0 0 872 572">
+<rect width="100%" height="100%" rx="10" fill="#22252d"/>
+<g font-family="'JetBrains Mono', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" xml:space="preserve" shape-rendering="crispEdges">
+<path transform="translate(24.40 16) scale(8.4 18)" d="M1 .5Q.5 .5 .5 1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 16) scale(58.8 18)" d="M0 .5H1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(91.60 16) scale(8.4 18)" d="M0 .5Q.5 .5 .5 1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="133.60" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="142.00" y="16.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="150.40" y="16.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="167.20" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="184.00" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="200.80" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="217.60" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="234.40" y="16.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="242.80" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="251.20" y="16.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="268.00" y="16.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="276.40" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="284.80" y="16.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="301.60" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="335.20" y="16.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="343.60" y="16.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="352.00" y="16.00" width="8.40" height="9.00" fill="#4b5263"/>
+<path transform="translate(24.40 34) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="58.0" y="47" fill="#4b5263">⇄</text>
+<path transform="translate(91.60 34) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="133.60" y="34.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="142.00" y="34.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="150.40" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="167.20" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="175.60" y="34.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="184.00" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="200.80" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="217.60" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="242.80" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="276.40" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="301.60" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="335.20" y="34.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="343.60" y="34.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="352.00" y="34.00" width="8.40" height="9.00" fill="#4b5263"/>
+<path transform="translate(16.00 52) scale(8.4 18)" d="M0 .5H1" fill="none" stroke="#4b5263" stroke-width="2.6" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(24.40 52) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(24.40 52) scale(8.4 18)" d="M0 .5H.5" fill="none" stroke="#4b5263" stroke-width="2.6" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="45.40" y="52.00" width="4.20" height="18.00" fill="#4b5263"/>
+<rect x="49.60" y="52.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="58.00" y="52.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="66.40" y="52.00" width="8.40" height="18.00" fill="#4b5263"/>
+<rect x="74.80" y="52.00" width="4.20" height="18.00" fill="#4b5263"/>
+<path transform="translate(91.60 52) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(91.60 52) scale(8.4 18)" d="M.5 .5H1" fill="none" stroke="#4b5263" stroke-width="2.6" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(100.00 52) scale(8.4 18)" d="M0 .5H1" fill="none" stroke="#4b5263" stroke-width="2.6" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="133.60" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="142.00" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="150.40" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="167.20" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="184.00" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="200.80" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="209.20" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="217.60" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="242.80" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="276.40" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="301.60" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="310.00" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="318.40" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="335.20" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="343.60" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<rect x="352.00" y="52.00" width="8.40" height="9.00" fill="#4b5263"/>
+<path transform="translate(24.40 70) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="41.2" y="83" fill="#4b5263">●</text>
+<path transform="translate(58.00 70) scale(8.4 18)" d="M0 .35H1M0 .65H1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="74.8" y="83" fill="#4b5263">●</text>
+<path transform="translate(91.60 70) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="133.6" y="83" fill="#4b5263">5</text>
+<text x="150.4 158.8 167.2 175.6 184.0 192.4 200.8 209.2" y="83" fill="#4b5263">shuttles</text>
+<text x="226.0" y="83" fill="#4b5263">·</text>
+<text x="242.8" y="83" fill="#4b5263">2</text>
+<text x="259.6 268.0 276.4 284.8 293.2 301.6 310.0" y="83" fill="#4b5263">running</text>
+<text x="326.8" y="83" fill="#4b5263">·</text>
+<text x="343.6" y="83" fill="#4b5263">1</text>
+<text x="360.4 368.8 377.2 385.6 394.0 402.4 410.8 419.2" y="83" fill="#4b5263">disabled</text>
+<path transform="translate(24.40 88) scale(8.4 18)" d="M.5 0Q.5 .5 1 .5" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 88) scale(8.4 18)" d="M0 .5H1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="41.20" y="88.00" width="8.40" height="9.00" fill="#4b5263"/>
+<path transform="translate(49.60 88) scale(25.2 18)" d="M0 .5H1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<rect x="74.80" y="88.00" width="8.40" height="9.00" fill="#4b5263"/>
+<path transform="translate(83.20 88) scale(8.4 18)" d="M0 .5H1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(91.60 88) scale(8.4 18)" d="M.5 0Q.5 .5 0 .5" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="142.0" y="101" fill="#4b5263">1</text>
+<text x="158.8 167.2 175.6 184.0 192.4 200.8 209.2 217.6" y="101" fill="#4b5263">Shuttles</text>
+<text x="242.8" y="101" fill="#4b5263">2</text>
+<text x="259.6 268.0 276.4 284.8 293.2 301.6 310.0 318.4 326.8" y="101" fill="#4b5263">Conflicts</text>
+<text x="352.0" y="101" fill="#4b5263">3</text>
+<text x="368.8 377.2 385.6 394.0 402.4 410.8 419.2 427.6" y="101" fill="#4b5263">Activity</text>
+<text x="452.8" y="101" fill="#4b5263">4</text>
+<text x="469.6 478.0 486.4 494.8 503.2 511.6 520.0 528.4" y="101" fill="#4b5263">Profiles</text>
+<text x="553.6" y="101" fill="#4b5263">5</text>
+<text x="570.4 578.8 587.2 595.6 604.0 612.4" y="101" fill="#4b5263">Shares</text>
+<text x="16.0 24.4" y="137" fill="#4b5263">NA</text>
+<path transform="translate(32.80 124) scale(8.4 18)" d="M1 .5Q.5 .5 .5 1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(41.20 124) scale(789.6 18)" d="M0 .5H1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(830.80 124) scale(8.4 18)" d="M0 .5Q.5 .5 .5 1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="16.0 24.4" y="155" fill="#4b5263">ar</text>
+<path transform="translate(32.80 142) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="49.6 58.0 66.4 74.8" y="155" fill="#61afef" font-weight="bold">Keys</text>
+<path transform="translate(830.80 142) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="16.0 24.4" y="173" fill="#4b5263">do</text>
+<path transform="translate(32.80 160) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(830.80 160) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="16.0 24.4" y="191" fill="#4b5263">mu</text>
+<path transform="translate(32.80 178) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4 74.8 83.2 91.6" y="191" fill="#c9ced8">1-5,</text>
+<text x="108.4 116.8 125.2 133.6" y="191" fill="#c9ced8">tab,</text>
+<text x="150.4 158.8 167.2 175.6 184.0 192.4 200.8 209.2 217.6" y="191" fill="#c9ced8">shift+tab</text>
+<text x="251.2 259.6 268.0 276.4 284.8 293.2" y="191" fill="#c9ced8">choose</text>
+<text x="310.0" y="191" fill="#c9ced8">a</text>
+<text x="326.8 335.2 343.6" y="191" fill="#c9ced8">tab</text>
+<path transform="translate(830.80 178) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="16.0 24.4" y="209" fill="#4b5263">ph</text>
+<path transform="translate(32.80 196) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4 74.8 83.2 91.6 100.0 108.4 116.8 125.2" y="209" fill="#c9ced8">up/down,</text>
+<text x="142.0 150.4 158.8" y="209" fill="#c9ced8">k/j</text>
+<text x="251.2 259.6 268.0 276.4 284.8 293.2" y="209" fill="#c9ced8">choose</text>
+<text x="310.0" y="209" fill="#c9ced8">a</text>
+<text x="326.8 335.2 343.6 352.0 360.4 368.8 377.2 385.6" y="209" fill="#c9ced8">shuttle;</text>
+<text x="402.4 410.8 419.2 427.6 436.0 444.4 452.8 461.2 469.6" y="209" fill="#c9ced8">home/end,</text>
+<text x="486.4 494.8 503.2 511.6" y="209" fill="#c9ced8">g/G:</text>
+<text x="528.4 536.8 545.2" y="209" fill="#c9ced8">the</text>
+<text x="562.0 570.4 578.8 587.2 595.6 604.0" y="209" fill="#c9ced8">first,</text>
+<text x="620.8 629.2 637.6" y="209" fill="#c9ced8">the</text>
+<text x="654.4 662.8 671.2 679.6" y="209" fill="#c9ced8">last</text>
+<path transform="translate(830.80 196) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="16.0 24.4" y="227" fill="#4b5263">pr</text>
+<path transform="translate(32.80 214) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4" y="227" fill="#c9ced8">s</text>
+<text x="251.2 259.6 268.0 276.4" y="227" fill="#c9ced8">sync</text>
+<text x="293.2 301.6 310.0" y="227" fill="#c9ced8">the</text>
+<text x="326.8 335.2 343.6 352.0 360.4 368.8 377.2" y="227" fill="#c9ced8">shuttle</text>
+<text x="394.0 402.4 410.8" y="227" fill="#c9ced8">now</text>
+<path transform="translate(830.80 214) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(16.00 232) scale(16.8 18)" d="M0 .5H1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 232) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4" y="245" fill="#c9ced8">p</text>
+<text x="251.2 259.6 268.0 276.4 284.8" y="245" fill="#c9ced8">pause</text>
+<text x="301.6 310.0" y="245" fill="#c9ced8">or</text>
+<text x="326.8 335.2 343.6 352.0 360.4 368.8" y="245" fill="#c9ced8">resume</text>
+<text x="385.6 394.0 402.4" y="245" fill="#c9ced8">the</text>
+<text x="419.2 427.6 436.0 444.4 452.8 461.2 469.6 478.0" y="245" fill="#c9ced8">shuttle:</text>
+<text x="494.8" y="245" fill="#c9ced8">a</text>
+<text x="511.6 520.0 528.4" y="245" fill="#c9ced8">run</text>
+<text x="545.2 553.6" y="245" fill="#c9ced8">in</text>
+<text x="570.4 578.8 587.2 595.6 604.0 612.4 620.8 629.2" y="245" fill="#c9ced8">progress</text>
+<text x="646.0 654.4 662.8 671.2 679.6 688.0 696.4 704.8" y="245" fill="#c9ced8">finishes</text>
+<text x="721.6 730.0 738.4" y="245" fill="#c9ced8">its</text>
+<text x="755.2 763.6 772.0 780.4" y="245" fill="#c9ced8">file</text>
+<path transform="translate(830.80 232) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(839.20 232) scale(16.8 18)" d="M0 .5H1" fill="none" stroke="#4b5263" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="16.0 24.4" y="263" fill="#c9ced8">ph</text>
+<path transform="translate(32.80 250) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4" y="263" fill="#c9ced8">P</text>
+<text x="251.2 259.6 268.0 276.4 284.8" y="263" fill="#c9ced8">pause</text>
+<text x="301.6 310.0" y="263" fill="#c9ced8">or</text>
+<text x="326.8 335.2 343.6 352.0 360.4 368.8" y="263" fill="#c9ced8">resume</text>
+<text x="385.6 394.0 402.4 410.8 419.2" y="263" fill="#c9ced8">every</text>
+<text x="436.0 444.4 452.8 461.2 469.6 478.0 486.4" y="263" fill="#c9ced8">shuttle</text>
+<path transform="translate(830.80 250) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 268) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4" y="281" fill="#c9ced8">d</text>
+<text x="251.2 259.6 268.0 276.4 284.8 293.2 301.6" y="281" fill="#c9ced8">disable</text>
+<text x="318.4 326.8" y="281" fill="#c9ced8">or</text>
+<text x="343.6 352.0 360.4 368.8 377.2 385.6" y="281" fill="#c9ced8">enable</text>
+<text x="402.4 410.8 419.2" y="281" fill="#c9ced8">the</text>
+<text x="436.0 444.4 452.8 461.2 469.6 478.0 486.4 494.8" y="281" fill="#c9ced8">shuttle,</text>
+<text x="511.6 520.0 528.4 536.8 545.2" y="281" fill="#c9ced8">saved</text>
+<text x="562.0 570.4" y="281" fill="#c9ced8">in</text>
+<text x="587.2 595.6 604.0" y="281" fill="#c9ced8">the</text>
+<text x="620.8 629.2 637.6 646.0 654.4 662.8" y="281" fill="#c9ced8">config</text>
+<text x="679.6 688.0 696.4 704.8" y="281" fill="#c9ced8">file</text>
+<path transform="translate(830.80 268) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 286) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4 74.8" y="299" fill="#c9ced8">n,</text>
+<text x="91.6" y="299" fill="#c9ced8">e</text>
+<text x="108.4 116.8" y="299" fill="#c9ced8">or</text>
+<text x="133.6 142.0 150.4 158.8 167.2 175.6" y="299" fill="#c9ced8">enter,</text>
+<text x="192.4" y="299" fill="#c9ced8">x</text>
+<text x="251.2 259.6 268.0" y="299" fill="#c9ced8">add</text>
+<text x="284.8" y="299" fill="#c9ced8">a</text>
+<text x="301.6 310.0 318.4 326.8 335.2 343.6 352.0 360.4" y="299" fill="#c9ced8">shuttle,</text>
+<text x="377.2 385.6 394.0 402.4" y="299" fill="#c9ced8">edit</text>
+<text x="419.2 427.6 436.0" y="299" fill="#c9ced8">it,</text>
+<text x="452.8 461.2 469.6 478.0 486.4 494.8" y="299" fill="#c9ced8">delete</text>
+<text x="511.6 520.0" y="299" fill="#c9ced8">it</text>
+<text x="536.8 545.2 553.6 562.0" y="299" fill="#c9ced8">(its</text>
+<text x="578.8 587.2 595.6 604.0 612.4" y="299" fill="#c9ced8">files</text>
+<text x="629.2 637.6 646.0 654.4" y="299" fill="#c9ced8">stay</text>
+<text x="671.2 679.6" y="299" fill="#c9ced8">on</text>
+<text x="696.4 704.8 713.2 721.6" y="299" fill="#c9ced8">both</text>
+<text x="738.4 746.8 755.2 763.6 772.0 780.4" y="299" fill="#c9ced8">sides)</text>
+<path transform="translate(830.80 286) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 304) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(830.80 304) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 322) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4 74.8" y="335" fill="#c9ced8">On</text>
+<text x="91.6 100.0 108.4" y="335" fill="#c9ced8">the</text>
+<text x="125.2 133.6 142.0 150.4 158.8 167.2 175.6 184.0 192.4" y="335" fill="#c9ced8">Conflicts</text>
+<text x="209.2 217.6 226.0 234.4" y="335" fill="#c9ced8">tab:</text>
+<path transform="translate(830.80 322) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 340) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4 74.8" y="353" fill="#c9ced8">l,</text>
+<text x="91.6" y="353" fill="#c9ced8">r</text>
+<text x="251.2 259.6 268.0 276.4" y="353" fill="#c9ced8">keep</text>
+<text x="293.2 301.6 310.0 318.4" y="353" fill="#c9ced8">this</text>
+<text x="335.2 343.6 352.0 360.4 368.8 377.2 385.6 394.0 402.4 410.8" y="353" fill="#c9ced8">computer's</text>
+<text x="427.6 436.0 444.4 452.8 461.2" y="353" fill="#c9ced8">copy,</text>
+<text x="478.0 486.4" y="353" fill="#c9ced8">or</text>
+<text x="503.2 511.6 520.0" y="353" fill="#c9ced8">the</text>
+<text x="536.8 545.2 553.6 562.0 570.4 578.8 587.2 595.6" y="353" fill="#c9ced8">share's,</text>
+<text x="612.4 620.8 629.2 637.6 646.0 654.4 662.8 671.2 679.6" y="353" fill="#c9ced8">replacing</text>
+<text x="696.4 704.8 713.2" y="353" fill="#c9ced8">the</text>
+<text x="730.0 738.4 746.8 755.2 763.6" y="353" fill="#c9ced8">other</text>
+<path transform="translate(830.80 340) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 358) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4" y="371" fill="#c9ced8">b</text>
+<text x="251.2 259.6 268.0 276.4" y="371" fill="#c9ced8">keep</text>
+<text x="293.2 301.6 310.0 318.4 326.8" y="371" fill="#c9ced8">both:</text>
+<text x="343.6 352.0 360.4" y="371" fill="#c9ced8">the</text>
+<text x="377.2 385.6 394.0 402.4 410.8" y="371" fill="#c9ced8">older</text>
+<text x="427.6 436.0" y="371" fill="#c9ced8">is</text>
+<text x="452.8 461.2 469.6 478.0 486.4" y="371" fill="#c9ced8">saved</text>
+<text x="503.2 511.6 520.0 528.4 536.8 545.2" y="371" fill="#c9ced8">beside</text>
+<text x="562.0 570.4 578.8" y="371" fill="#c9ced8">the</text>
+<text x="595.6 604.0 612.4 620.8 629.2" y="371" fill="#c9ced8">newer</text>
+<text x="646.0 654.4 662.8 671.2 679.6" y="371" fill="#c9ced8">under</text>
+<text x="696.4" y="371" fill="#c9ced8">a</text>
+<text x="713.2 721.6 730.0 738.4 746.8 755.2 763.6 772.0" y="371" fill="#c9ced8">conflict</text>
+<text x="788.8 797.2 805.6 814.0" y="371" fill="#c9ced8">name</text>
+<path transform="translate(830.80 358) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 376) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4" y="389" fill="#c9ced8">a</text>
+<text x="251.2 259.6 268.0" y="389" fill="#c9ced8">let</text>
+<text x="284.8 293.2 301.6" y="389" fill="#c9ced8">the</text>
+<text x="318.4 326.8 335.2 343.6 352.0 360.4 368.8 377.2 385.6" y="389" fill="#c9ced8">deletions</text>
+<text x="402.4 410.8 419.2" y="389" fill="#c9ced8">the</text>
+<text x="436.0 444.4 452.8 461.2 469.6 478.0 486.4 494.8" y="389" fill="#c9ced8">deletion</text>
+<text x="511.6 520.0 528.4 536.8 545.2" y="389" fill="#c9ced8">guard</text>
+<text x="562.0 570.4 578.8 587.2" y="389" fill="#c9ced8">held</text>
+<text x="604.0 612.4 620.8 629.2" y="389" fill="#c9ced8">back</text>
+<text x="646.0 654.4" y="389" fill="#c9ced8">go</text>
+<text x="671.2 679.6 688.0 696.4 704.8" y="389" fill="#c9ced8">ahead</text>
+<path transform="translate(830.80 376) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 394) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(830.80 394) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 412) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4 74.8" y="425" fill="#c9ced8">On</text>
+<text x="91.6 100.0 108.4" y="425" fill="#c9ced8">the</text>
+<text x="125.2 133.6 142.0 150.4 158.8 167.2 175.6 184.0" y="425" fill="#c9ced8">Activity</text>
+<text x="200.8 209.2 217.6 226.0" y="425" fill="#c9ced8">tab:</text>
+<path transform="translate(830.80 412) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 430) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4 74.8 83.2 91.6 100.0 108.4 116.8 125.2" y="443" fill="#c9ced8">up/down,</text>
+<text x="142.0 150.4 158.8 167.2 175.6 184.0 192.4 200.8 209.2 217.6 226.0" y="443" fill="#c9ced8">pgup/pgdown</text>
+<text x="251.2 259.6 268.0 276.4 284.8 293.2 301.6" y="443" fill="#c9ced8">scroll;</text>
+<text x="318.4 326.8 335.2 343.6 352.0 360.4 368.8 377.2 385.6" y="443" fill="#c9ced8">home/end,</text>
+<text x="402.4 410.8 419.2 427.6" y="443" fill="#c9ced8">g/G:</text>
+<text x="444.4 452.8 461.2" y="443" fill="#c9ced8">the</text>
+<text x="478.0 486.4 494.8 503.2 511.6 520.0 528.4" y="443" fill="#c9ced8">newest,</text>
+<text x="545.2 553.6 562.0" y="443" fill="#c9ced8">the</text>
+<text x="578.8 587.2 595.6 604.0 612.4 620.8" y="443" fill="#c9ced8">oldest</text>
+<path transform="translate(830.80 430) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 448) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4" y="461" fill="#c9ced8">f</text>
+<text x="251.2 259.6 268.0 276.4" y="461" fill="#c9ced8">show</text>
+<text x="293.2 301.6 310.0" y="461" fill="#c9ced8">one</text>
+<text x="326.8 335.2 343.6 352.0 360.4 368.8 377.2 385.6" y="461" fill="#c9ced8">shuttle,</text>
+<text x="402.4 410.8 419.2 427.6" y="461" fill="#c9ced8">then</text>
+<text x="444.4 452.8 461.2" y="461" fill="#c9ced8">the</text>
+<text x="478.0 486.4 494.8 503.2 511.6" y="461" fill="#c9ced8">next,</text>
+<text x="528.4 536.8 545.2 553.6" y="461" fill="#c9ced8">then</text>
+<text x="570.4 578.8 587.2 595.6 604.0" y="461" fill="#c9ced8">every</text>
+<text x="620.8 629.2 637.6 646.0 654.4 662.8 671.2" y="461" fill="#c9ced8">shuttle</text>
+<text x="688.0 696.4 704.8 713.2 721.6" y="461" fill="#c9ced8">again</text>
+<path transform="translate(830.80 448) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 466) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(830.80 466) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 484) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="66.4" y="497" fill="#8e97a9">↓</text>
+<text x="83.2 91.6 100.0 108.4" y="497" fill="#8e97a9">more</text>
+<path transform="translate(830.80 484) scale(8.4 18)" d="M.5 0V1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(32.80 502) scale(8.4 18)" d="M.5 0Q.5 .5 1 .5" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(41.20 502) scale(789.6 18)" d="M0 .5H1" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<path transform="translate(830.80 502) scale(8.4 18)" d="M.5 0Q.5 .5 0 .5" fill="none" stroke="#61afef" stroke-width="1.2" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>
+<text x="696.4" y="533" fill="#4b5263">↑</text>
+<text x="713.2 721.6 730.0" y="533" fill="#4b5263">8.0</text>
+<text x="746.8 755.2 763.6 772.0" y="533" fill="#4b5263">MB/s</text>
+<text x="797.2" y="533" fill="#4b5263">↓</text>
+<text x="814.0" y="533" fill="#4b5263">0</text>
+<text x="830.8 839.2 847.6" y="533" fill="#4b5263">B/s</text>
+<text x="16.0 24.4" y="551" fill="#f5c451" font-weight="bold">↑↓</text>
+<text x="41.2 49.6 58.0 66.4 74.8 83.2" y="551" fill="#8e97a9">scroll</text>
+<text x="108.4 116.8 125.2" y="551" fill="#f5c451" font-weight="bold">esc</text>
+<text x="142.0 150.4 158.8 167.2 175.6" y="551" fill="#8e97a9">close</text>
+<text x="200.8" y="551" fill="#f5c451" font-weight="bold">P</text>
+<text x="217.6 226.0 234.4 242.8 251.2" y="551" fill="#8e97a9">pause</text>
+<text x="268.0 276.4 284.8" y="551" fill="#8e97a9">all</text>
+<text x="310.0 318.4 326.8" y="551" fill="#f5c451" font-weight="bold">1-5</text>
+<text x="343.6 352.0 360.4 368.8" y="551" fill="#8e97a9">tabs</text>
+<text x="394.0" y="551" fill="#f5c451" font-weight="bold">?</text>
+<text x="410.8 419.2 427.6 436.0" y="551" fill="#8e97a9">help</text>
+<text x="461.2" y="551" fill="#f5c451" font-weight="bold">q</text>
+<text x="478.0 486.4 494.8 503.2" y="551" fill="#8e97a9">quit</text>
+</g>
+</svg>
