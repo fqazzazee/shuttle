@@ -210,7 +210,7 @@ func TestDeleteProfile(t *testing.T) {
 		t.Errorf("deleting a profile in use:\n%s", s)
 	}
 	press(t, m, "down", "x")
-	if !strings.Contains(screen(m), "Delete the profile spare from the config file? (y/n)") {
+	if !strings.Contains(screen(m), "│ Delete the profile spare from the config file? │") {
 		t.Fatalf("no question:\n%s", screen(m))
 	}
 	press(t, m, "y")

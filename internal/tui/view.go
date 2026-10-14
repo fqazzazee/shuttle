@@ -25,17 +25,12 @@ func (m *model) View() tea.View {
 }
 
 // render lays out the screen: the header, the tab's content, a status
-// line and the keys.
+// line and the keys; with the help or a question over it all but the keys.
 func (m *model) render() string {
 	header := m.headerLines()
 	status, keys := m.statusLine(), m.keyLines()
 	room := m.room(len(keys))
-	var body []string
-	if m.help {
-		body = m.helpView(room)
-	} else {
-		body = m.content(room)
-	}
+	body := m.content(room)
 	if len(body) > room {
 		body = body[:room]
 	}
@@ -46,6 +41,12 @@ func (m *model) render() string {
 	lines = append(append(lines, status), keys...)
 	for i, l := range lines {
 		lines[i] = ansi.Truncate(l, m.width, "…")
+	}
+	switch top := len(header) + 1; {
+	case m.question != "":
+		return m.overlaid(lines, len(keys), m.questionBox(), top, room)
+	case m.help:
+		return m.overlaid(lines, len(keys), m.helpBox(), top, room)
 	}
 	return strings.Join(lines, "\n")
 }
@@ -450,8 +451,6 @@ func (m *model) statusLine() string {
 	var left string
 	fresh := m.message != "" && m.now().Sub(m.messageAt) < messageFor
 	switch {
-	case m.question != "":
-		return heldStyle.Render(m.question + " (y/n)")
 	case m.configErr != "":
 		left = badStyle.Render("The config file has an error, so the previous settings are in use: " + firstLine(m.configErr))
 	case fresh && m.failed:
@@ -562,30 +561,37 @@ func wrapKeys(parts []string, width int) string {
 
 var choiceNames = map[rune]string{'l': "keep this computer's", 'r': "keep the share's", 'b': "keep both", 'a': "allow the deletions"}
 
-// helpView is the help wrapped to the width, from where it is scrolled to,
-// in room lines; the last says when there is more below.
-func (m *model) helpView(room int) []string {
-	lines := m.helpWrapped()
+// helpBox is the help in its frame, wrapped to it, from where it is
+// scrolled to; the last line says when there is more below.
+func (m *model) helpBox() string {
+	width, room := m.helpSize()
+	lines := m.helpWrapped(width)
 	lines = lines[min(m.helpScroll, max(len(lines)-room, 0)):]
 	if len(lines) > room {
 		lines = append(lines[:max(room-1, 0)], faint.Render("  ↓ more"))
 	}
-	return lines
+	return framed(&helpFrame, lines, width)
 }
 
-// helpWrapped is the help wrapped to the width.
-func (m *model) helpWrapped() []string {
+// helpSize is the room inside the help's frame: the frame as tall as the
+// tab's room, as wide as the terminal but a margin, up to helpWidth.
+func (m *model) helpSize() (width, height int) {
+	return max(min(m.width-2*margin, helpWidth)-frameWidth, 1), max(m.room(len(m.keyLines()))-frameHeight, 1)
+}
+
+// helpWrapped is the help wrapped to width.
+func (m *model) helpWrapped(width int) []string {
 	var out []string
 	for _, l := range helpLines() {
-		out = append(out, wrapHelp(l, m.width)...)
+		out = append(out, wrapHelp(l, width)...)
 	}
 	return out
 }
 
 // helpKey scrolls the help.
 func (m *model) helpKey(k string) {
-	room := m.room(len(m.keyLines()))
-	last := max(len(m.helpWrapped())-room, 0)
+	width, room := m.helpSize()
+	last := max(len(m.helpWrapped(width))-room, 0)
 	switch k {
 	case "up", "k":
 		m.helpScroll--

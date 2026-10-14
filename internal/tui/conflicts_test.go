@@ -86,7 +86,7 @@ func TestResolving(t *testing.T) {
 
 	// Replacing a copy asks first; n leaves it.
 	press(t, m, "l")
-	if s := screen(m); !strings.Contains(s, "Keep this computer's copy of a.jpg and replace the share's? (y/n)") ||
+	if s := screen(m); !strings.Contains(s, "│ Keep this computer's copy of a.jpg and replace the share's? │") ||
 		!strings.Contains(s, "y yes  n no") {
 		t.Errorf("no question:\n%s", s)
 	}

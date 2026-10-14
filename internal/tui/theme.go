@@ -23,6 +23,7 @@ type palette struct {
 	ink     color.Color // text on yellow
 	sign    color.Color // the bus's destination sign, behind its arrows in yellow
 	glass   color.Color // the bus's windscreen
+	shade   color.Color // the screen behind an overlay
 	amber   color.Color // shuttle itself: the title, the keys
 	sky     color.Color // headings, the bus
 	coral   color.Color // errors, an offline share
@@ -42,6 +43,7 @@ var (
 		ink:     lipgloss.Color("#1b1e26"),
 		sign:    lipgloss.Color("#13151b"),
 		glass:   lipgloss.Color("#cde3fb"),
+		shade:   lipgloss.Color("#4b5263"),
 		amber:   lipgloss.Color("#f5c451"),
 		sky:     lipgloss.Color("#61afef"),
 		coral:   lipgloss.Color("#f7848d"),
@@ -57,6 +59,7 @@ var (
 		ink:     lipgloss.Color("#1b1e26"),
 		sign:    lipgloss.Color("#241f31"),
 		glass:   lipgloss.Color("#4787d6"),
+		shade:   lipgloss.Color("#b4b9c2"),
 		amber:   lipgloss.Color("#8a5b00"),
 		sky:     lipgloss.Color("#1c64c8"),
 		coral:   lipgloss.Color("#c8303f"),
@@ -74,25 +77,28 @@ func (p *palette) gradient(steps int) []color.Color {
 
 // The styles, set by useTheme.
 var (
-	titleStyle  lipgloss.Style
-	activeTab   lipgloss.Style
-	headStyle   lipgloss.Style
-	faint       lipgloss.Style
-	selected    lipgloss.Style
-	badStyle    lipgloss.Style
-	heldStyle   lipgloss.Style
-	busyStyle   lipgloss.Style
-	goodStyle   lipgloss.Style
-	busStyle    lipgloss.Style
-	signStyle   lipgloss.Style
-	glassStyle  lipgloss.Style
-	windowStyle lipgloss.Style // the big bus's windscreen: spaces, filled
-	lightStyle  lipgloss.Style
-	keyStyle    lipgloss.Style
-	stateStyles map[daemon.State]lipgloss.Style
-	kindStyles  map[activity.Kind]lipgloss.Style
-	wordColors  []color.Color // the wordmark's, a column each; nil for the terminal's own
-	barCells    [barWidth][9]string
+	titleStyle    lipgloss.Style
+	activeTab     lipgloss.Style
+	headStyle     lipgloss.Style
+	faint         lipgloss.Style
+	selected      lipgloss.Style
+	badStyle      lipgloss.Style
+	heldStyle     lipgloss.Style
+	busyStyle     lipgloss.Style
+	goodStyle     lipgloss.Style
+	busStyle      lipgloss.Style
+	signStyle     lipgloss.Style
+	glassStyle    lipgloss.Style
+	windowStyle   lipgloss.Style // the big bus's windscreen: spaces, filled
+	lightStyle    lipgloss.Style
+	keyStyle      lipgloss.Style
+	shadeStyle    lipgloss.Style // the screen behind an overlay
+	helpFrame     lipgloss.Style
+	questionFrame lipgloss.Style
+	stateStyles   map[daemon.State]lipgloss.Style
+	kindStyles    map[activity.Kind]lipgloss.Style
+	wordColors    []color.Color // the wordmark's, a column each; nil for the terminal's own
+	barCells      [barWidth][9]string
 )
 
 // Tests see the dark palette; Run picks one for the terminal.
@@ -140,6 +146,9 @@ func useTheme(p *palette) {
 		windowStyle = s.Reverse(true)
 		lightStyle = heldStyle
 		keyStyle = s.Bold(true)
+		shadeStyle = s.Faint(true)
+		helpFrame = s.Border(lipgloss.RoundedBorder()).Padding(0, 1)
+		questionFrame = helpFrame
 		wordColors = nil
 	} else {
 		titleStyle = s.Bold(true).Foreground(p.amber)
@@ -157,6 +166,9 @@ func useTheme(p *palette) {
 		windowStyle = s.Background(p.glass)
 		lightStyle = s.Foreground(p.amber)
 		keyStyle = s.Bold(true).Foreground(p.amber)
+		shadeStyle = s.Foreground(p.shade)
+		helpFrame = s.Border(lipgloss.RoundedBorder()).BorderForeground(p.sky).Padding(0, 1)
+		questionFrame = helpFrame.BorderForeground(p.orange)
 		wordColors = p.gradient(lipgloss.Width(wordmark[0]))
 	}
 	stateStyles = map[daemon.State]lipgloss.Style{

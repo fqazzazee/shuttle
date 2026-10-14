@@ -95,7 +95,7 @@ shows "2 Conflicts (1)"
 keys 2
 shows "notes.txt"
 keys l
-shows "Keep this computer's copy of notes.txt and replace the share's? (y/n)"
+shows "│ Keep this computer's copy of notes.txt" # in the question's frame
 keys y
 shows "kept this computer's copy of notes.txt"
 for _ in $(seq 50); do [ "$(cat "$share/docs/notes.txt")" = mine ] && break; sleep 0.2; done
