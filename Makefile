@@ -90,6 +90,11 @@ package-files:
 	sed 's|@BINDIR@|/usr/bin|g' packaging/desktop/$(DESKTOP).in > $(PKGDIR)/$(DESKTOP)
 	cp -r extension $(PKGDIR)/extension
 	rm -rf $(PKGDIR)/extension/test
+	packaging/notices.sh > $(PKGDIR)/THIRD_PARTY_NOTICES
+	# Debian keeps every license in one copyright file, the one doc file
+	# that minimal images do not leave out.
+	{ cat LICENSE; printf '\n%s\n== The GNOME Shell extension: GPL-2.0-or-later\n\n' "$$(printf '=%.0s' $$(seq 78))"; \
+	  cat extension/LICENSE; cat $(PKGDIR)/THIRD_PARTY_NOTICES; } > $(PKGDIR)/copyright
 
 # SMB integration tests run against a throwaway Samba container.
 CONTAINER    ?= podman

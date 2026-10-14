@@ -43,7 +43,14 @@ same /src/extension/icons/shuttle-symbolic.svg "$symbolic" || fail "$symbolic is
 # The extension as it is in the repo, folders and all, without its tests.
 [ "$(sums /src/extension)" = "$(sums "$ext")" ] || fail "the installed extension is not the repo's: $(sums "$ext")"
 [ -f /usr/share/licenses/shuttle/LICENSE ] || [ -f /usr/share/doc/shuttle/copyright ] || fail "no licence"
-echo "installed: binary, user unit, desktop file, icons, extension, licence"
+notices=
+for f in /usr/share/licenses/shuttle/THIRD_PARTY_NOTICES /usr/share/doc/shuttle/copyright; do
+	[ -f "$f" ] && notices=$f
+done
+[ -n "$notices" ] || fail "no third-party notices"
+grep -q 'GNU LESSER GENERAL PUBLIC LICENSE' "$notices" && grep -q 'Version 3, 29 June 2007' "$notices" ||
+	fail "the notices lack the LGPL-3.0 or GPL-3.0 text"
+echo "installed: binary, user unit, desktop file, icons, extension, licence, notices"
 
 remove >/dev/null 2>&1 || fail "the package did not remove"
 for p in /usr/bin/shuttle "$unit" "$desktop" "$icon" "$symbolic" "$ext"; do
