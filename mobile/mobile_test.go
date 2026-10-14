@@ -54,10 +54,12 @@ type listener struct {
 	mu       sync.Mutex
 	statuses []string
 	events   []string
+	reloads  []string
 }
 
 func (l *listener) OnStatus(s string) { l.mu.Lock(); l.statuses = append(l.statuses, s); l.mu.Unlock() }
 func (l *listener) OnEvent(e string)  { l.mu.Lock(); l.events = append(l.events, e); l.mu.Unlock() }
+func (l *listener) OnReload(r string) { l.mu.Lock(); l.reloads = append(l.reloads, r); l.mu.Unlock() }
 
 func (l *listener) heard() (statuses, events []string) {
 	l.mu.Lock()
@@ -505,5 +507,35 @@ func TestQuiet(t *testing.T) {
 		if got := quiet([]daemon.Status{tt.st}, sched); got != tt.want {
 			t.Errorf("%s: quiet = %v", tt.name, got)
 		}
+	}
+}
+
+// After a reload the app hears which shuttles went, so it can drop them,
+// and plans again.
+func TestReloadIsHeard(t *testing.T) {
+	f := newFixture(t)
+	m := f.start(t)
+	if err := os.WriteFile(f.opts.ConfigPath, nil, 0o600); err != nil { // every shuttle gone
+		t.Fatal(err)
+	}
+	if err := m.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		f.listener.mu.Lock()
+		reloads := slices.Clone(f.listener.reloads)
+		f.listener.mu.Unlock()
+		if len(reloads) > 0 {
+			var r daemon.Reloaded
+			if err := json.Unmarshal([]byte(reloads[len(reloads)-1]), &r); err != nil || !slices.Equal(r.Removed, []string{"s"}) {
+				t.Errorf("reload heard: %s, %v; want s removed", reloads[len(reloads)-1], err)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("no reload heard")
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
