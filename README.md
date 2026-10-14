@@ -58,6 +58,23 @@ an in-process test server. Still to come:
 
 ## Install
 
+As a package from the [latest release](https://github.com/fqazzazee/shuttle/releases/latest),
+for amd64 (installed and tested on Fedora 44 and Debian stable) or arm64 (built, not yet
+tested):
+
+```bash
+v=0.1.0   # the release's version
+# Fedora
+sudo dnf install https://github.com/fqazzazee/shuttle/releases/download/v$v/shuttle_${v}_linux_amd64.rpm
+# Debian, Ubuntu
+curl -LO https://github.com/fqazzazee/shuttle/releases/download/v$v/shuttle_${v}_linux_amd64.deb
+sudo apt install ./shuttle_${v}_linux_amd64.deb
+```
+
+Each release lists its files' SHA-256 sums in `checksums.txt`: with it beside your
+downloads, `sha256sum -c --ignore-missing checksums.txt` checks them. The tarballs hold the
+binary alone, with its licenses.
+
 From source, into `~/.local/bin`, with a systemd user unit:
 
 ```bash
@@ -65,7 +82,7 @@ git clone https://github.com/fqazzazee/shuttle.git
 cd shuttle && make install
 ```
 
-Or as a package, built from the clone (**none are published yet**):
+Or as a package built from the clone:
 
 ```bash
 make packages                                      # RPM, DEB and tarballs in dist/
@@ -73,7 +90,7 @@ sudo dnf install ./dist/shuttle_*_linux_amd64.rpm  # Fedora; on Debian or Ubuntu
 sudo apt install ./dist/shuttle_*_linux_amd64.deb  #   the .deb
 ```
 
-The package installs the same things system-wide, the GNOME extension included (enable it
+A package installs the same things system-wide, the GNOME extension included (enable it
 as below). Either way, the service is yours to enable.
 
 **Requires:** Go 1.26+ to build, systemd, and a Secret Service (GNOME Keyring) for share

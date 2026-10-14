@@ -70,11 +70,34 @@ nfpms:
         dst: /usr/share/doc/shuttle/copyright
         packager: deb
 
+# What each release's page says above its changelog.
+release:
+  header: |
+    Install as a package, for amd64 (tested on Fedora 44 and Debian stable) or arm64
+    (built, not yet tested):
+
+    ```bash
+    # Fedora
+    sudo dnf install https://github.com/fqazzazee/shuttle/releases/download/{{ .Tag }}/shuttle_{{ .Version }}_linux_amd64.rpm
+    # Debian, Ubuntu
+    curl -LO https://github.com/fqazzazee/shuttle/releases/download/{{ .Tag }}/shuttle_{{ .Version }}_linux_amd64.deb
+    sudo apt install ./shuttle_{{ .Version }}_linux_amd64.deb
+    ```
+
+    Then enable the service and, on GNOME 50, the extension: see the
+    [README](https://github.com/fqazzazee/shuttle#install). `checksums.txt` has every
+    file's SHA-256.
+
+    shuttle is source-available under PolyForm Noncommercial 1.0.0 or PolyForm Internal Use
+    1.0.0; its GNOME extension is GPL-2.0-or-later. See
+    [LICENSE](https://github.com/fqazzazee/shuttle/blob/{{ .Tag }}/LICENSE).
+
 # Release notes come from conventional commit subjects (squash merges keep them
 # one per PR).
 changelog:
   use: git
   sort: asc
+  abbrev: -1   # no hashes: each line names its PR
   groups:
     - title: Features
       regexp: '^.*?feat(\(.+\))??!?:.+$'
