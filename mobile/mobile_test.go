@@ -212,7 +212,19 @@ func TestStartFails(t *testing.T) {
 
 func TestDaemonOptions(t *testing.T) {
 	f := newFixture(t)
-	do := daemonOptions(&f.opts, &access{}, nil)
+	f.opts.PausedJSON, f.opts.PausedAll = `["s", "t"]`, true
+	do, err := daemonOptions(&f.opts, &access{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(do.Paused, []string{"s", "t"}) || !do.PausedAll {
+		t.Errorf("paused = %v, all %v", do.Paused, do.PausedAll)
+	}
+	f.opts.PausedJSON = "not json"
+	if _, err := daemonOptions(&f.opts, &access{}, nil); err == nil {
+		t.Error("bad PausedJSON taken")
+	}
+	f.opts.PausedJSON = ""
 	if do.DeviceName != "Test Phone" || do.Paths.Config != f.opts.ConfigPath || do.Paths.StateDir != f.opts.StateDir {
 		t.Errorf("options = %+v", do)
 	}
@@ -220,7 +232,7 @@ func TestDaemonOptions(t *testing.T) {
 		t.Error("LocalNames, Waiting, OnChange or OnEvent not set")
 	}
 	f.opts.Listener = nil
-	if do := daemonOptions(&f.opts, &access{}, nil); do.OnChange != nil || do.OnEvent != nil {
+	if do, _ := daemonOptions(&f.opts, &access{}, nil); do.OnChange != nil || do.OnEvent != nil {
 		t.Error("callbacks set without a listener")
 	}
 }
@@ -537,5 +549,31 @@ func TestReloadIsHeard(t *testing.T) {
 			t.Fatal("no reload heard")
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// A paused shuttle, or one waiting for a permission, gets no job: its due
+// run cannot start, and a job would start a worker again and again.
+func TestWorkJSONLeavesOutHeldShuttles(t *testing.T) {
+	f := newFixture(t)
+	doc, err := os.ReadFile(f.opts.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc = append(doc, "triggers = [\"schedule\"]\ninterval = \"1h\"\n"...)
+	if err := os.WriteFile(f.opts.ConfigPath, doc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.opts.PausedJSON = `["s"]`
+	m := f.start(t)
+	if got := m.WorkJSON(); got != "[]" {
+		t.Errorf("paused: work = %s, want none", got)
+	}
+	if err := m.SetPaused("s", false); err != nil {
+		t.Fatal(err)
+	}
+	m.SetPermissions(false, true) // the fixture's folders are not in shared storage: no wait
+	if got := m.WorkJSON(); !strings.Contains(got, `"Name":"s"`) {
+		t.Errorf("resumed: work = %s, want s's", got)
 	}
 }

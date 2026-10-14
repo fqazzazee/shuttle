@@ -71,6 +71,12 @@ type Options struct {
 	// file. It is asked often, under the runner's lock: it must be quick and
 	// must not call the daemon. Call Recheck when what it depends on changes.
 	Waiting func(cfg *config.Config, s *config.Shuttle) string
+	// Paused and PausedAll are the shuttles paused, and whether all are, as
+	// the daemon starts: in place before any of them can run. The desktop's
+	// pauses last while its daemon runs; the Android app starts daemons
+	// often, so it keeps the user's pauses itself and hands them over.
+	Paused    []string
+	PausedAll bool
 	// LocalNames, if set, gives the naming rules of the file system a
 	// shuttle's local folder is on, where Linux cannot tell: the Android app
 	// says which folders are in the phone's shared storage. nil: Linux's.
@@ -160,7 +166,7 @@ func New(opts *Options) (*Daemon, error) {
 	}
 	d := &Daemon{o: o, cfg: cfg, runners: map[string]*runner{}, hostname: host, shares: map[string]string{},
 		ready: make(chan struct{}), quit: make(chan struct{}), reload: make(chan struct{}, 1),
-		global: engine.NewCap(cfg.Bandwidth.Up, cfg.Bandwidth.Down)}
+		global: engine.NewCap(cfg.Bandwidth.Up, cfg.Bandwidth.Down), pausedAll: o.PausedAll}
 	for i := range cfg.Shuttles {
 		s := &cfg.Shuttles[i]
 		d.runners[s.Name] = newRunner(d, cfg, s)
