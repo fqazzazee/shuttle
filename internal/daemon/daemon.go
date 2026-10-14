@@ -60,6 +60,10 @@ type Options struct {
 	// OnEvent, if set, is called with what is worth a desktop notification
 	// (see Event). Like OnChange, it must not block or keep the pointer.
 	OnEvent func(*Event)
+	// DeviceName names this side in conflict copies and in what was done
+	// about a conflict. "" means the host name, which Android gives as
+	// "localhost": the app passes the device's name.
+	DeviceName string
 	// LocalNames, if set, gives the naming rules of the file system a
 	// shuttle's local folder is on, where Linux cannot tell: the Android app
 	// says which folders are in the phone's shared storage. nil: Linux's.
@@ -141,9 +145,11 @@ func New(opts *Options) (*Daemon, error) {
 	if _, err := os.Stat(o.Paths.Config); errors.Is(err, fs.ErrNotExist) {
 		o.Log.Info("no config file yet: run shuttle to add a share and a shuttle", "config", o.Paths.Config)
 	}
-	host, err := os.Hostname()
-	if err != nil {
-		host = "local"
+	host := o.DeviceName
+	if host == "" {
+		if host, err = os.Hostname(); err != nil {
+			host = "local"
+		}
 	}
 	d := &Daemon{o: o, cfg: cfg, runners: map[string]*runner{}, hostname: host, shares: map[string]string{},
 		ready: make(chan struct{}), quit: make(chan struct{}), reload: make(chan struct{}, 1),

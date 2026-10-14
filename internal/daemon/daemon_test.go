@@ -42,6 +42,7 @@ type fixture struct {
 	lastEnd      time.Time
 	last         map[string]State // each shuttle's state in the last change seen
 	events       []Event          // what the daemon would notify, in order
+	deviceName   string           // Options.DeviceName
 }
 
 // newFixture writes a config with one shuttle, s, between local and the
@@ -82,7 +83,8 @@ func (f *fixture) start() {
 // build creates the daemon without running it, so a test can adjust it.
 func (f *fixture) build() {
 	f.t.Helper()
-	d, err := New(&Options{Paths: f.paths, Store: noKeyring{f.t}, OnChange: f.onChange, OnEvent: f.onEvent})
+	d, err := New(&Options{Paths: f.paths, Store: noKeyring{f.t}, OnChange: f.onChange, OnEvent: f.onEvent,
+		DeviceName: f.deviceName})
 	if err != nil {
 		f.t.Fatal(err)
 	}

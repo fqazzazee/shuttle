@@ -207,6 +207,35 @@ func TestConflictNames(t *testing.T) {
 	}
 }
 
+// A device's name, as a phone's user typed it, keeps its letters and loses
+// whatever a file system could refuse.
+func TestLabel(t *testing.T) {
+	refuses, err := fsys.OpenLocalWith(t.TempDir(), fsys.AndroidSharedStorage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer refuses.Close()
+	for in, want := range map[string]string{
+		"laptop":              "laptop",
+		"Test Phone":          "Test-Phone",
+		"Téléphone de Zoé":    "Téléphone-de-Zoé",
+		"Телефон":             "Телефон",
+		"e\u0301":             "e\u0301", // a decomposed é keeps its accent
+		`a:b?c*d"e<f>g|h\i/j`: "a-b-c-d-e-f-g-h-i-j",
+		"tab\there\x7f":       "tab-here",
+		"..":                  "unknown",
+		"  .phone.  ":         "phone",
+	} {
+		got := label(in)
+		if got != want {
+			t.Errorf("label(%q) = %q, want %q", in, got, want)
+		}
+		if err := fsys.RefuseName(refuses, conflictName("a.txt", resolvedAt, in)); err != nil {
+			t.Errorf("conflict name for %q: %v", in, err)
+		}
+	}
+}
+
 func TestConflictNameAvoidsExistingFiles(t *testing.T) {
 	h := conflicted(t, config.ConflictKeepBoth, t1, t1)
 	taken := "a.sync-conflict-20261011-153000-nas.txt"
