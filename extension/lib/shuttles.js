@@ -39,7 +39,8 @@ export function heldConflicts(st) {
 }
 
 // attention lists what needs the user, most pressing first: "2 conflicts
-// waiting for you; a run is waiting".
+// waiting for you; a run is waiting". A shuttle a metered connection holds
+// says so, rather than only that a run waits.
 export function attention(st) {
     const parts = [];
     if (st.Error)
@@ -49,7 +50,11 @@ export function attention(st) {
         parts.push(`${plural(held, 'conflict')} waiting for you`);
     if (st.HeldDeletions > 0)
         parts.push(`${plural(st.HeldDeletions, 'deletion')} held by the guard`);
-    if (st.Pending)
+    if (st.Metered && st.Pending)
+        parts.push('a run waits for a connection that is not metered');
+    else if (st.Metered)
+        parts.push('paused while the connection is metered');
+    else if (st.Pending)
         parts.push('a run is waiting');
     if (st.Note)
         parts.push(st.Note);
