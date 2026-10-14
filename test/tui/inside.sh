@@ -68,7 +68,7 @@ keys Down Enter
 shows "from live: sync"
 # Down to notify.completed, past the rows that do not apply to a sync shuttle
 # with no triggers and trash versions: every, at, poll, deletions, keep last.
-for _ in $(seq 13); do keys Down; done; keys Left Down  # notify.completed: off
+for _ in $(seq 14); do keys Down; done; keys Left Down  # notify.completed: off
 shows " ●Tell done      off"
 shows "from live: ask"
 keys C-s

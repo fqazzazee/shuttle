@@ -107,6 +107,8 @@ var settings = []setting{
 	{key: "versioning.size_cap", label: "Size cap", def: "none", hint: "the most the versions may take, e.g. 10GB",
 		needs: whenIs("versioning.kind", "while versions are kept", "trash", "simple", "staggered")},
 	{key: "ignore", label: "Ignore", list: true, def: "nothing", hint: "patterns, e.g. *.tmp, node_modules/"},
+	{key: "metered", label: "Metered", choices: []string{"pause", "run"}, def: "pause",
+		hint: "on a metered connection, such as a phone's hotspot: wait for another, or run anyway"},
 	{key: "bandwidth.up", label: "Upload", def: "unlimited", hint: "e.g. 20MB/s"},
 	{key: "bandwidth.down", label: "Download", def: "unlimited", hint: "e.g. 50MB/s"},
 	{key: "notify.errors", label: "Tell errors", choices: []string{"on", "off"}, def: "on", hint: "desktop notifications"},
