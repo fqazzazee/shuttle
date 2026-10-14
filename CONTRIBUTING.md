@@ -33,6 +33,12 @@ report it.
 Every check on the PR must be green before review. If a check is flaky, say so rather than
 re-running it until it passes.
 
+CI runs only the jobs your change can affect, so expect some to show as skipped: a change to
+documentation alone runs the secret scan, the dependency review and the `ci` and `analyze`
+checks, which pass when every job passed or was not needed. Which files count as what is in
+[`.github/actions/changes`](.github/actions/changes/areas.sh); a file it does not know runs
+everything.
+
 ## Commits
 
 `type(scope): summary` — feat, fix, docs, refactor, test, chore, ci, deps, perf, build.
