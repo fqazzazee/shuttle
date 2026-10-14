@@ -42,18 +42,27 @@ func (f *fixture) eventsOf(kind EventKind) []Event {
 // time its events have been sent.
 func (f *fixture) syncNow() Status {
 	f.t.Helper()
+	f.ranAfter(func() {
+		if err := f.d.SyncNow("s"); err != nil {
+			f.t.Fatal(err)
+		}
+	})
+	return f.d.Statuses()[0]
+}
+
+// ranAfter calls start, which starts a run of s, and waits until that run
+// has been reported.
+func (f *fixture) ranAfter(start func()) {
+	f.t.Helper()
 	f.mu.Lock()
 	want := f.ended + 1
 	f.mu.Unlock()
-	if err := f.d.SyncNow("s"); err != nil {
-		f.t.Fatal(err)
-	}
+	start()
 	f.waitFor("s", "the run to be reported", func(Status) bool {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		return f.ended >= want
 	})
-	return f.d.Statuses()[0]
 }
 
 func TestCompletedRuns(t *testing.T) {
