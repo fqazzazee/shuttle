@@ -99,6 +99,17 @@ jobs:
       # Releases ship arm64 too; catch anything that only builds on amd64.
       - name: cross-compile linux/arm64
         run: GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./...
+      # The Android app will reuse the core: catch a Linux-desktop-only call the
+      # day it lands. vet as well, so the tests are compiled for it too.
+      # android/amd64 cannot link without cgo and the NDK.
+      - name: cross-compile android/arm64
+        env:
+          GOOS: android
+          GOARCH: arm64
+          CGO_ENABLED: '0'
+        run: |
+          go build ./...
+          go vet ./...
 
   integration:
     name: integration
