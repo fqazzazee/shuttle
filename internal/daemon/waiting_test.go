@@ -140,3 +140,31 @@ interval = "1h"`)
 		t.Errorf("NextRuns = %v, want now: the run never happened", next)
 	}
 }
+
+// A shuttle paused as the daemon starts never begins the run that was due:
+// the Android app hands its pauses over this way, to every daemon it starts.
+func TestPausedAtStart(t *testing.T) {
+	for _, all := range []bool{false, true} {
+		t.Run(fmt.Sprint("all=", all), func(t *testing.T) {
+			f := newFixture(t, "push", `triggers = ["schedule"]
+interval = "1h"`)
+			write(t, f.local, "a.txt", "a") // never ran: due at start
+			if all {
+				f.pausedAll = true
+			} else {
+				f.paused = []string{"s"}
+			}
+			f.start()
+			st := f.waitFor("s", "the due run, held", func(st Status) bool { return st.Pending })
+			if st.State != StatePaused || f.runCount() != 0 || exists(f.mount, "a.txt") {
+				t.Fatalf("status %+v: want paused, nothing run", st)
+			}
+			if err := f.d.SetPaused(map[bool]string{false: "s", true: ""}[all], false); err != nil {
+				t.Fatal(err)
+			}
+			if st := f.settled("s"); st.Copied != 1 {
+				t.Errorf("after resuming: %+v", st)
+			}
+		})
+	}
+}

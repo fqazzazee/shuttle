@@ -19,6 +19,7 @@ import io.github.fqazzazee.shuttle.mobile.Mobile
 import io.github.fqazzazee.shuttle.mobile.Options
 import java.time.Instant
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -37,6 +38,9 @@ object Core {
     /** Each shuttle's status as the daemon last sent it, as JSON, by name. */
     var statuses by mutableStateOf(emptyMap<String, String>())
         private set
+
+    /** Runs the user asked for that the service is seeing through (Sync now): it stays while there are any. */
+    val manualRuns = AtomicInteger()
 
     /** Why the daemon could not start, or null. */
     var startError by mutableStateOf<String?>(null)
@@ -97,8 +101,14 @@ object Core {
      */
     fun updateService(context: Context, d: Daemon) {
         val intent = Intent(context, SyncService::class.java)
-        if (d.realTime()) context.startForegroundService(intent) else context.stopService(intent)
+        when {
+            d.realTime() -> context.startForegroundService(intent)
+            manualRuns.get() == 0 -> context.stopService(intent)
+        }
     }
+
+    /** The user's pauses, kept by the app for every daemon it starts. */
+    fun pauses(context: Context) = Pauses(context.getSharedPreferences("app", Context.MODE_PRIVATE))
 
     private fun start(app: Context): Daemon {
         val files = AppFiles(app.filesDir, app.noBackupFilesDir)
@@ -138,6 +148,9 @@ object Core {
             }
             filesAccess = access.files
             localNetwork = access.localNetwork
+            val pauses = pauses(app)
+            pausedJSON = pauses.json()
+            pausedAll = pauses.all
         }
         return Mobile.start(o).also { d ->
             watchNetwork(app, d)

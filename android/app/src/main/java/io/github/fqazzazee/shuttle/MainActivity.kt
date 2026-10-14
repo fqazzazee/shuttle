@@ -40,12 +40,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.net.toUri
-import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private var access by mutableStateOf(Access(files = false, localNetwork = false, notifications = false))
     private var firstRunSeen by mutableStateOf(false)
     private var forceStopped by mutableStateOf(false)
+    private val pauses by lazy { Core.pauses(this) }
+    private var pausedAll by mutableStateOf(false)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -56,6 +57,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         firstRunSeen = prefs.getBoolean(FIRST_RUN_SEEN, false)
+        pausedAll = pauses.all
         // Opening the app after a force stop starts syncing again (the screen holds the daemon,
         // which starts the service and plans the jobs); say that it had stopped.
         val lastSeen = prefs.getLong(LAST_EXIT_SEEN, 0)
@@ -72,7 +74,7 @@ class MainActivity : ComponentActivity() {
                             firstRunSeen = true
                         }
                     } else {
-                        Main(access, Core.statuses, Core.startError, forceStopped, { forceStopped = false }, ::allow)
+                        Main(access, Core.statuses, Core.startError, forceStopped, { forceStopped = false }, ::allow, pausedAll, actions)
                     }
                 }
             }
@@ -100,6 +102,19 @@ class MainActivity : ComponentActivity() {
         Core.async { Core.setAccess(now) }
     }
 
+    private val actions = ListActions(
+        syncNow = { SyncService.syncNow(this, it) },
+        setPaused = { name, paused ->
+            pauses.set(name, paused)
+            Core.async { Core.current?.setPaused(name, paused) }
+        },
+        setPausedAll = { paused ->
+            pauses.setAll(paused)
+            pausedAll = paused
+            Core.async { Core.current?.setPaused("", paused) }
+        },
+    )
+
     private fun allow(p: Permission) {
         val name = p.system
         val asked = "asked:" + p.name
@@ -122,7 +137,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Until the shuttle list (step 14): each shuttle's name and state, and why it waits. */
+/** The app's main screen: what needs saying first, then the shuttles. */
 @Composable
 private fun Main(
     access: Access,
@@ -131,6 +146,8 @@ private fun Main(
     forceStopped: Boolean,
     onSeen: () -> Unit,
     onAllow: (Permission) -> Unit,
+    pausedAll: Boolean,
+    actions: ListActions,
 ) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -140,11 +157,10 @@ private fun Main(
         if (forceStopped && statuses.isNotEmpty()) ForceStopped(onSeen)
         MissingPermissions(access, onAllow)
         startError?.let { Text(stringResource(R.string.start_failed, it), color = MaterialTheme.colorScheme.error) }
-        if (statuses.isEmpty()) Text(stringResource(R.string.not_set_up))
-        for ((name, json) in statuses.toSortedMap()) {
-            val st = JSONObject(json)
-            val waiting = st.optString("Waiting")
-            Text(if (waiting.isEmpty()) "$name: ${st.getString("State")}" else "$name: $waiting")
+        if (statuses.isEmpty()) {
+            Text(stringResource(R.string.not_set_up))
+        } else {
+            ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
     }
 }

@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path"
@@ -64,6 +65,11 @@ type Options struct {
 	// "All files access", and on Android 17 local network access. Without
 	// them, the shuttles that need them wait and say which (SetPermissions).
 	FilesAccess, LocalNetwork bool
+	// PausedJSON is the shuttles the user paused, as a JSON array of names,
+	// and PausedAll whether they paused all: the app keeps them, since its
+	// daemons come and go, and every daemon starts with them in place.
+	PausedJSON string
+	PausedAll  bool
 }
 
 // Why a shuttle waits for a permission, as its status says.
@@ -134,7 +140,12 @@ func Start(o *Options) (*Daemon, error) {
 	acc := &access{}
 	acc.files.Store(o.FilesAccess)
 	acc.network.Store(o.LocalNetwork)
-	d, err := daemon.New(daemonOptions(o, acc, slog.New(slog.NewTextHandler(logf, nil))))
+	do, err := daemonOptions(o, acc, slog.New(slog.NewTextHandler(logf, nil)))
+	if err != nil {
+		logf.Close()
+		return nil, err
+	}
+	d, err := daemon.New(do)
 	if err != nil {
 		logf.Close()
 		return nil, err
@@ -165,8 +176,16 @@ func Running() *Daemon {
 	return running
 }
 
-func daemonOptions(o *Options, acc *access, log *slog.Logger) *daemon.Options {
+func daemonOptions(o *Options, acc *access, log *slog.Logger) (*daemon.Options, error) {
+	var paused []string
+	if o.PausedJSON != "" {
+		if err := json.Unmarshal([]byte(o.PausedJSON), &paused); err != nil {
+			return nil, fmt.Errorf("paused shuttles: %w", err)
+		}
+	}
 	do := &daemon.Options{
+		Paused:     paused,
+		PausedAll:  o.PausedAll,
 		Paths:      daemon.Paths{Config: o.ConfigPath, StateDir: o.StateDir},
 		Store:      store{o.Passwords},
 		Log:        log,
@@ -178,7 +197,7 @@ func daemonOptions(o *Options, acc *access, log *slog.Logger) *daemon.Options {
 		do.OnChange = func(st *daemon.Status) { l.OnStatus(toJSON(st)) }
 		do.OnEvent = func(e *daemon.Event) { l.OnEvent(toJSON(e)) }
 	}
-	return do
+	return do, nil
 }
 
 // localNames gives a folder in shared storage the phone's rules: the
@@ -266,14 +285,24 @@ type work struct {
 // WorkJSON is the work for every enabled shuttle that has a schedule or the
 // share-available trigger and is not real-time (the foreground service runs
 // those), as a JSON array. Ask again after each worker and after Reload.
+//
+// A shuttle paused, or waiting for a permission, has none: its due run
+// cannot start, so its schedule stays due, and a job for it would start a
+// worker over and over. Resuming it, or giving the permission, happens in
+// the app, which plans again.
 func (m *Daemon) WorkJSON() string {
 	next := m.d.NextRuns()
 	cfg := m.d.Config()
+	held := map[string]bool{}
+	statuses := m.d.Statuses()
+	for i := range statuses {
+		held[statuses[i].Name] = statuses[i].Paused || statuses[i].Waiting != ""
+	}
 	out := []work{}
 	for i := range cfg.Shuttles {
 		s := &cfg.Shuttles[i]
 		st := &s.Settings
-		if !s.Enabled || st.Has(config.TriggerRealtime) ||
+		if !s.Enabled || held[s.Name] || st.Has(config.TriggerRealtime) ||
 			!st.Has(config.TriggerSchedule) && !st.Has(config.TriggerShareAvailable) {
 			continue
 		}

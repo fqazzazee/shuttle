@@ -4,10 +4,38 @@
     <string name="app_name">shuttle</string>
     <string name="not_set_up">No shuttles yet. Setting them up on the phone comes in a later version.</string>
     <string name="start_failed">Syncing could not start: %1$s</string>
-    <string name="service_channel">Real-time syncing</string>
-    <string name="service_title">Syncing in real time</string>
-    <string name="service_text">shuttle is watching your real-time shuttles. Tap to open.</string>
+    <string name="service_channel">Syncing</string>
+    <string name="service_title">shuttle is syncing</string>
+    <string name="service_text">Watching your real-time shuttles, or finishing a run you asked for. Tap to open.</string>
 
+    <string name="sync_now">Sync now</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="pause_all">Pause all</string>
+    <string name="resume_all">Resume all</string>
+    <string name="state_idle">Idle</string>
+    <string name="state_running">Syncing</string>
+    <string name="state_paused">Paused</string>
+    <string name="state_waiting">Waiting</string>
+    <string name="state_held">Needs you</string>
+    <string name="state_error">Error</string>
+    <string name="state_offline">Offline</string>
+    <string name="state_disabled">Off</string>
+    <string name="never_run">Never run</string>
+    <string name="last_run">Last run %1$s</string>
+    <string name="progress_rate">%1$s · %2$s/s</string>
+    <plurals name="conflicts">
+        <item quantity="one">%d conflict</item>
+        <item quantity="other">%d conflicts</item>
+    </plurals>
+    <plurals name="errors">
+        <item quantity="one">%d file could not be synced</item>
+        <item quantity="other">%d files could not be synced</item>
+    </plurals>
+    <plurals name="left_out">
+        <item quantity="one">%d name left out</item>
+        <item quantity="other">%d names left out</item>
+    </plurals>
     <string name="force_stopped_title">Syncing was stopped</string>
     <string name="force_stopped_text">shuttle was force-stopped, so nothing synced until you opened it. Syncing has started again.</string>
     <string name="ok">OK</string>
