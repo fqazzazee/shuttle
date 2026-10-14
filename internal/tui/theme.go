@@ -99,6 +99,7 @@ var (
 	kindStyles    map[activity.Kind]lipgloss.Style
 	wordColors    []color.Color // the wordmark's, a column each; nil for the terminal's own
 	barCells      [barWidth][9]string
+	sparkStyles   []lipgloss.Style // a sparkline's, a height each
 )
 
 // Tests see the dark palette; Run picks one for the terminal.
@@ -187,4 +188,11 @@ func useTheme(p *palette) {
 		activity.KindRun:      headStyle,
 	}
 	barCells = barCellsFor(p)
+	sparkStyles = make([]lipgloss.Style, len(sparkLevels))
+	for i := range sparkStyles {
+		sparkStyles[i] = busyStyle
+		if p != nil {
+			sparkStyles[i] = s.Foreground(p.gradient(len(sparkLevels))[i])
+		}
+	}
 }
