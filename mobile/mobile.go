@@ -236,6 +236,91 @@ func (m *Daemon) ActivityJSON(name string, limit int) (string, error) {
 // Reload.
 func (m *Daemon) RealTime() bool { return m.d.Triggered(config.TriggerRealtime) }
 
+// work is what the app asks Android's WorkManager to run for a shuttle that
+// is not real-time (DECISIONS 2026-10-14, "Android: how shuttles run"). A
+// worker starts the daemon, which runs what is due by itself (a schedule
+// slot that passed, a share that is there on its first probe), and stops it
+// once all is quiet (WaitQuiet).
+type work struct {
+	Name string
+	// NextRun is when its schedule runs it next; absent without one.
+	NextRun time.Time `json:",omitzero"`
+	// ShareAvailable: it runs when its share is there. Without the
+	// foreground service, the app looks whenever the phone is on a network,
+	// at most every 15 minutes.
+	ShareAvailable bool
+	// Network: its share is reached over a network, so its worker waits
+	// for one.
+	Network bool
+	// Unmetered: its own runs wait for a connection that is not metered.
+	Unmetered bool
+}
+
+// WorkJSON is the work for every enabled shuttle that has a schedule or the
+// share-available trigger and is not real-time (the foreground service runs
+// those), as a JSON array. Ask again after each worker and after Reload.
+func (m *Daemon) WorkJSON() string {
+	next := m.d.NextRuns()
+	cfg := m.d.Config()
+	out := []work{}
+	for i := range cfg.Shuttles {
+		s := &cfg.Shuttles[i]
+		st := &s.Settings
+		if !s.Enabled || st.Has(config.TriggerRealtime) ||
+			!st.Has(config.TriggerSchedule) && !st.Has(config.TriggerShareAvailable) {
+			continue
+		}
+		out = append(out, work{
+			Name:           s.Name,
+			NextRun:        next[s.Name],
+			ShareAvailable: st.Has(config.TriggerShareAvailable),
+			Network:        cfg.Shares[s.Share].Type != config.SharePath,
+			Unmetered:      st.Metered == config.MeteredPause,
+		})
+	}
+	return toJSON(out)
+}
+
+// WaitQuiet waits up to timeoutMillis for every enabled shuttle to have
+// looked for its share and worked out its schedule, and for none of them to
+// be running or have a run waiting that could start. A shuttle held back
+// (paused, metered, waiting for a permission) counts as quiet.
+func (m *Daemon) WaitQuiet(timeoutMillis int64) error {
+	deadline := time.Now().Add(time.Duration(timeoutMillis) * time.Millisecond)
+	for {
+		if quiet(m.d.Statuses(), m.d.Config().Shuttles) {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return errors.New("the shuttles did not finish in time")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func quiet(statuses []daemon.Status, shuttles []config.Shuttle) bool {
+	scheduled := map[string]bool{}
+	for i := range shuttles {
+		scheduled[shuttles[i].Name] = shuttles[i].Settings.Has(config.TriggerSchedule)
+	}
+	for i := range statuses {
+		st := &statuses[i]
+		switch {
+		case st.State == daemon.StateDisabled:
+		case st.State == daemon.StateRunning,
+			st.Pending && st.State != daemon.StatePaused,
+			st.Share == "", // not probed yet
+			scheduled[st.Name] && st.NextRun.IsZero(): // schedule not worked out yet
+			return false
+		}
+	}
+	return true
+}
+
+// ProbeNow looks for every share now: the app calls it when the phone joins
+// a network.
+func (m *Daemon) ProbeNow() { m.d.ProbeNow() }
+
 // SyncNow asks for a run of a shuttle.
 func (m *Daemon) SyncNow(name string) error { return m.d.SyncNow(name) }
 

@@ -426,6 +426,43 @@ func (d *Daemon) runner(name string) (*runner, error) {
 }
 
 // all returns the current runners, sorted by name.
+// ProbeNow checks every share now rather than at the next probe: the
+// Android app calls it when the phone joins a network, where the desktop
+// waits up to 30 seconds.
+func (d *Daemon) ProbeNow() {
+	for _, r := range d.all() {
+		select {
+		case r.probe <- struct{}{}:
+		default: // one is already asked for
+		}
+	}
+}
+
+// Config is the config the daemon runs, which may be a reload behind the
+// file. A reload replaces it rather than changing it: read it, never
+// change it.
+func (d *Daemon) Config() *config.Config {
+	d.runnersMu.RLock()
+	defer d.runnersMu.RUnlock()
+	return d.cfg
+}
+
+// NextRuns is when each scheduled shuttle's schedule runs it next, by name,
+// worked out now rather than read from its status, which the scheduler
+// fills in once it has started. It counts from the last run that ended: a
+// slot the scheduler triggered but whose run has not happened (a daemon
+// stopped at once, as the Android app's are) is still due, now.
+func (d *Daemon) NextRuns() map[string]time.Time {
+	now := d.o.Now()
+	out := map[string]time.Time{}
+	for _, r := range d.all() {
+		if next, ok := nextDue(&r.shuttle.Settings, r.lastEnded(), now); ok {
+			out[r.shuttle.Name] = next
+		}
+	}
+	return out
+}
+
 // Triggered reports whether an enabled shuttle has trigger t. The Android
 // app keeps its foreground service running while one is real-time.
 func (d *Daemon) Triggered(t config.Trigger) bool {

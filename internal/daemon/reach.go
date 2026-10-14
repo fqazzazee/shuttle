@@ -67,6 +67,7 @@ func (r *runner) watchShare(quit <-chan struct{}) {
 		select {
 		case <-quit:
 			return
+		case <-r.probe:
 		case <-time.After(probeEvery):
 		}
 	}
