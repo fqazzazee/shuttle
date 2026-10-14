@@ -31,6 +31,7 @@ jobs:
       go: ${{ steps.areas.outputs.go }}
       extension: ${{ steps.areas.outputs.extension }}
       packaging: ${{ steps.areas.outputs.packaging }}
+      android: ${{ steps.areas.outputs.android }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -256,12 +257,38 @@ jobs:
           check-latest: true
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
+  # The Android app's Go core: gomobile, pinned in go.mod, binds mobile/
+  # into the .aar the app builds on. The runner has the Android SDK and a
+  # JDK; the NDK version is the Makefile's.
+  android:
+    name: android
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      - name: install the NDK
+        run: |
+          ndk=$(sed -n 's/^NDK_VERSION *?= *//p' Makefile)
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$ndk" >/dev/null
+      - run: make aar ANDROID_HOME="$ANDROID_HOME"
+      - name: the .aar holds the arm64 library and the Java API
+        run: |
+          unzip -l bin/android/shuttle.aar | tee /dev/stderr | grep -q ' jni/arm64-v8a/libgojni.so$'
+          unzip -l bin/android/shuttle.aar | grep -q ' classes.jar$'
+
   # The one check branch protection requires of CI: every job passed, or was
   # skipped as nothing it tests changed. A job added above goes in needs.
   ci:
     name: ci
     if: always()
-    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln]
+    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln, android]
     runs-on: ubuntu-latest
     steps:
       - name: every job passed or was not needed
