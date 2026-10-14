@@ -22,8 +22,26 @@ permissions:
 # stdlib bugs in release binaries.
 
 jobs:
+  # What the pull request changes, so the jobs it cannot affect skip: see
+  # .github/actions/changes. Anything but a pull request runs everything.
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.areas.outputs.go }}
+      extension: ${{ steps.areas.outputs.extension }}
+      packaging: ${{ steps.areas.outputs.packaging }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # both ends of the pull request, for the diff
+      - id: areas
+        uses: ./.github/actions/changes
+
   lint:
     name: lint
+    needs: changes
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.packaging == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -45,6 +63,8 @@ jobs:
 
   test:
     name: test (go ${{ matrix.go }})
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -65,6 +85,8 @@ jobs:
 
   build:
     name: build
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -80,6 +102,8 @@ jobs:
 
   integration:
     name: integration
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -101,6 +125,8 @@ jobs:
 
   nfs:
     name: nfs
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -117,6 +143,8 @@ jobs:
   # that is `make test-extension`, before a PR.
   extension:
     name: extension
+    needs: changes
+    if: needs.changes.outputs.extension == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -133,6 +161,8 @@ jobs:
   # suite through an NFSv4 mount (a share of type "path").
   nfs-kernel:
     name: nfs (kernel server)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -171,6 +201,8 @@ jobs:
 
   systemd:
     name: systemd
+    needs: changes
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.packaging == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -186,6 +218,8 @@ jobs:
 
   tui:
     name: tui
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -200,6 +234,8 @@ jobs:
 
   vuln:
     name: govulncheck
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -208,3 +244,18 @@ jobs:
           go-version: '1.26'
           check-latest: true
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  # The one check branch protection requires of CI: every job passed, or was
+  # skipped as nothing it tests changed. A job added above goes in needs.
+  ci:
+    name: ci
+    if: always()
+    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln]
+    runs-on: ubuntu-latest
+    steps:
+      - name: every job passed or was not needed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
+          ! jq -e 'any(.[]; .result == "failure" or .result == "cancelled")' <<<"$NEEDS" >/dev/null

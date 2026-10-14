@@ -8,6 +8,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # Not a required check, so a plain filter: a pull request that changes
+    # none of what it builds and installs does not start it.
+    paths:
+      - '**.go'
+      - go.mod
+      - go.sum
+      - Makefile
+      - packaging/**
+      - .github/workflows/smoke-distros.yaml
   workflow_dispatch:
 
 concurrency:
