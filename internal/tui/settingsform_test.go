@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/fqazzazee/shuttle/internal/config"
 )
 
 // A setting that depends on another applies only while that one is set to
@@ -107,5 +109,33 @@ func TestGreyedValuesAreNotSaved(t *testing.T) {
 	}
 	if got := configFile(t, m); !strings.Contains(got, "versioning = { kind = \"none\" }\n") {
 		t.Errorf("config:\n%s", got)
+	}
+}
+
+// What a profile does on a metered connection is a choice in its form, the
+// default pause; run is written to the config file as such.
+func TestMeteredSetting(t *testing.T) {
+	m := profilesTab(t, profilesConfig, 40)
+	press(t, m, "e") // live
+	toRow(t, m, "metered")
+	if s := screen(m); !strings.Contains(s, "Metered") || !strings.Contains(s, "wait for another, or run anyway") {
+		t.Fatalf("no metered row:\n%s", s)
+	}
+	send(t, m, tea.KeyPressMsg{Code: tea.KeyLeft}) // from not set, round to run
+	ctrl(t, m, 's')
+	if m.settings != nil {
+		t.Fatalf("form still open: %s", m.settings.result)
+	}
+	got := configFile(t, m)
+	if !strings.Contains(got, `metered = "run"`) {
+		t.Fatalf("config:\n%s", got)
+	}
+	cfg, err := config.Parse([]byte(got), "/home/user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// docs uses live, and takes its setting.
+	if s, ok := cfg.Shuttle("docs"); !ok || s.Settings.Metered != config.MeteredRun || s.Sources["metered"] != config.SourceProfile {
+		t.Errorf("docs loads with metered %q from %v, want run from its profile", s.Settings.Metered, s.Sources["metered"])
 	}
 }
