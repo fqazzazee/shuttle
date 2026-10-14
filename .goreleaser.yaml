@@ -31,7 +31,9 @@ nfpms:
     homepage: https://github.com/fqazzazee/shuttle
     maintainer: Fadi Q <fadi.qazzazee@gmail.com>
     description: Push, pull and sync folders between SMB/NFS shares and local storage.
-    license: GPL-2.0-or-later
+    # The program under the PolyForm licenses; the extension it installs under
+    # the GPL (LICENSE says which is which).
+    license: (PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0) AND GPL-2.0-or-later
     formats: [rpm, deb]
     bindir: /usr/bin
     # What `make install` and `make install-extension` put in place. The service
@@ -53,8 +55,14 @@ nfpms:
       - src: LICENSE
         dst: /usr/share/licenses/shuttle/LICENSE
         packager: rpm
+      - src: extension/LICENSE
+        dst: /usr/share/licenses/shuttle/LICENSE.extension
+        packager: rpm
       - src: LICENSE
         dst: /usr/share/doc/shuttle/copyright
+        packager: deb
+      - src: extension/LICENSE
+        dst: /usr/share/doc/shuttle/LICENSE.extension
         packager: deb
 
 # Release notes come from conventional commit subjects (squash merges keep them

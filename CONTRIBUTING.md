@@ -39,6 +39,15 @@ re-running it until it passes.
 Summary in the imperative, under 72 characters. PRs are squash-merged, so the PR title
 becomes the commit on `main` and should follow the same format.
 
+## Licensing of contributions
+
+shuttle is source-available under the PolyForm licenses in [`LICENSE`](LICENSE), and its
+maintainer also grants commercial licenses. By opening a pull request, you agree that your
+contribution may be distributed under all of those terms, commercial licenses included.
+Contributions to the GNOME extension (`extension/`, and the files that lint and test it) are
+under the GPL-2.0-or-later, as the extension is. If you cannot agree to that, say so in the
+PR before it is reviewed.
+
 ## Reporting bugs
 
 Include the version, the platform, what you ran, what happened, and what you expected.

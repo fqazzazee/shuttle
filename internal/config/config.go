@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package config loads shuttle's configuration file: shares, profiles and
 // shuttles. Each shuttle's effective settings are resolved field by field from

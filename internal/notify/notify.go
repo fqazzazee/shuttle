@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package notify shows the daemon's events as desktop notifications,
 // through org.freedesktop.Notifications on the session bus: GNOME Shell's,

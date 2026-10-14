@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package tui is shuttle's terminal interface: a client of the daemon, with
 // a tab per subject (SPEC.md, "TUI"). It follows the daemon live: statuses

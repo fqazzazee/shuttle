@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 #
 # Installs the amd64 packages `make packages` built in throwaway containers,
 # the RPM on Fedora 44 and the DEB on Debian, checks that each puts what

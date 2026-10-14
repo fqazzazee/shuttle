@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package fsys is the filesystem layer the sync engine works through. Each
 // backend (local disk, SMB, NFS) exposes one shuttle's folder as an FS whose

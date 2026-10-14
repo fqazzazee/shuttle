@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 #
 # Phase 3's exit condition, under a real systemd. Runs inside the container
 # from run.sh, as the lingering user "tester", with the shuttle binary and

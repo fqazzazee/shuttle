@@ -1,7 +1,9 @@
 name: Dependency review
 
 # Blocks PRs that add dependencies with known vulnerabilities or licenses that
-# cannot ship inside a GPL-2.0-or-later binary.
+# cannot ship inside shuttle's binary, which is under the PolyForm licenses: the
+# GPL and its kind would make all of it GPL. The LGPL can, with the relinking
+# the LICENSE allows. The extension's npm tooling is never shipped.
 on:
   pull_request:
     branches: [main]
@@ -21,4 +23,4 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
-          deny-licenses: AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1
+          deny-licenses: GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1

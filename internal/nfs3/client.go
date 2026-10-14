@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package nfs3 is a small NFSv3 client (RFC 1813) over TCP: the portmapper,
 // the MOUNT protocol and the NFS calls shuttle's fsys backend needs. It

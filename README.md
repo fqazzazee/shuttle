@@ -31,7 +31,7 @@ the terminal interface and the GNOME Shell 50 extension work. SMB is tested agai
 an in-process test server. Still to come:
 
 1. NFS tested against the Linux kernel server: NFSv3 directly, NFSv4 through a mount
-2. Packages: RPM (Fedora COPR), DEB, extensions.gnome.org
+2. Packages: RPM, DEB and a tarball on GitHub Releases; the extension on extensions.gnome.org
 
 ### Not planned as of right now but could be an addition in the future if requested
 
@@ -223,4 +223,20 @@ If it saved you dragging folders to the NAS by hand, you can [buy me a coffee â˜
 
 ## License
 
-GPL-2.0-or-later â€” see [`LICENSE`](LICENSE).
+shuttle is source-available, not open source. You can use it under either of two
+licenses, whichever fits you:
+
+- **[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)**
+  covers personal, hobby and home-lab use with no commercial purpose, plus charities,
+  schools, public research and government.
+- **[PolyForm Internal Use 1.0.0](https://polyformproject.org/licenses/internal-use/1.0.0)**
+  covers a company running shuttle on its own systems, for its own files, at no cost.
+
+Using shuttle to deliver work for someone else needs a commercial license. That includes
+consulting, freelancing, contracting and managed services, even if you work alone. Email
+fadi.qazzazee@gmail.com to arrange one.
+
+The GNOME Shell extension in [`extension/`](extension) is free software, under the
+GPL-2.0-or-later ([`extension/LICENSE`](extension/LICENSE)), as GNOME Shell's own license
+asks of its extensions. See [`LICENSE`](LICENSE) for the full terms, including what the
+LGPL-licensed library in shuttle's binary allows you.
