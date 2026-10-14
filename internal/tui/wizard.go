@@ -426,7 +426,7 @@ func (w *wizard) lines(m *model, room int) []string {
 			if p == "" {
 				label, about = "none", "its own settings only"
 			} else if raw := m.rawProfile(p); raw != nil {
-				about = rawText(raw["mode"]) + ", " + orManual(rawText(raw["triggers"]))
+				about = config.RawText(raw["mode"]) + ", " + orManual(config.RawText(raw["triggers"]))
 			}
 			line := "    " + pad(label, 14) + faint.Render(about)
 			if i == w.profile {
