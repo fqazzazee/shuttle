@@ -246,6 +246,52 @@ func TestSyncSameEditOnBothSidesIsNotAConflict(t *testing.T) {
 	}
 }
 
+// readSizesFS records how much each Read of an opened file asks for.
+type readSizesFS struct {
+	fsys.FS
+	sizes *[]int
+}
+
+func (r readSizesFS) Open(ctx context.Context, name string) (io.ReadCloser, error) {
+	f, err := r.FS.Open(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return readSizesFile{f, r.sizes}, nil
+}
+
+type readSizesFile struct {
+	io.ReadCloser
+	sizes *[]int
+}
+
+func (f readSizesFile) Read(p []byte) (int, error) {
+	*f.sizes = append(*f.sizes, len(p))
+	return f.ReadCloser.Read(p)
+}
+
+// Comparing contents reads the share's copy, a round trip per read: not
+// io.Copy's 32 KB at a time.
+func TestCompareReadsShareInLargeChunks(t *testing.T) {
+	localDir, remoteDir := t.TempDir(), newRemoteDir(t)
+	big := strings.Repeat("0123456789abcdef", 3<<20/16)
+	write(t, localDir, "big.bin", big, t0)
+	write(t, remoteDir, "big.bin", big, t1)
+
+	var sizes []int
+	res, err := runSync(localDir, remoteDir, filepath.Join(t.TempDir(), "state.db"), nil,
+		func(f fsys.FS) fsys.FS { return readSizesFS{f, &sizes} }, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Adopted != 1 || res.Copied != 0 {
+		t.Fatalf("result = %+v, want big.bin compared and adopted", res)
+	}
+	if len(sizes) == 0 || slices.Max(sizes) < 1<<20 {
+		t.Errorf("reads of the share asked for %v bytes, want 1 MB", slices.Compact(sizes))
+	}
+}
+
 func TestFirstSyncOfExistingCopies(t *testing.T) {
 	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
 	h.settings.Conflicts = config.ConflictAsk

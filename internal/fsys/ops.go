@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"path"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -47,7 +48,7 @@ func WriteFile(ctx context.Context, fsys FS, name string, r io.Reader, mtime tim
 		}
 	}()
 
-	n, err = io.Copy(w, ctxReader{ctx, r})
+	n, err = Copy(w, ctxReader{ctx, r})
 	if cerr := w.Close(); err == nil {
 		err = cerr
 	}
@@ -71,6 +72,20 @@ func tempName(name string) (string, error) {
 }
 
 // ctxReader stops a long copy once the context is cancelled, between reads.
+// copyBuffers hold Copy's buffers. A share answers each read with a round
+// trip, so io.Copy's 32 KB caps a pull at 32 KB per round trip: about 2 MB/s
+// from a phone on Wi-Fi, where 1 MB ran five times faster.
+var copyBuffers = sync.Pool{New: func() any { b := make([]byte, 1<<20); return &b }}
+
+// Copy copies src to dst, reading up to 1 MB at a time. Unlike io.Copy it
+// never hands the copy to dst's ReadFrom or src's WriteTo, whose fallbacks
+// (os.File's among them) read 32 KB at a time.
+func Copy(dst io.Writer, src io.Reader) (int64, error) {
+	b := copyBuffers.Get().(*[]byte)
+	defer copyBuffers.Put(b)
+	return io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, *b)
+}
+
 type ctxReader struct {
 	ctx context.Context
 	r   io.Reader
