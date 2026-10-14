@@ -18,6 +18,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
+	"github.com/fqazzazee/shuttle/internal/secrets/secretservice"
 )
 
 // keyring is a Store in memory.
@@ -341,7 +342,7 @@ func TestFormRefuses(t *testing.T) {
 	typeIn(t, m, "u")
 	press(t, m, "tab")
 	typeIn(t, m, "pw")
-	kr.err = secrets.ErrLocked
+	kr.err = secretservice.ErrLocked
 	send(t, m, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	if !strings.Contains(screen(m), "the keyring is locked") {
 		t.Errorf("a locked keyring:\n%s", screen(m))

@@ -21,6 +21,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys/fsystest"
 	"github.com/fqazzazee/shuttle/internal/nfs3/nfs3test"
 	"github.com/fqazzazee/shuttle/internal/secrets"
+	"github.com/fqazzazee/shuttle/internal/secrets/secretservice"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
 
@@ -252,7 +253,7 @@ func TestPasswordComesOnlyFromTheKeyring(t *testing.T) {
 	// A stuck keyring must fail this test, not hang it.
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	store := secrets.SecretService()
+	store := secretservice.New()
 	k, _ := Key(ptr(cfg.Shares["nas"]))
 	const password = fsystest.SambaPassword
 	if err := store.Set(ctx, k, password); err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
+	"github.com/fqazzazee/shuttle/internal/secrets/secretservice"
 	"github.com/fqazzazee/shuttle/internal/shares"
 	"github.com/fqazzazee/shuttle/internal/tui"
 )
@@ -216,7 +217,7 @@ func runTUI(ctx context.Context, tab string, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "shuttle: %v\n", err)
 		return 1
 	}
-	o := tui.Options{Config: paths.Config, Home: home, Store: secrets.SecretService(), Test: shares.Test, Tab: first,
+	o := tui.Options{Config: paths.Config, Home: home, Store: secretservice.New(), Test: shares.Test, Tab: first,
 		Browse: func(ctx context.Context, share *config.Share, store secrets.Store) (fsys.FS, error) {
 			return shares.OpenShare(ctx, share, ".", store)
 		}}

@@ -8,15 +8,17 @@ import (
 	"testing"
 )
 
-// The sync core must stay usable without a Linux desktop, so a later Android
-// app can reuse it (SPEC.md, portability rule). This fails the build the day
-// a core package picks up a desktop dependency, directly or indirectly.
+// The sync core and the daemon must stay usable without a Linux desktop, so
+// the Android app can reuse them (SPEC.md, portability rule). This fails the
+// build the day one of them picks up a desktop dependency, directly or
+// indirectly.
 func TestCoreHasNoDesktopDependencies(t *testing.T) {
 	goBin, err := exec.LookPath("go")
 	if err != nil {
 		t.Skip("go not installed")
 	}
-	core := []string{"engine", "config", "fsys", "state", "ignore", "activity"}
+	core := []string{"engine", "config", "fsys", "state", "ignore", "activity", "nfs3",
+		"secrets", "shares", "daemon"}
 	args := []string{"list", "-deps", "-f", "{{.ImportPath}}"}
 	for _, p := range core {
 		args = append(args, "github.com/fqazzazee/shuttle/internal/"+p)
@@ -26,10 +28,11 @@ func TestCoreHasNoDesktopDependencies(t *testing.T) {
 		t.Fatalf("go list: %v", err)
 	}
 	forbidden := []string{
-		"github.com/fqazzazee/shuttle/internal/daemon",
-		"github.com/fqazzazee/shuttle/internal/secrets",
-		"github.com/fqazzazee/shuttle/internal/shares",
+		"github.com/fqazzazee/shuttle/internal/secrets/secretservice",
 		"github.com/fqazzazee/shuttle/internal/bus",
+		"github.com/fqazzazee/shuttle/internal/notify",
+		"github.com/fqazzazee/shuttle/internal/network",
+		"github.com/fqazzazee/shuttle/internal/terminal",
 		"github.com/fqazzazee/shuttle/internal/tui",
 		"github.com/godbus/",                                            // D-Bus
 		"github.com/coreos/go-systemd",                                  // systemd

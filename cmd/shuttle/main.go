@@ -27,7 +27,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/network"
 	"github.com/fqazzazee/shuttle/internal/notify"
 	"github.com/fqazzazee/shuttle/internal/present"
-	"github.com/fqazzazee/shuttle/internal/secrets"
+	"github.com/fqazzazee/shuttle/internal/secrets/secretservice"
 	"github.com/fqazzazee/shuttle/internal/terminal"
 )
 
@@ -117,7 +117,7 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 	}
 	log := slog.New(slog.NewTextHandler(stderr, nil))
 	notifier := notify.New(log)
-	d, err := daemon.New(&daemon.Options{Paths: paths, Store: secrets.SecretService(), Log: log, OnEvent: notifier.Send})
+	d, err := daemon.New(&daemon.Options{Paths: paths, Store: secretservice.New(), Log: log, OnEvent: notifier.Send})
 	if err != nil {
 		return err
 	}
