@@ -31,6 +31,7 @@
       <a href="#features"><span class="n">3</span><span class="label">Features</span></a>
       <a href="#how"><span class="n">4</span><span class="label">How it works</span></a>
       <a href="#install"><span class="n">5</span><span class="label">Install</span></a>
+      <a href="#contribute"><span class="n">6</span><span class="label">Contribute</span></a>
     </nav>
   </div>
 </header>
@@ -325,6 +326,47 @@
         building from source, NFS exports, the GNOME extension, every setting.</p>
       <p style="margin-top: 26px">shuttle is not:</p>
       <div class="not"><span>a cloud sync client</span><span>a backup tool with deduplication</span><span>peer-to-peer, like Syncthing</span></div>
+    </div>
+  </section>
+
+  <section id="contribute">
+    <div class="wrap">
+      <p class="kicker">Contributing</p>
+      <h2>Help make it better</h2>
+      <p class="lead">Bug reports, ideas and pull requests are welcome. A few habits keep a change easy
+        to review, and safe for a tool that deletes and overwrites files on both sides.</p>
+      <ol class="steps">
+        <li><span class="n">1</span><h3>Open an issue first</h3>
+          <p>For anything beyond a typo. A rejected PR costs you more than a rejected issue; check the
+            README's Status and Not planned sections too.</p></li>
+        <li><span class="n">2</span><h3>Set up</h3>
+          <p>Go 1.26 or later. If the tests fail on a clean checkout, that is a bug: report it.</p></li>
+        <li><span class="n">3</span><h3>One concern, tests with it</h3>
+          <p>Two unrelated fixes are two PRs. Tests run on temporary folders and in-process servers,
+            never a real share or your home.</p></li>
+        <li><span class="n">4</span><h3>Green before review</h3>
+          <p>Every check passes; a flaky one is said so, not rerun until it passes. The PR says what
+            changes for a user; its title is a <code>type(scope): summary</code> commit.</p></li>
+      </ol>
+<pre class="term"><span class="p">$ </span>git clone https://github.com/fqazzazee/shuttle.git &amp;&amp; cd shuttle
+<span class="p">$ </span>pre-commit install        <span class="c"># optional; CI runs the same checks</span>
+<span class="p">$ </span>make lint &amp;&amp; make test
+<span class="p">$ </span>make lint-extension &amp;&amp; make test-extension   <span class="c"># for the GNOME extension</span></pre>
+      <div class="note">
+        <h3>How contributions are licensed</h3>
+        <p>shuttle is source-available under the PolyForm licenses, and its maintainer also grants
+          commercial ones. By opening a pull request, you agree that your contribution may be
+          distributed under all of those terms. Contributions to the GNOME extension are under the
+          GPL-2.0-or-later, as the extension is. If you cannot agree, say so in the PR before it is
+          reviewed.</p>
+      </div>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/fqazzazee/shuttle/issues/new?template=bug_report.yml">Report a bug</a>
+        <a class="button" href="https://github.com/fqazzazee/shuttle/issues/new?template=feature_request.yml">Ask for a feature</a>
+        <a class="button" href="https://github.com/fqazzazee/shuttle/blob/main/CONTRIBUTING.md">Read CONTRIBUTING.md</a>
+      </div>
+      <p class="caption">Found a security issue? Do not open an issue: report it privately, as
+        <a href="https://github.com/fqazzazee/shuttle/blob/main/SECURITY.md">SECURITY.md</a> says.</p>
     </div>
   </section>
 </main>
