@@ -48,7 +48,7 @@ the terminal interface and the GNOME Shell 50 extension work. SMB is tested agai
 an in-process test server. Still to come:
 
 1. NFS tested against the Linux kernel server: NFSv3 directly, NFSv4 through a mount
-2. Packages: RPM, DEB and a tarball on GitHub Releases; the extension on extensions.gnome.org
+2. Packages: RPM, DEB and a tarball on GitHub Releases
 
 ### Not planned as of right now but could be an addition in the future if requested
 
@@ -170,6 +170,9 @@ the shuttles with what each is doing; a toggle that pauses and resumes every shu
 and a "Sync now" button for each, and "Open shuttle". The top bar's menu has the same
 controls as the Quick Settings toggle. It only talks to the running service; settings stay in
 the terminal interface.
+
+The extension comes from this repository: the RPM and DEB install it for every user, and
+from a checkout it installs for you alone. It is not on extensions.gnome.org.
 
 ```bash
 make install-extension   # into ~/.local/share/gnome-shell/extensions
