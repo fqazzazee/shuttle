@@ -18,7 +18,7 @@ GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v
 # Keep in step with the release workflow. Not newer: from v2.18 it needs Go 1.27.
 GORELEASER    ?= go run github.com/goreleaser/goreleaser/v2@v2.17.1
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -95,6 +95,21 @@ package-files:
 	# that minimal images do not leave out.
 	{ cat LICENSE; printf '\n%s\n== The GNOME Shell extension: GPL-2.0-or-later\n\n' "$$(printf '=%.0s' $$(seq 78))"; \
 	  cat extension/LICENSE; cat $(PKGDIR)/THIRD_PARTY_NOTICES; } > $(PKGDIR)/copyright
+
+# The Android app's Go core: mobile/ bound into an .aar by the gomobile pinned
+# in go.mod. Needs the Android SDK at ANDROID_HOME with this NDK, and a JDK.
+# gomobile runs gobind from PATH, so the pinned one is built first.
+ANDROID_HOME    ?= $(HOME)/Android/Sdk
+NDK_VERSION     ?= 30.0.16248370
+ANDROID_TARGETS ?= android/arm64
+AAR             := bin/android/shuttle.aar
+
+aar:
+	GOBIN=$(CURDIR)/bin/android/tools go install golang.org/x/mobile/cmd/gobind
+	PATH="$(CURDIR)/bin/android/tools:$$PATH" ANDROID_HOME=$(ANDROID_HOME) \
+	ANDROID_NDK_HOME=$(ANDROID_HOME)/ndk/$(NDK_VERSION) \
+		go tool gomobile bind -target=$(ANDROID_TARGETS) -androidapi 30 -trimpath \
+		-javapkg io.github.fqazzazee.shuttle -o $(AAR) ./mobile
 
 # SMB integration tests run against a throwaway Samba container.
 CONTAINER    ?= podman

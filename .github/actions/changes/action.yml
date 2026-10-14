@@ -15,6 +15,9 @@ outputs:
   packaging:
     description: '"true" when what the packages carry or how they are built changes'
     value: ${{ steps.areas.outputs.packaging }}
+  android:
+    description: '"true" when the Android app, its binding or the Go core it uses changes'
+    value: ${{ steps.areas.outputs.android }}
 runs:
   using: composite
   steps:
