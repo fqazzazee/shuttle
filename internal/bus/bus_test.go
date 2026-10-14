@@ -492,3 +492,67 @@ func TestActivityOverTheBus(t *testing.T) {
 		t.Errorf("Activity(nope) = %v, want ErrUnknownShuttle", err)
 	}
 }
+
+// An editor reads a shuttle's settings as rows over the bus, sets one, and
+// hears ConfigReloaded once the daemon runs with it.
+func TestShuttleSettingsOverTheBus(t *testing.T) {
+	f := newFixture(t, "push", "")
+	conn := f.connect()
+	obj := conn.Object(Name, Path)
+
+	var xml string
+	if err := conn.Object(Name, Path).Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`<method name="ShuttleSettings">`, `type="a(ssssasssss)"`, `<method name="SetShuttleSetting">`, `<signal name="ConfigReloaded">`} {
+		if !strings.Contains(xml, want) {
+			t.Errorf("introspection lacks %s", want)
+		}
+	}
+
+	rows := func() map[string]setting {
+		var out []setting
+		if err := obj.Call(Interface+".ShuttleSettings", 0, "s").Store(&out); err != nil {
+			t.Fatal(err)
+		}
+		m := map[string]setting{}
+		for _, r := range out {
+			m[r.Key] = r
+		}
+		return m
+	}
+	if r := rows()["metered"]; r.Kind != "choice" || strings.Join(r.Choices, ",") != "pause,run" || r.Value != "" ||
+		r.Inherited != "pause" || r.From != "default" {
+		t.Errorf("metered row %+v", r)
+	}
+	if r := rows()["triggers"]; r.Kind != "list" {
+		t.Errorf("triggers row %+v, want a list", r)
+	}
+
+	if err := conn.AddMatchSignal(dbus.WithMatchInterface(Interface), dbus.WithMatchMember("ConfigReloaded")); err != nil {
+		t.Fatal(err)
+	}
+	sigs := make(chan *dbus.Signal, 8)
+	conn.Signal(sigs)
+	if err := obj.Call(Interface+".SetShuttleSetting", 0, "s", "metered", "run").Err; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-sigs:
+	case <-time.After(10 * time.Second):
+		t.Fatal("no ConfigReloaded after a setting changed")
+	}
+	if r := rows()["metered"]; r.Value != "run" {
+		t.Errorf("after setting it: %+v", r)
+	}
+
+	var dbusErr dbus.Error
+	err := obj.Call(Interface+".SetShuttleSetting", 0, "nope", "metered", "run").Err
+	if !errors.As(err, &dbusErr) || dbusErr.Name != errUnknownShuttle {
+		t.Errorf("an unknown shuttle: %v", err)
+	}
+	err = obj.Call(Interface+".SetShuttleSetting", 0, "s", "metered", "sometimes").Err
+	if err == nil || !strings.Contains(err.Error(), "is none of") {
+		t.Errorf("a value none of the choices: %v", err)
+	}
+}

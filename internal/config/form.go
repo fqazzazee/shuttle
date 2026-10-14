@@ -3,6 +3,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -162,67 +163,101 @@ func RawText(v any) string {
 // one set is written, each one not set, or off (greyed out: off says why),
 // is removed; versioning, bandwidth and notify as one inline table each.
 func WriteRows(d *Doc, table []string, value, off func(key string) string) error {
-	groups := map[string]Inline{}
-	var order []string
+	// The plain settings first, then each group once, in that order: a new
+	// table reads as it always has.
+	var groups []string
 	for _, s := range Rows {
-		text := value(s.Key)
-		if off(s.Key) != "" {
-			text = ""
-		}
-		var v any = text
-		switch {
-		case text == "":
-		case s.List:
-			items := []string{} // "none" is an empty list: no triggers, nothing ignored
-			if text == "none" {
-				v = items
-				break
-			}
-			for _, x := range strings.Split(text, ",") {
-				if x = strings.TrimSpace(x); x != "" {
-					items = append(items, x)
-				}
-			}
-			v = items
-		case s.Number:
-			n, err := strconv.Atoi(text)
-			if err != nil {
-				return fmt.Errorf("%s must be a number, not %q", strings.ToLower(s.Label), text)
-			}
-			v = n
-		case s.Choices != nil && (text == "on" || text == "off"):
-			v = text == "on"
-		}
-		group, sub, inGroup := strings.Cut(s.Key, ".")
-		if inGroup {
-			if !slices.Contains(order, group) {
-				order = append(order, group)
-			}
-			if text != "" {
-				groups[group] = append(groups[group], Field{Key: sub, Value: v})
+		if group, _, inGroup := strings.Cut(s.Key, "."); inGroup {
+			if !slices.Contains(groups, group) {
+				groups = append(groups, group)
 			}
 			continue
 		}
-		var err error
-		if text == "" {
-			err = d.Delete(table, s.Key)
-		} else {
-			err = d.Set(table, s.Key, v)
-		}
-		if err != nil {
+		if err := WriteRow(d, table, s.Key, value, off); err != nil {
 			return err
 		}
 	}
-	for _, g := range order {
-		var err error
-		if len(groups[g]) == 0 {
-			err = d.Delete(table, g)
-		} else {
-			err = d.Set(table, g, groups[g])
-		}
-		if err != nil {
+	for _, g := range groups {
+		if err := WriteRow(d, table, g+".", value, off); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// WriteRow writes the one setting key into table as WriteRows does, and
+// leaves the rest of the table as written. A key in versioning, bandwidth
+// or notify writes that group's inline table again, from value and off for
+// each of its keys: the group is one TOML value.
+func WriteRow(d *Doc, table []string, key string, value, off func(key string) string) error {
+	group, _, inGroup := strings.Cut(key, ".")
+	if !inGroup {
+		r := RowOf(key)
+		if r == nil {
+			return fmt.Errorf("%w: %s", ErrNoSetting, key)
+		}
+		text := value(key)
+		if off(key) != "" {
+			text = ""
+		}
+		if text == "" {
+			return d.Delete(table, key)
+		}
+		v, err := typed(r, text)
+		if err != nil {
+			return err
+		}
+		return d.Set(table, key, v)
+	}
+	var fields Inline
+	for i := range Rows {
+		r := &Rows[i]
+		g, sub, ok := strings.Cut(r.Key, ".")
+		if !ok || g != group {
+			continue
+		}
+		text := value(r.Key)
+		if text == "" || off(r.Key) != "" {
+			continue
+		}
+		v, err := typed(r, text)
+		if err != nil {
+			return err
+		}
+		fields = append(fields, Field{Key: sub, Value: v})
+	}
+	if fields == nil {
+		return d.Delete(table, group)
+	}
+	return d.Set(table, group, fields)
+}
+
+// ErrNoSetting means a key is none of the settings' rows.
+var ErrNoSetting = errors.New("no such setting")
+
+// typed is text, as typed in r's row, as the TOML value it is written as:
+// a list of strings, a number, a bool for on and off, or the text itself.
+func typed(r *Row, text string) (any, error) {
+	switch {
+	case r.List:
+		items := []string{} // "none" is an empty list: no triggers, nothing ignored
+		if text == "none" {
+			return items, nil
+		}
+		for _, x := range strings.Split(text, ",") {
+			if x = strings.TrimSpace(x); x != "" {
+				items = append(items, x)
+			}
+		}
+		return items, nil
+	case r.Number:
+		n, err := strconv.Atoi(text)
+		if err != nil {
+			return nil, fmt.Errorf("%s must be a number, not %q", strings.ToLower(r.Label), text)
+		}
+		return n, nil
+	case r.Choices != nil && (text == "on" || text == "off"):
+		return text == "on", nil
+	}
+	return text, nil
 }

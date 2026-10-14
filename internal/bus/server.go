@@ -84,6 +84,7 @@ func Serve(ctx context.Context, conn *dbus.Conn, d *daemon.Daemon) error {
 					{Name: "ShuttleChanged", Args: []introspect.Arg{{Name: "name", Type: "s"}, {Name: "status", Type: "a{sv}"}}},
 					{Name: "ConflictRaised", Args: []introspect.Arg{{Name: "name", Type: "s"}, {Name: "path", Type: "s"}, {Name: "reason", Type: "s"}}},
 					{Name: "ShuttleRemoved", Args: []introspect.Arg{{Name: "name", Type: "s"}}},
+					{Name: "ConfigReloaded"},
 				},
 			},
 		},
@@ -132,6 +133,7 @@ func (s *server) changed(st *daemon.Status) {
 // reloaded is the daemon's reload listener: it updates the properties,
 // then emits ShuttleRemoved (see changed).
 func (s *server) reloaded(r *daemon.Reloaded) {
+	defer func() { _ = s.conn.Emit(Path, Interface+".ConfigReloaded") }() // last: the settings are those on disk now
 	s.setProp("ConfigError", r.ConfigError)
 	s.setProp("State", string(s.d.State()))
 	for _, name := range r.Removed {
@@ -223,6 +225,47 @@ func (s *server) ResolveConflict(name, path, choice string) *dbus.Error {
 		return busErr(s.d.Resolve(context.Background(), name, path, c))
 	}
 	return dbus.NewError(errInvalid, []any{fmt.Sprintf("choice %q must be keep-local, keep-remote or keep-both", choice)})
+}
+
+// setting is a settings row on the bus: a(ssssasssss).
+type setting struct {
+	Key, Label, Hint string
+	Kind             string   // choice, list, number or text
+	Choices          []string // for a choice; on and off for a switch
+	Value            string   // the shuttle's own; "" when it sets none
+	Inherited, From  string   // what applies when it sets none, and from where
+	Off              string   // why the row does not apply; "" when it does
+}
+
+// ShuttleSettings are a shuttle's settings as rows, for an editor such as
+// the GNOME extension's preferences.
+func (s *server) ShuttleSettings(name string) ([]setting, *dbus.Error) {
+	rows, err := s.d.ShuttleSettings(name)
+	if err != nil {
+		return nil, busErr(err)
+	}
+	out := make([]setting, 0, len(rows))
+	for i := range rows {
+		r := &rows[i]
+		kind := "text"
+		switch {
+		case r.Choices != nil:
+			kind = "choice"
+		case r.List:
+			kind = "list"
+		case r.Number:
+			kind = "number"
+		}
+		out = append(out, setting{Key: r.Key, Label: r.Label, Hint: r.Hint, Kind: kind, Choices: r.Choices,
+			Value: r.Value, Inherited: r.Inherited, From: r.From, Off: r.Off})
+	}
+	return out, nil
+}
+
+// SetShuttleSetting sets one of a shuttle's settings in the config file; ""
+// removes it, so its profile's or the default applies again.
+func (s *server) SetShuttleSetting(name, key, value string) *dbus.Error {
+	return busErr(s.d.SetShuttleSetting(name, key, value))
 }
 
 // SetEnabled turns a shuttle on or off in the config file, which the
