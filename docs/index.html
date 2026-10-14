@@ -1,0 +1,332 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>shuttle — sync folders with your NAS, from the terminal and GNOME</title>
+  <meta name="description" content="shuttle pushes, pulls and syncs folders between a Linux desktop and SMB or NFS shares, with no mounts and no root. A terminal interface, a user service, and GNOME showing what it is doing.">
+  <meta name="theme-color" content="#1b1e26" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="sign">⇄</span> shuttle</a>
+    <nav aria-label="Sections">
+      <a href="#problem"><span class="n">1</span><span class="label">Problem</span></a>
+      <a href="#different"><span class="n">2</span><span class="label">Different</span></a>
+      <a href="#features"><span class="n">3</span><span class="label">Features</span></a>
+      <a href="#how"><span class="n">4</span><span class="label">How it works</span></a>
+      <a href="#install"><span class="n">5</span><span class="label">Install</span></a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <div class="hero-art">
+      <!-- The bus from the TUI's header: its sign shows the sync arrows; its
+           lights take turns, as they do there while a shuttle runs. -->
+      <svg class="bus" viewBox="0 0 120 112" role="img" aria-label="shuttle's bus">
+        <rect class="body" x="14" y="6" width="92" height="88" rx="14" fill="none" stroke-width="5"/>
+        <path class="body" d="M0 48H14M106 48H120" stroke-width="6" fill="none"/>
+        <rect class="sign-plate" x="36" y="14" width="48" height="20" rx="4"/>
+        <text class="arrows" x="60" y="29" text-anchor="middle">⇄</text>
+        <rect class="glass" x="27" y="42" width="66" height="24" rx="4"/>
+        <circle class="light" cx="34" cy="80" r="5.5"/>
+        <circle class="light right" cx="86" cy="80" r="5.5"/>
+        <rect class="grille" x="50" y="78" width="20" height="4" rx="2"/>
+        <rect class="wheel" x="24" y="96" width="14" height="12" rx="2"/>
+        <rect class="wheel" x="82" y="96" width="14" height="12" rx="2"/>
+      </svg>
+      <!-- The wordmark, block for block as the TUI draws it, in its gradient. -->
+      <svg class="wordmark" viewBox="0 0 27 6" role="img" aria-label="shuttle" shape-rendering="crispEdges">
+        <defs>
+          <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="27" y2="0">
+            <stop offset="0" style="stop-color: var(--sky)"/>
+            <stop offset="0.33" style="stop-color: var(--teal)"/>
+            <stop offset="0.66" style="stop-color: var(--mint)"/>
+            <stop offset="1" style="stop-color: var(--amber)"/>
+          </linearGradient>
+        </defs>
+        <g fill="url(#g)">
+        <rect x="0" y="0" width="3" height="1"/>
+        <rect x="4" y="0" width="1" height="1"/>
+        <rect x="6" y="0" width="1" height="1"/>
+        <rect x="8" y="0" width="1" height="1"/>
+        <rect x="10" y="0" width="1" height="1"/>
+        <rect x="12" y="0" width="3" height="1"/>
+        <rect x="16" y="0" width="3" height="1"/>
+        <rect x="20" y="0" width="1" height="1"/>
+        <rect x="24" y="0" width="3" height="1"/>
+        <rect x="0" y="1" width="1" height="1"/>
+        <rect x="4" y="1" width="1" height="1"/>
+        <rect x="6" y="1" width="1" height="1"/>
+        <rect x="8" y="1" width="1" height="1"/>
+        <rect x="10" y="1" width="1" height="1"/>
+        <rect x="13" y="1" width="1" height="1"/>
+        <rect x="17" y="1" width="1" height="1"/>
+        <rect x="20" y="1" width="1" height="1"/>
+        <rect x="24" y="1" width="1" height="1"/>
+        <rect x="0" y="2" width="3" height="1"/>
+        <rect x="4" y="2" width="3" height="1"/>
+        <rect x="8" y="2" width="1" height="1"/>
+        <rect x="10" y="2" width="1" height="1"/>
+        <rect x="13" y="2" width="1" height="1"/>
+        <rect x="17" y="2" width="1" height="1"/>
+        <rect x="20" y="2" width="1" height="1"/>
+        <rect x="24" y="2" width="3" height="1"/>
+        <rect x="2" y="3" width="1" height="1"/>
+        <rect x="4" y="3" width="1" height="1"/>
+        <rect x="6" y="3" width="1" height="1"/>
+        <rect x="8" y="3" width="1" height="1"/>
+        <rect x="10" y="3" width="1" height="1"/>
+        <rect x="13" y="3" width="1" height="1"/>
+        <rect x="17" y="3" width="1" height="1"/>
+        <rect x="20" y="3" width="1" height="1"/>
+        <rect x="24" y="3" width="1" height="1"/>
+        <rect x="0" y="4" width="3" height="1"/>
+        <rect x="4" y="4" width="1" height="1"/>
+        <rect x="6" y="4" width="1" height="1"/>
+        <rect x="8" y="4" width="3" height="1"/>
+        <rect x="13" y="4" width="1" height="1"/>
+        <rect x="17" y="4" width="1" height="1"/>
+        <rect x="20" y="4" width="3" height="1"/>
+        <rect x="24" y="4" width="3" height="1"/>
+        </g>
+      </svg>
+    </div>
+
+    <p class="tagline">Push, pull and sync folders between your Linux desktop and a NAS, over SMB or
+      NFS, with no mounts and no root. Set it up in the terminal; a user service runs it;
+      GNOME shows what it is doing.</p>
+    <p class="modes"><b>↑</b> push &nbsp; <b>↓</b> pull &nbsp; <b>⇅</b> sync &nbsp;·&nbsp; real time, on a schedule, when the share comes online, or when you ask</p>
+    <div class="actions">
+      <a class="button primary" href="#install">Install v0.1.0</a>
+      <a class="button" href="https://github.com/fqazzazee/shuttle">Source on GitHub</a>
+      <a class="button" href="https://github.com/fqazzazee/shuttle/releases/latest">Releases</a>
+    </div>
+  </div>
+
+  <section id="problem">
+    <div class="wrap">
+      <p class="kicker">The problem</p>
+      <h2>Every tool does part of the job</h2>
+      <p class="lead">Keeping folders on a Linux desktop in step with folders on a NAS or file
+        server means picking between tools that each leave something out.</p>
+      <div class="tools">
+        <div class="tool">
+          <div class="name">rsync</div>
+          <div class="gap">✗ one-way, no memory</div>
+          <p>It has no idea what happened since the last run, so it cannot tell a file you deleted
+            from one that is new on the other side. A safe two-way sync is out of reach.</p>
+        </div>
+        <div class="tool">
+          <div class="name">Syncthing</div>
+          <div class="gap">✗ needs a peer on the NAS</div>
+          <p>It syncs both ways well, but only with another Syncthing on the other side. An SMB or
+            NFS share is not one.</p>
+        </div>
+        <div class="tool">
+          <div class="name">mount + a script</div>
+          <div class="gap">✗ fstab, root, a mount that may be gone</div>
+          <p>The job is tied to an fstab entry, root, and a mount that is not there when you are
+            away from home or the VPN is down.</p>
+        </div>
+        <div class="tool">
+          <div class="name">all of them</div>
+          <div class="gap">✗ invisible on the desktop</div>
+          <p>None shows what it is doing in GNOME, or lets you pause from Quick Settings when you
+            are on a slow connection.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mission">
+    <div class="wrap">
+      <div class="mission">
+        <div class="glyph" aria-hidden="true">⇅</div>
+        <div>
+          <p class="kicker">The mission</p>
+          <h2>One tool for all of it, as simple as an email client</h2>
+          <p>Each folder pair is a <em>shuttle</em>: it pushes, pulls or syncs both ways against a
+            share it connects to directly. You describe it once, in a terminal interface or a
+            plain config file, and it keeps going: in real time, on a schedule, or whenever the
+            share is back. When something needs you, a conflict or a share gone missing, it says
+            so, on the desktop, and waits.</p>
+          <p>Nothing is lost on the way: every write lands whole or not at all, a scan that failed
+            never turns into deletions, and what a sync replaces is kept.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="different">
+    <div class="wrap">
+      <p class="kicker">What sets it apart</p>
+      <h2>Built for a NAS, not for the cloud</h2>
+      <div class="distinct">
+        <article style="--c: var(--sky)">
+          <h3>No mounts, no root</h3>
+          <p>shuttle speaks SMB 2/3 and NFSv3 itself, as you, from a user service. No fstab entry,
+            no sudo, no mount to keep alive. An already-mounted path works too, for NFSv4.</p>
+        </article>
+        <article style="--c: var(--teal)">
+          <h3>Two-way sync that remembers</h3>
+          <p>A record of every file's last synced state tells "deleted here" from "new there", and
+            a change on both sides becomes a conflict, settled your way: keep both, newest wins,
+            or ask.</p>
+        </article>
+        <article style="--c: var(--mint)">
+          <h3>Made not to lose files</h3>
+          <p>Writes go to a temp name and are renamed into place. A failed or partial scan never
+            deletes; a run that would delete too much at once is held for you. Replaced files
+            can be versioned, and a run that would not fit stops before it copies.</p>
+        </article>
+        <article style="--c: var(--amber)">
+          <h3>At home on GNOME</h3>
+          <p>A top-bar indicator with the live transfer rate, a Quick Settings toggle to pause
+            everything or one shuttle, and notifications that open the terminal interface right
+            where something waits for you.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <p class="kicker">Main features</p>
+      <h2>Everything a folder pair needs</h2>
+      <div class="features">
+        <div class="feature"><span class="icon">↑ ↓ ⇅</span><h3>Push, pull or sync</h3>
+          <p>One way to the share, one way from it, or both. Push and pull mirror deletions, or add only.</p></div>
+        <div class="feature" style="--c: var(--teal)"><span class="icon">⠹</span><h3>Runs when it should</h3>
+          <p>Real time as files settle, on an interval or at set times, when the share comes back online, or only when you ask. Combine them.</p></div>
+        <div class="feature" style="--c: var(--sky)"><span class="icon">▤</span><h3>Profiles</h3>
+          <p>Reusable settings, "Live sync" or "Nightly backup", that a shuttle overrides one setting at a time.</p></div>
+        <div class="feature" style="--c: var(--orange)"><span class="icon">⚑</span><h3>Conflicts your way</h3>
+          <p>Keep both, newest wins, or hold the file until you choose, with both copies' size and time side by side.</p></div>
+        <div class="feature" style="--c: var(--mint)"><span class="icon">⟲</span><h3>Versioning</h3>
+          <p>Keep replaced files for N days, the last N versions, or on a staggered schedule, with a size cap.</p></div>
+        <div class="feature"><span class="icon">☑</span><h3>Selective sync</h3>
+          <p>Mark files and folders on a tree of the share or of this computer; or ignore by gitignore-style patterns.</p></div>
+        <div class="feature" style="--c: var(--teal)"><span class="icon">⇣</span><h3>Bandwidth limits</h3>
+          <p>Up and down, per shuttle, and a global cap across all of them that applies from the next file.</p></div>
+        <div class="feature" style="--c: var(--sky)"><span class="icon">▦</span><h3>Room checked first</h3>
+          <p>Free space on both sides is shown, and a run that would not fit stops before it copies, saying how much it needed.</p></div>
+        <div class="feature" style="--c: var(--coral)"><span class="icon">⚿</span><h3>Passwords in the keyring</h3>
+          <p>Share passwords live in GNOME Keyring, <span class="dim">never in the config file, logs or process arguments.</span></p></div>
+        <div class="feature" style="--c: var(--mint)"><span class="icon">✎</span><h3>A config that follows you</h3>
+          <p>Edit <code>config.toml</code> by hand or in the interface, comments kept: changes apply within a second, no restart.</p></div>
+        <div class="feature" style="--c: var(--orange)"><span class="icon">☰</span><h3>Activity log</h3>
+          <p>Every copy, deletion, conflict and error, newest first, kept for 30 days, per shuttle or all together.</p></div>
+        <div class="feature"><span class="icon">❯_</span><h3>A command line too</h3>
+          <p><code>shuttle status</code>, <code>sync</code>, <code>pause</code>, <code>resume</code> and <code>activity</code>, for scripts and quick checks.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="look">
+    <div class="wrap">
+      <p class="kicker">The terminal interface</p>
+      <h2>Every shuttle live, in one screen</h2>
+      <p class="lead">Progress, transfer rates and whether each share is online; under them, the
+        selected shuttle in full, its rate drawn as it goes. Tabs for conflicts, the activity log,
+        profiles and shares. <code>?</code> lists the keys.</p>
+      <div class="window">
+        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp; shuttle</div>
+        <picture>
+          <source media="(prefers-color-scheme: light)" srcset="screenshots/dashboard-light.svg">
+          <img src="screenshots/dashboard-dark.svg" width="872" height="572"
+               alt="shuttle's dashboard: five shuttles, two of them pushing to a NAS; below, the selected one in full, with its transfer rate as a sparkline">
+        </picture>
+      </div>
+      <p class="caption">The real interface, drawn from a run against a test daemon.</p>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <p class="kicker">How it works</p>
+      <h2>A service that runs as you, and what talks to it</h2>
+      <p class="lead">One binary: the terminal interface, the service and the command line. The service
+        does the syncing; everything else asks it over the session bus.</p>
+      <div class="arch">
+        <div class="col">
+          <div class="box"><b>Terminal interface</b><span>shuttle</span></div>
+          <div class="box"><b>GNOME extension</b><span>top bar · Quick Settings</span></div>
+          <div class="box"><b>Command line</b><span>shuttle status, sync…</span></div>
+        </div>
+        <div class="wire"><span class="arrow">⇄</span>D-Bus<br>session bus</div>
+        <div class="box core"><b>shuttle daemon</b><span>a systemd user service: triggers, scans, sync,
+            conflicts, versions, notifications<br><br>config.toml · state · GNOME Keyring</span></div>
+        <div class="wire"><span class="arrow">⇄</span>direct,<br>as you</div>
+        <div class="col">
+          <div class="box"><b>SMB 2/3</b><span>Samba, Windows, Synology, QNAP, TrueNAS</span></div>
+          <div class="box"><b>NFSv3</b><span>its own client: no kernel mount</span></div>
+          <div class="box"><b>A mounted path</b><span>NFSv4, or anything already mounted</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <p class="kicker">Install</p>
+      <h2>Fedora, Debian and Ubuntu, on GNOME 50</h2>
+      <p>From the <a href="https://github.com/fqazzazee/shuttle/releases/latest">latest release</a>, as a
+        package (amd64; arm64 built, not yet tested), then enable the service:</p>
+      <div class="stack">
+<pre class="term"><span class="p">$ </span>v=0.1.0
+<span class="p">$ </span>url=https://github.com/fqazzazee/shuttle/releases/download/v$v
+
+<span class="c"># Fedora</span>
+<span class="p">$ </span>sudo dnf install $url/shuttle_${v}_linux_amd64.rpm
+
+<span class="c"># Debian, Ubuntu</span>
+<span class="p">$ </span>curl -LO $url/shuttle_${v}_linux_amd64.deb
+<span class="p">$ </span>sudo apt install ./shuttle_${v}_linux_amd64.deb
+
+<span class="c"># then, for you</span>
+<span class="p">$ </span>systemctl --user enable --now shuttle
+<span class="p">$ </span>shuttle</pre>
+        <p class="label">Then a share, a profile and a shuttle: in the interface's tabs, or by hand</p>
+<pre class="term"><span class="c"># ~/.config/shuttle/config.toml</span>
+[<span class="k">shares.nas</span>]
+<span class="k">type</span> = <span class="s">"smb"</span>
+<span class="k">host</span> = <span class="s">"nas.example"</span>
+<span class="k">share</span> = <span class="s">"home"</span>
+<span class="k">user</span> = <span class="s">"you"</span>        <span class="c"># the password: in the keyring</span>
+
+[<span class="k">profiles.live</span>]
+<span class="k">mode</span> = <span class="s">"sync"</span>
+<span class="k">triggers</span> = [<span class="s">"realtime"</span>, <span class="s">"share-available"</span>]
+
+[<span class="k">shuttles.documents</span>]
+<span class="k">profile</span> = <span class="s">"live"</span>
+<span class="k">local</span> = <span class="s">"~/Documents"</span>
+<span class="k">remote</span> = <span class="s">"nas:/docs"</span></pre>
+      </div>
+      <p class="caption">The <a href="https://github.com/fqazzazee/shuttle#install">README</a> has the rest:
+        building from source, NFS exports, the GNOME extension, every setting.</p>
+      <p style="margin-top: 26px">shuttle is not:</p>
+      <div class="not"><span>a cloud sync client</span><span>a backup tool with deduplication</span><span>peer-to-peer, like Syncthing</span></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>shuttle is source-available: free under <a href="https://github.com/fqazzazee/shuttle/blob/main/LICENSE">PolyForm
+      Noncommercial or Internal Use</a>; its GNOME extension is GPL-2.0-or-later. Work for others needs a commercial license.</div>
+    <div><a href="https://github.com/fqazzazee/shuttle">GitHub</a> · <a href="https://buymeacoffee.com/fqazzazee">Buy me a coffee ☕</a></div>
+  </div>
+</footer>
+
+</body>
+</html>
