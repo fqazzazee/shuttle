@@ -7,7 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/fqazzazee/shuttle/internal/daemon"
 )
 
 // The bus and the wordmark line up only if every row is as wide as the
@@ -90,5 +93,51 @@ func TestSummaryWaitsForTheDaemon(t *testing.T) {
 	m := start(t, f, 120, 24)
 	if s := m.summary(); s != "" {
 		t.Errorf("summary %q with the daemon down", s)
+	}
+}
+
+// The bus is in the shuttles' state taken together, in the dashboard's
+// colors for it: sky when all is well, faint while the daemon is down.
+func TestBusTint(t *testing.T) {
+	idle := func(f *fake) {
+		for i := range f.shuttles {
+			f.shuttles[i].State = daemon.StateIdle
+		}
+	}
+	for _, tc := range []struct {
+		name string
+		set  func(f *fake)
+		want *lipgloss.Style
+	}{
+		{"all well", idle, &busStyle},
+		{"held", func(*fake) {}, &heldStyle},
+		{"running", func(f *fake) { idle(f); f.shuttles[0].State = daemon.StateRunning }, &busyStyle},
+		{"offline", func(f *fake) { idle(f); f.shuttles[1].State = daemon.StateOffline }, &badStyle},
+		{"everything paused", func(f *fake) { idle(f); f.pausedAll = true }, &faint},
+		{"a broken config", func(f *fake) { idle(f); f.configErr = "line 3: bad" }, &badStyle},
+		{"the daemon down", func(f *fake) { f.down = errors.New("no daemon") }, &faint},
+	} {
+		f := newFake()
+		tc.set(f)
+		m := start(t, f, 120, 24)
+		if top := tc.want.Render(" ╭───────╮ "); !strings.HasPrefix(m.View().Content, top) {
+			t.Errorf("%s: the bus is not in %q:\n%q", tc.name, top, strings.SplitN(m.View().Content, "\n", 2)[0])
+		}
+	}
+}
+
+// A shuttle that starts running tints the bus as soon as its status
+// arrives, as it does its row, not at the next refresh.
+func TestBusTintFollowsChanges(t *testing.T) {
+	f := newFake()
+	for i := range f.shuttles {
+		f.shuttles[i].State = daemon.StateIdle
+	}
+	m := start(t, f, 120, 24)
+	st := f.shuttles[0]
+	st.State = daemon.StateRunning
+	send(t, m, changedMsg(st))
+	if top := busyStyle.Render(" ╭───────╮ "); !strings.HasPrefix(m.View().Content, top) {
+		t.Errorf("the bus is not running:\n%q", strings.SplitN(m.View().Content, "\n", 2)[0])
 	}
 }

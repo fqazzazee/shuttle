@@ -12,7 +12,8 @@ import (
 	"github.com/fqazzazee/shuttle/internal/present"
 )
 
-// part is a run of a drawing in one style.
+// part is a run of a drawing in one style; nil for the bus's body, which
+// is drawn in the daemon's state (busTint).
 type part struct {
 	style *lipgloss.Style
 	text  string
@@ -22,11 +23,11 @@ type part struct {
 // the bus, the sync arrows on its destination sign, its windscreen, lights
 // and wheels. Every row is busWidth columns, one a character.
 var smallBus = [][]part{
-	{{&busStyle, " ╭───────╮ "}},
-	{{&busStyle, " │  "}, {&signStyle, " ⇄ "}, {&busStyle, "  │ "}},
-	{{&busStyle, "━┥ "}, {&glassStyle, "▐███▌"}, {&busStyle, " ┝━"}},
-	{{&busStyle, " │ "}, {&lightStyle, "●"}, {&faint, " ═ "}, {&lightStyle, "●"}, {&busStyle, " │ "}},
-	{{&busStyle, " ╰─"}, {&faint, "▀"}, {&busStyle, "───"}, {&faint, "▀"}, {&busStyle, "─╯ "}},
+	{{nil, " ╭───────╮ "}},
+	{{nil, " │  "}, {&signStyle, " ⇄ "}, {nil, "  │ "}},
+	{{nil, "━┥ "}, {&glassStyle, "▐███▌"}, {nil, " ┝━"}},
+	{{nil, " │ "}, {&lightStyle, "●"}, {&faint, " ═ "}, {&lightStyle, "●"}, {nil, " │ "}},
+	{{nil, " ╰─"}, {&faint, "▀"}, {nil, "───"}, {&faint, "▀"}, {nil, "─╯ "}},
 }
 
 // wordmark is "shuttle" in blocks, three rows high.
@@ -57,15 +58,36 @@ func (m *model) headerLines() []string {
 		m.summary(),
 		m.tabsLine(""),
 	}
+	body := m.busTint()
 	lines := make([]string, len(smallBus))
 	for i, row := range smallBus {
 		var b strings.Builder
 		for _, p := range row {
-			b.WriteString(p.style.Render(p.text))
+			style := &body
+			if p.style != nil {
+				style = p.style
+			}
+			b.WriteString(style.Render(p.text))
 		}
 		lines[i] = b.String() + strings.Repeat(" ", gap) + right[i]
 	}
 	return lines
+}
+
+// busTint is the bus's color: the shuttles' state taken together, as the
+// daemon works it out for its icon in the top bar, in the dashboard's
+// colors for it; sky when all is well, faint while the daemon is down.
+func (m *model) busTint() lipgloss.Style {
+	switch {
+	case m.down != nil:
+		return faint
+	case !m.loaded:
+		return busStyle
+	}
+	if style, ok := stateStyles[daemon.Overall(m.shuttles, m.pausedAll, m.configErr)]; ok {
+		return style
+	}
+	return busStyle
 }
 
 // tall says whether the terminal has room for the tall header: the height,
