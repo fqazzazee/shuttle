@@ -134,11 +134,24 @@ func (m *model) content(room int) []string {
 
 // withBus is an empty state on a first run: shuttle's icon, then text.
 func withBus(text ...string) []string {
-	lines := make([]string, 0, len(present.Bus)+1+len(text))
-	for _, l := range present.Bus {
-		lines = append(lines, busStyle.Render(l))
+	return append(append(bigBus(), ""), text...)
+}
+
+// bigBus is present.Bus in color, as the app icon has it: the body in sky,
+// the sync arrows on a dark destination sign, a windscreen that glows, the
+// lights in amber, the grille and wheels dim. Stripped of its colors, it is
+// present.Bus (TestBigBusIsTheBus).
+func bigBus() []string {
+	body := busStyle.Render
+	return []string{
+		body("  .----------."),
+		body("  |  ") + signStyle.Render("[ ⇄  ]") + body("  |"),
+		body(" =| .------. |="),
+		body("  | |") + windowStyle.Render("      ") + body("| |"),
+		body("  | '------' |"),
+		body("  | ") + lightStyle.Render("o") + "  " + faint.Render("==") + "  " + lightStyle.Render("o") + body(" |"),
+		body("  '-") + faint.Render("[]") + body("----") + faint.Render("[]") + body("-'"),
 	}
-	return append(append(lines, ""), text...)
 }
 
 // Column widths of the shuttles table; DETAILS takes the rest.
