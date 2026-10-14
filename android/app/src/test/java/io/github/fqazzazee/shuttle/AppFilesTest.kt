@@ -9,8 +9,10 @@ import org.junit.Test
 class AppFilesTest {
     @Test
     fun everythingIsInPrivateStorage() {
-        val files = AppFiles(File("/data/user/0/io.github.fqazzazee.shuttle/files"))
-        assertEquals("/data/user/0/io.github.fqazzazee.shuttle/files/config.toml", files.config.path)
-        assertEquals("/data/user/0/io.github.fqazzazee.shuttle/files/state", files.state.path)
+        val app = "/data/user/0/io.github.fqazzazee.shuttle"
+        val files = AppFiles(File("$app/files"), File("$app/no_backup"))
+        assertEquals("$app/files/config.toml", files.config.path)
+        assertEquals("$app/files/state", files.state.path)
+        assertEquals("$app/no_backup/passwords", files.passwords.path)
     }
 }
