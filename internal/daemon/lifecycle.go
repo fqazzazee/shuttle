@@ -277,6 +277,47 @@ func (d *Daemon) SetEnabled(name string, on bool) error {
 	return nil
 }
 
+// ShuttleSettings are the named shuttle's settings as rows, as its editor in
+// the TUI shows them: its own value of each, what applies otherwise and
+// from where, and whether the row applies. From the config file as it is
+// on disk, which may be ahead of what the daemon runs by a reload.
+func (d *Daemon) ShuttleSettings(name string) ([]config.RowState, error) {
+	data, err := os.ReadFile(d.o.Paths.Config)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrConfig, err)
+	}
+	rows, err := config.ShuttleRows(data, name)
+	if errors.Is(err, config.ErrNoShuttle) {
+		return nil, fmt.Errorf("%q: %w", name, ErrUnknownShuttle)
+	}
+	return rows, err
+}
+
+// SetShuttleSetting sets one of the named shuttle's settings in the config
+// file, the text as its row has it; "" removes the shuttle's own, so its
+// profile's or the default applies again. Only that key changes in the
+// file (config.SetShuttleRow), and the daemon reloads at once.
+func (d *Daemon) SetShuttleSetting(name, key, text string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	d.editMu.Lock()
+	changed, err := config.SetShuttleRow(d.o.Paths.Config, home, name, key, text)
+	d.editMu.Unlock()
+	switch {
+	case errors.Is(err, config.ErrNoShuttle):
+		return fmt.Errorf("%q: %w", name, ErrUnknownShuttle)
+	case err != nil:
+		return err
+	}
+	if changed {
+		d.o.Log.Info("setting changed", "shuttle", name, "key", key)
+		d.askReload()
+	}
+	return nil
+}
+
 func (d *Daemon) askReload() {
 	select {
 	case d.reload <- struct{}{}:
