@@ -11,6 +11,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/fqazzazee/shuttle/internal/config"
 )
 
 const profilesConfig = `[shares.nas]
@@ -240,11 +242,11 @@ func TestProfileFormScrolls(t *testing.T) {
 
 func TestRawText(t *testing.T) {
 	for v, want := range map[any]string{nil: "", true: "on", false: "off", int64(5): "5", "30d": "30d"} {
-		if got := rawText(v); got != want {
-			t.Errorf("rawText(%v) = %q, want %q", v, got, want)
+		if got := config.RawText(v); got != want {
+			t.Errorf("config.RawText(%v) = %q, want %q", v, got, want)
 		}
 	}
-	if got := rawText([]any{"a", "b"}); got != "a, b" {
+	if got := config.RawText([]any{"a", "b"}); got != "a, b" {
 		t.Errorf("a list: %q", got)
 	}
 }

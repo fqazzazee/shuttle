@@ -156,11 +156,11 @@ func (m *model) profilesLines(room int) []string {
 			break
 		}
 		raw := m.rawProfile(n)
-		triggers := rawText(raw["triggers"])
+		triggers := config.RawText(raw["triggers"])
 		if _, set := raw["triggers"]; !set || triggers == "" {
 			triggers = "manual only"
 		}
-		line := row(n, orNone(rawText(raw["mode"])), triggers, orNone(strings.Join(m.profilesUsing(n), ", ")))
+		line := row(n, orNone(config.RawText(raw["mode"])), triggers, orNone(strings.Join(m.profilesUsing(n), ", ")))
 		if n == m.profileSel {
 			line = selected.Render(pad(line, m.width))
 		}
