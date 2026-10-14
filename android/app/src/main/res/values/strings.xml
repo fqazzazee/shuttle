@@ -3,7 +3,10 @@
 <resources>
     <string name="app_name">shuttle</string>
     <string name="not_set_up">No shuttles yet. Setting them up on the phone comes in a later version.</string>
-    <string name="core_loaded">Sync engine loaded; no daemon running.</string>
+    <string name="start_failed">Syncing could not start: %1$s</string>
+    <string name="service_channel">Real-time syncing</string>
+    <string name="service_title">Syncing in real time</string>
+    <string name="service_text">shuttle is watching your real-time shuttles. Tap to open.</string>
 
     <string name="perm_heading">Before you start</string>
     <string name="perm_intro">shuttle needs three permissions to sync. You can give them now or later; until you do, the shuttles that need one wait and say which.</string>

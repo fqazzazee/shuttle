@@ -35,7 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.net.toUri
-import io.github.fqazzazee.shuttle.mobile.Mobile
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private var access by mutableStateOf(Access(files = false, localNetwork = false, notifications = false))
@@ -50,8 +50,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         firstRunSeen = prefs.getBoolean(FIRST_RUN_SEEN, false)
-        // Calling into the Go core loads it: a broken .aar fails here, at once.
-        val running = Mobile.running() != null
         setContent {
             ShuttleTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -61,18 +59,32 @@ class MainActivity : ComponentActivity() {
                             firstRunSeen = true
                         }
                     } else {
-                        Main(access, running, ::allow)
+                        Main(access, Core.statuses, Core.startError, ::allow)
                     }
                 }
             }
         }
     }
 
+    // The screen holds the daemon while it is shown, and starts the foreground service if a
+    // shuttle is real-time.
+    override fun onStart() {
+        super.onStart()
+        Core.async { Core.acquire(this, SCREEN)?.let { Core.updateService(this, it) } }
+    }
+
+    override fun onStop() {
+        Core.async { Core.release(SCREEN) }
+        super.onStop()
+    }
+
     // Permissions are given in Settings and in dialogs, and can be taken back there at any
-    // time: look again whenever the app comes back.
+    // time: look again whenever the app comes back, and tell the daemon.
     override fun onResume() {
         super.onResume()
         access = Access.of(this)
+        val now = access
+        Core.async { Core.setAccess(now) }
     }
 
     private fun allow(p: Permission) {
@@ -92,20 +104,25 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val FIRST_RUN_SEEN = "first_run_seen"
+        const val SCREEN = "screen"
     }
 }
 
+/** Until the shuttle list (step 14): each shuttle's name and state, and why it waits. */
 @Composable
-private fun Main(access: Access, running: Boolean, onAllow: (Permission) -> Unit) {
+private fun Main(access: Access, statuses: Map<String, String>, startError: String?, onAllow: (Permission) -> Unit) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
         MissingPermissions(access, onAllow)
-        Text(stringResource(R.string.not_set_up))
-        if (!running) {
-            Text(stringResource(R.string.core_loaded), style = MaterialTheme.typography.bodySmall)
+        startError?.let { Text(stringResource(R.string.start_failed, it), color = MaterialTheme.colorScheme.error) }
+        if (statuses.isEmpty()) Text(stringResource(R.string.not_set_up))
+        for ((name, json) in statuses.toSortedMap()) {
+            val st = JSONObject(json)
+            val waiting = st.optString("Waiting")
+            Text(if (waiting.isEmpty()) "$name: ${st.getString("State")}" else "$name: $waiting")
         }
     }
 }

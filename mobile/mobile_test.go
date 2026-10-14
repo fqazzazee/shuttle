@@ -144,6 +144,9 @@ func TestSyncAndWait(t *testing.T) {
 	if err := json.Unmarshal([]byte(m.StatusesJSON()), &all); err != nil || len(all) != 1 || all[0].Copied != 1 {
 		t.Errorf("StatusesJSON = %s, %v", m.StatusesJSON(), err)
 	}
+	if m.RealTime() {
+		t.Error("RealTime for a shuttle with no triggers")
+	}
 	if m.State() != "idle" || m.ConfigError() != "" {
 		t.Errorf("State = %q, ConfigError = %q", m.State(), m.ConfigError())
 	}

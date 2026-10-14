@@ -231,6 +231,11 @@ func (m *Daemon) ActivityJSON(name string, limit int) (string, error) {
 	return toJSON(es), nil
 }
 
+// RealTime reports whether an enabled shuttle is real-time: while one is,
+// the app's foreground service keeps this daemon running. Ask again after
+// Reload.
+func (m *Daemon) RealTime() bool { return m.d.Triggered(config.TriggerRealtime) }
+
 // SyncNow asks for a run of a shuttle.
 func (m *Daemon) SyncNow(name string) error { return m.d.SyncNow(name) }
 
