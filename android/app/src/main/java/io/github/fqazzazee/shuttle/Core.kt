@@ -119,6 +119,22 @@ object Core {
                 override fun onEvent(eventJSON: String) {
                     Log.i(TAG, "event $eventJSON")
                 }
+
+                // The config changed: drop the shuttles it removed, and see again whether the
+                // service is needed and what work to plan.
+                override fun onReload(reloadedJSON: String) {
+                    val removed = JSONObject(reloadedJSON).optJSONArray("Removed")
+                    if (removed != null) {
+                        val names = (0 until removed.length()).map { removed.getString(it) }.toSet()
+                        synchronized(this@Core) { statuses = statuses - names }
+                    }
+                    async {
+                        current?.let {
+                            updateService(app, it)
+                            plan(app, it)
+                        }
+                    }
+                }
             }
             filesAccess = access.files
             localNetwork = access.localNetwork

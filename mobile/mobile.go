@@ -40,12 +40,15 @@ type Passwords interface {
 	Delete(account string) error
 }
 
-// Listener hears from the daemon: a shuttle's status after each change, and
-// what is worth a notification, each as JSON. It is called on the daemon's
-// goroutines and must not block.
+// Listener hears from the daemon: a shuttle's status after each change,
+// what is worth a notification, and each reload of the config (the shuttles
+// it removed, or why it did not load), each as JSON. After a reload, the
+// app asks again which shuttles are real-time and what work to plan. It is
+// called on the daemon's goroutines and must not block.
 type Listener interface {
 	OnStatus(statusJSON string)
 	OnEvent(eventJSON string)
+	OnReload(reloadedJSON string)
 }
 
 // Options are what Start needs.
@@ -135,6 +138,10 @@ func Start(o *Options) (*Daemon, error) {
 	if err != nil {
 		logf.Close()
 		return nil, err
+	}
+	if l := o.Listener; l != nil {
+		// Never stopped: it goes with the daemon.
+		d.WatchReloads(func(r *daemon.Reloaded) { l.OnReload(toJSON(r)) })
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Daemon{d: d, cancel: cancel, done: make(chan error, 1), log: logf, access: acc}
