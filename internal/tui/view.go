@@ -69,7 +69,7 @@ func (m *model) keyLines() []string {
 func (m *model) room(keys int) int {
 	header := 1
 	if m.tall() {
-		header = len(smallBus)
+		header = busHeight
 	}
 	return max(m.height-header-2-keys, 1)
 }

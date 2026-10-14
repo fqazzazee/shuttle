@@ -157,8 +157,9 @@ func (m *model) tick() tea.Cmd {
 	return tea.Tick(m.every, func(time.Time) tea.Msg { return tickMsg{} })
 }
 
-// spin turns the spinners while a shuttle shows one, and stops with the
-// last: a run that only copies shows a bar, which needs no turning.
+// spin turns the spinners while a shuttle shows one, and blinks the bus's
+// lights, slower, while one runs and the bus shows; it stops when nothing
+// moves. A run that only copies shows a bar, which needs no turning.
 func (m *model) spin() tea.Cmd {
 	if m.spinning || m.every == 0 {
 		return nil
@@ -168,6 +169,12 @@ func (m *model) spin() tea.Cmd {
 			m.spinning = true
 			return tea.Tick(spinEvery, func(time.Time) tea.Msg { return spinMsg{} })
 		}
+	}
+	if m.tall() && m.running() {
+		m.spinning = true
+		// On the clock's half seconds, as the lights turn: every tick
+		// turns them.
+		return tea.Every(blinkEvery, func(time.Time) tea.Msg { return spinMsg{} })
 	}
 	return nil
 }
