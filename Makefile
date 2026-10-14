@@ -125,7 +125,7 @@ samba-down:
 # Service (a throwaway one; the user's own keyring is never touched). Needs
 # `make samba-up` first, plus dbus-run-session and gnome-keyring-daemon.
 test-integration:
-	$(SMB_TEST_ENV) internal/secrets/testdata/with-test-keyring.sh go test -race -count=1 ./...
+	$(SMB_TEST_ENV) internal/secrets/secretservice/testdata/with-test-keyring.sh go test -race -count=1 ./...
 
 # The engine suite with its remote side on an in-process NFSv3 server
 # (willscott/go-nfs) instead of a local folder. The fsys contract over NFS
@@ -137,7 +137,7 @@ test-nfs:
 # the user's own keyring is never touched. Needs dbus-run-session and
 # gnome-keyring-daemon.
 test-keyring:
-	internal/secrets/testdata/with-test-keyring.sh go test -race -count=1 -v ./internal/secrets/
+	internal/secrets/secretservice/testdata/with-test-keyring.sh go test -race -count=1 -v ./internal/secrets/...
 
 # Phase 3's exit condition under a real systemd: a throwaway container with
 # systemd as PID 1 runs the unit, every trigger, kill -9 mid-run and a broken
