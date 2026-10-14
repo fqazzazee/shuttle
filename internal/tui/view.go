@@ -406,19 +406,42 @@ func spins(p *daemon.Progress) bool {
 	return p.TotalBytes == 0 && p.Total == 0
 }
 
-// barWidth is a progress bar's length, in columns: two steps each.
+// barWidth is a progress bar's length, in columns: eight steps each.
 const barWidth = 8
 
-// bar is done, a fraction, as a progress bar: ━ done, ╸ half a column, ─ to
-// go. The shapes say it without the colors, which a selected row has not.
+// bar is done, a fraction, as a progress bar: filled a column's eighth at
+// a time, along the palette's gradient, on a track. The shapes say it
+// without the colors, which a selected row has not.
 func bar(done float64) string {
-	steps := min(max(int(done*2*barWidth), 0), 2*barWidth)
-	full, half := steps/2, steps%2
-	s := strings.Repeat("━", full)
-	if half == 1 {
-		s += "╸"
+	steps := min(max(int(done*8*barWidth), 0), 8*barWidth)
+	var b strings.Builder
+	for i := range barWidth {
+		b.WriteString(barCells[i][min(max(steps-8*i, 0), 8)])
 	}
-	return busyStyle.Render(s) + faint.Render(strings.Repeat("─", barWidth-full-half))
+	return b.String()
+}
+
+// barEighths are a column filled by eighths, from none to full.
+var barEighths = [9]string{"", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"}
+
+// barCellsFor is each column of a progress bar in each of its fills: in
+// p's gradient on a filled track; with p nil, in the terminal's own colors
+// on a faint one, which shows without colors.
+func barCellsFor(p *palette) (cells [barWidth][9]string) {
+	empty := faint.Render("░")
+	fill := func(int) lipgloss.Style { return busyStyle }
+	if p != nil {
+		empty = lipgloss.NewStyle().Background(p.surface).Render(" ")
+		colors := p.gradient(barWidth)
+		fill = func(i int) lipgloss.Style { return lipgloss.NewStyle().Foreground(colors[i]).Background(p.surface) }
+	}
+	for i := range barWidth {
+		cells[i][0] = empty
+		for e := 1; e < len(barEighths); e++ {
+			cells[i][e] = fill(i).Render(barEighths[e])
+		}
+	}
+	return cells
 }
 
 // statusLine says what needs saying most: a broken config, the last

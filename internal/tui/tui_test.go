@@ -370,7 +370,7 @@ func TestLiveProgress(t *testing.T) {
 		Progress: daemon.Progress{Phase: engine.PhaseSyncing, Done: 3, Total: 10, Bytes: 450, TotalBytes: 1000,
 			RateUp: 2_100_000, Path: "a.pdf"}})
 	s := screen(m)
-	if !strings.Contains(s, "docs    ⇅ sync  running") || !strings.Contains(s, "━━━╸────  45% ↑ 2.1 MB/s") {
+	if !strings.Contains(s, "docs    ⇅ sync  running") || !strings.Contains(s, "███▌      45% ↑ 2.1 MB/s") {
 		t.Errorf("progress not shown:\n%s", s)
 	}
 	if !strings.Contains(s, "↑ 2.1 MB/s  ↓ 0 B/s") {
@@ -397,9 +397,9 @@ func TestLiveProgress(t *testing.T) {
 	}{
 		{daemon.Progress{Phase: engine.PhaseScanning, Done: 1234}, "⠙ scanning 1234"},
 		{daemon.Progress{Phase: engine.PhaseComparing, Done: 2, Total: 5, RateDown: 1000}, "⠙ comparing 2/5 ↓ 1.0 kB/s"},
-		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 4}, "━━──────  25%"},
-		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 3}, "━━╸─────  33%"},
-		{daemon.Progress{Phase: engine.PhaseSyncing, Bytes: 5, TotalBytes: 5}, "━━━━━━━━ 100%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 4}, "██        25%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Done: 1, Total: 3}, "██▋       33%"},
+		{daemon.Progress{Phase: engine.PhaseSyncing, Bytes: 5, TotalBytes: 5}, "████████ 100%"},
 		{daemon.Progress{Phase: engine.PhaseSyncing}, "⠙ syncing"},
 		{daemon.Progress{}, ""},
 	} {
