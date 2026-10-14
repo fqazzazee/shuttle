@@ -24,6 +24,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/network"
 	"github.com/fqazzazee/shuttle/internal/notify"
 	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
@@ -126,12 +127,27 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 		return fmt.Errorf("connecting to the session bus: %w", err)
 	}
 	defer conn.Close()
+	// Whether the connection is metered, from NetworkManager on the system
+	// bus. Without one, it never is: shuttles run as they always would.
+	sys, sysErr := dbus.ConnectSystemBus()
+	if sysErr != nil {
+		log.Warn("not following metered connections: no system bus", "error", sysErr)
+	} else {
+		defer sys.Close()
+	}
 
 	var notifying sync.WaitGroup
 	defer notifying.Wait() // after cancel, before conn closes
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	notifying.Go(func() { notifier.Run(ctx, conn) })
+	if sys != nil {
+		notifying.Go(func() {
+			if err := network.Watch(ctx, sys, d.SetMetered); err != nil {
+				log.Warn("not following metered connections", "error", err)
+			}
+		})
+	}
 	runErr := make(chan error, 1)
 	go func() { runErr <- d.Run(ctx) }()
 	select {

@@ -126,6 +126,12 @@ Bandwidth limits go in a profile or a shuttle: `bandwidth = { up = "20MB/s", dow
 The same key under `[global]` caps all shuttles together. A change to the global cap applies
 from the next file, without restarting anything.
 
+On a metered connection, such as a phone's hotspot, a mobile modem, or a network marked metered
+in GNOME's network settings, shuttles **pause by default**: none starts a run of its own, one
+already running finishes its file and stops, and they carry on once the connection is not
+metered. "Sync now" still runs. shuttle asks NetworkManager; without it, no connection is
+metered. A shuttle that should keep going sets `metered = "run"`, in its profile or itself.
+
 Shares can also be added in the terminal interface (`shuttle`, then `5`), which tests them and
 keeps their passwords in the keyring. For a share written by hand, store its password with:
 

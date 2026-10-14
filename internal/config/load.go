@@ -63,6 +63,7 @@ type rawSettings struct {
 	ConflictHold  *string        `toml:"conflict_hold"`
 	Deletions     *string        `toml:"deletions"`
 	DeletionGuard *int           `toml:"deletion_guard"`
+	Metered       *string        `toml:"metered"`
 	Versioning    *rawVersioning `toml:"versioning"`
 	Ignore        *[]string      `toml:"ignore"`
 	Bandwidth     *rawBandwidth  `toml:"bandwidth"`
@@ -338,7 +339,7 @@ func (p *parser) shuttle(name string, r *rawShuttle, profiles map[string]rawSett
 // settingKeys are the Sources keys every shuttle has.
 var settingKeys = []string{
 	"mode", "triggers", "poll_interval", "interval", "at", "conflicts", "conflict_hold",
-	"deletions", "deletion_guard", "versioning", "ignore",
+	"deletions", "deletion_guard", "metered", "versioning", "ignore",
 	"bandwidth.up", "bandwidth.down",
 	"notify.errors", "notify.conflicts", "notify.completed", "notify.share",
 }
@@ -404,6 +405,13 @@ func (p *parser) apply(at string, s *Settings, sources map[string]Source, r *raw
 	if r.DeletionGuard != nil {
 		s.DeletionGuard = *r.DeletionGuard
 		set("deletion_guard")
+	}
+	if r.Metered != nil {
+		s.Metered = MeteredMode(*r.Metered)
+		if s.Metered != MeteredPause && s.Metered != MeteredRun {
+			p.errorf("%s.metered: %q must be pause or run", at, *r.Metered)
+		}
+		set("metered")
 	}
 	if r.Versioning != nil {
 		s.Versioning = p.versioning(at+".versioning", r.Versioning)

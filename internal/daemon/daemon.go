@@ -113,6 +113,7 @@ type Daemon struct {
 
 	mu        sync.Mutex
 	pausedAll bool
+	metered   bool // the connection is metered (SetMetered)
 	hostname  string
 }
 
@@ -276,6 +277,32 @@ func loadConfig(path string) (*config.Config, error) {
 		return nil, err
 	}
 	return config.Parse(nil, home)
+}
+
+// SetMetered says whether the computer's connection is metered. A shuttle set
+// to pause on one (config.MeteredPause, the default) starts no run of its own
+// while it is, and one in progress stops after its file; on a connection that
+// is not, waiting runs start. Runs the user asks for (SyncNow) still run.
+func (d *Daemon) SetMetered(metered bool) {
+	d.mu.Lock()
+	changed := d.metered != metered
+	d.metered = metered
+	d.mu.Unlock()
+	if !changed {
+		return
+	}
+	d.o.Log.Info("connection", "metered", metered)
+	d.runnersMu.RLock()
+	defer d.runnersMu.RUnlock()
+	for _, r := range d.runners {
+		r.pausedChanged()
+	}
+}
+
+func (d *Daemon) isMetered() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.metered
 }
 
 // Paused reports whether every shuttle is paused (SetPaused("", true)).

@@ -76,6 +76,7 @@ func encode(st *daemon.Status) map[string]dbus.Variant {
 		"State":         dbus.MakeVariant(string(st.State)),
 		"Mode":          dbus.MakeVariant(string(st.Mode)),
 		"Paused":        dbus.MakeVariant(st.Paused),
+		"Metered":       dbus.MakeVariant(st.Metered),
 		"Pending":       dbus.MakeVariant(st.Pending),
 		"Share":         dbus.MakeVariant(st.Share),
 		"Note":          dbus.MakeVariant(st.Note),
@@ -134,6 +135,7 @@ func decode(name string, m map[string]dbus.Variant) daemon.Status {
 	get("State", &state)
 	get("Mode", &mode)
 	get("Paused", &st.Paused)
+	get("Metered", &st.Metered)
 	get("Pending", &st.Pending)
 	get("Share", &st.Share)
 	get("Note", &st.Note)

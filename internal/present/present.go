@@ -56,7 +56,12 @@ func Attention(st *daemon.Status) string {
 	if st.HeldDeletions > 0 {
 		parts = append(parts, Plural(st.HeldDeletions, "deletion")+" held by the guard")
 	}
-	if st.Pending {
+	switch {
+	case st.Metered && st.Pending:
+		parts = append(parts, "a run waits for a connection that is not metered")
+	case st.Metered:
+		parts = append(parts, "paused while the connection is metered")
+	case st.Pending:
 		parts = append(parts, "a run is waiting")
 	}
 	if st.Note != "" {

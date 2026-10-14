@@ -59,6 +59,15 @@ const (
 	DeletionsAdditive DeletionMode = "additive"
 )
 
+// MeteredMode is what a shuttle does on a metered connection, such as a
+// phone's hotspot.
+type MeteredMode string
+
+const (
+	MeteredPause MeteredMode = "pause" // wait for a connection that is not metered
+	MeteredRun   MeteredMode = "run"   // run as on any other
+)
+
 // VersioningKind is how replaced and deleted files are kept.
 type VersioningKind string
 
@@ -102,6 +111,7 @@ type Settings struct {
 	ConflictHold  HoldScope
 	Deletions     DeletionMode
 	DeletionGuard int // percent of files gone at once that holds deletions; 0 is off
+	Metered       MeteredMode
 	Versioning    Versioning
 	Ignore        []string
 	// Include and Exclude are what a shuttle selects of its folder: slash
@@ -210,7 +220,8 @@ func (c *Config) Shuttle(name string) (Shuttle, bool) {
 // Defaults are the built-in settings every profile and shuttle starts from.
 // Mode has no default: which way files move must be chosen, never assumed.
 // The rest lean towards never losing data: manual runs only, additive
-// push/pull, and deleted or replaced files kept for 30 days.
+// push/pull, and deleted or replaced files kept for 30 days; and towards not
+// spending what a metered connection costs.
 func Defaults() Settings {
 	return Settings{
 		PollInterval:  60 * time.Second,
@@ -218,6 +229,7 @@ func Defaults() Settings {
 		ConflictHold:  HoldFile,
 		Deletions:     DeletionsAdditive,
 		DeletionGuard: 50,
+		Metered:       MeteredPause,
 		Versioning:    Versioning{Kind: VersioningTrash, Keep: 30 * 24 * time.Hour},
 		Notify:        Notify{Errors: true, Conflicts: true, Completed: true, Share: true},
 	}
