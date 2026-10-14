@@ -77,13 +77,15 @@ type model struct {
 	profileSel string
 	settings   *settingsForm
 
+	rates map[string][]rateSample // each running shuttle's, for its sparkline
+
 	wizard  *wizard              // the shuttle editor, on the Shuttles tab
 	changes <-chan daemon.Status // nil until subscribed
 }
 
 func newModel(ctx context.Context, c Client, o Options) *model {
 	return &model{ctx: ctx, c: c, o: o, tab: o.Tab, now: time.Now, every: refreshEvery, width: 80, height: 24,
-		resolving: map[string]bool{}, tested: map[string]testResult{}}
+		resolving: map[string]bool{}, tested: map[string]testResult{}, rates: map[string][]rateSample{}}
 }
 
 // Messages.
@@ -202,6 +204,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.down = nil
 		m.shuttles, m.pausedAll, m.configErr = msg.shuttles, msg.pausedAll, msg.configErr
+		// The signals' samples come first; a refresh fills in without them.
+		for i := range m.shuttles {
+			m.sample(&m.shuttles[i], 2*sampleEvery)
+		}
 		m.keepSelection()
 		cmd := m.spin()
 		return m, cmd
@@ -309,6 +315,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // changed puts a status from a signal in place, or adds a new shuttle.
 func (m *model) changed(st *daemon.Status) {
+	m.sample(st, sampleEvery/2)
 	i := slices.IndexFunc(m.shuttles, func(s daemon.Status) bool { return s.Name == st.Name })
 	if i >= 0 {
 		m.shuttles[i] = *st

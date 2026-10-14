@@ -58,7 +58,9 @@ func (m *model) panel() []string {
 	if !st.LastRun.IsZero() {
 		add("Last run", present.Ago(st.LastRun, now)+lastRunText(st))
 	}
+	width := max(m.width-2-panelLabel, 20)
 	add("Now", present.Progress(&st.Progress))
+	add("Rate", m.rateLine(st.Name, width))
 	if a := present.Attention(st); a != "" {
 		style := heldStyle
 		if st.State == daemon.StateError || st.State == daemon.StateOffline {
@@ -67,7 +69,6 @@ func (m *model) panel() []string {
 		add("Details", style.Render(a))
 	}
 
-	width := max(m.width-2-panelLabel, 20)
 	lines := []string{faint.Render(strings.Repeat("─", max(m.width, 1))), title}
 	for _, r := range rows {
 		wrapped := strings.Split(ansi.Wrap(r[1], width, " "), "\n")
