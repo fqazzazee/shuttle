@@ -189,5 +189,13 @@ pre.term {
 .not { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .not span { font: 14px var(--mono); border: 1px dashed var(--line); border-radius: 999px; padding: 4px 12px; color: var(--dim); }
 
+/* Contributing: numbered steps, like the TUI's tabs. */
+.steps { list-style: none; padding: 0; margin: 24px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.steps li { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+.steps .n { display: inline-block; font: 700 14px var(--mono); background: var(--yellow); color: var(--ink); border-radius: 4px; padding: 1px 8px; margin-bottom: 10px; }
+.steps p { margin: 0; font-size: 15px; }
+.note { border-left: 4px solid var(--orange); background: var(--panel); border-radius: 0 8px 8px 0; padding: 18px 20px; margin: 22px 0; }
+.note p { margin: 0; font-size: 15.5px; }
+
 footer { border-top: 1px solid var(--line); padding: 36px 0 56px; color: var(--dim); font-size: 15px; }
 footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: space-between; }
