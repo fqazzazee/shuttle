@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 #
 # The README's screenshots: the real binary in tmux against a running
 # daemon, on a private session bus, with HOME and every XDG folder in a

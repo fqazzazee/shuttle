@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Command shuttle pushes, pulls and syncs folders between SMB/NFS shares and
 // local storage. `shuttle daemon` runs the background service; with no

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 #
 # The Linux kernel NFS server for CI's "nfs (kernel server)" job, the second
 # half of Phase 5's exit condition. It installs a system service and rewrites

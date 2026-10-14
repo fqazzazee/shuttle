@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package bus is shuttle's D-Bus interface: the daemon serves it, and the
 // CLI, the TUI and the GNOME extension use it. See SPEC.md, "D-Bus API".

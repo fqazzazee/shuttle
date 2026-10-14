@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package activity keeps a shuttle's activity log: what its runs did, file by
 // file, and what went wrong. Each shuttle has a file of its own, one JSON

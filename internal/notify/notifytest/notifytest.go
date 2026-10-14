@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package notifytest is a stand-in desktop notification server: it owns
 // org.freedesktop.Notifications on a bus and records what it is asked to

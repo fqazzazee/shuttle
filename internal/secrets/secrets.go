@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package secrets keeps share passwords in the desktop's Secret Service
 // (GNOME Keyring, KWallet), and nowhere else: not in the config file, not in

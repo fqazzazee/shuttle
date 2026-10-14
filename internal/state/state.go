@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 
 // Package state stores what each file of a shuttle looked like on both sides
 // when it was last synced. It is the common ancestor of a two-way sync: it is
