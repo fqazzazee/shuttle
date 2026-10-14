@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
+<resources>
+    <string name="app_name">shuttle</string>
+    <string name="not_set_up">No shuttles yet. Setting them up on the phone comes in a later version.</string>
+    <string name="core_loaded">Sync engine loaded; no daemon running.</string>
+</resources>

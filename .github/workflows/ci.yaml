@@ -257,9 +257,10 @@ jobs:
           check-latest: true
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
-  # The Android app's Go core: gomobile, pinned in go.mod, binds mobile/
-  # into the .aar the app builds on. The runner has the Android SDK and a
-  # JDK; the NDK version is the Makefile's.
+  # The Android app: gomobile, pinned in go.mod, binds mobile/ into the .aar,
+  # and Gradle builds the app on it, with its unit tests and Android lint.
+  # The runner has the Android SDK and a JDK; the NDK version is the
+  # Makefile's, Gradle's the wrapper's.
   android:
     name: android
     needs: changes
@@ -282,6 +283,18 @@ jobs:
         run: |
           unzip -l bin/android/shuttle.aar | tee /dev/stderr | grep -q ' jni/arm64-v8a/libgojni.so$'
           unzip -l bin/android/shuttle.aar | grep -q ' classes.jar$'
+      - run: make test-android ANDROID_HOME="$ANDROID_HOME"
+      - name: lint report
+        if: failure()
+        run: cat android/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt || true
+      # To try a pull request's app on a phone: a debug build, signed with
+      # the runner's throwaway debug key.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: shuttle-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
 
   # The one check branch protection requires of CI: every job passed, or was
   # skipped as nothing it tests changed. A job added above goes in needs.

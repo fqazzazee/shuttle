@@ -18,7 +18,7 @@ GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v
 # Keep in step with the release workflow. Not newer: from v2.18 it needs Go 1.27.
 GORELEASER    ?= go run github.com/goreleaser/goreleaser/v2@v2.17.1
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar test-android samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -110,6 +110,11 @@ aar:
 	ANDROID_NDK_HOME=$(ANDROID_HOME)/ndk/$(NDK_VERSION) \
 		go tool gomobile bind -target=$(ANDROID_TARGETS) -androidapi 30 -trimpath \
 		-javapkg io.github.fqazzazee.shuttle -o $(AAR) ./mobile
+
+# The app in android/, on that .aar: a debug APK, its unit tests and Android
+# lint. Gradle comes from the wrapper, at the version and checksum it pins.
+test-android: aar
+	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug
 
 # SMB integration tests run against a throwaway Samba container.
 CONTAINER    ?= podman
