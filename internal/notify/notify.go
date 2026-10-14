@@ -9,16 +9,14 @@ package notify
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/fqazzazee/shuttle/internal/daemon"
-	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/notice"
 )
 
 // desktopEntry is shuttle's desktop file, without .desktop: it gives the
@@ -137,7 +135,7 @@ func (s *sender) call(ctx context.Context, e *daemon.Event) error {
 		s.markup = &has
 	}
 	m := message(e)
-	body := m.body
+	body := m.Body
 	if *s.markup {
 		// File names come from the share: never let them read as markup.
 		body = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(body)
@@ -148,128 +146,45 @@ func (s *sender) call(ctx context.Context, e *daemon.Event) error {
 		"desktop-entry": dbus.MakeVariant(desktopEntry),
 	}
 	actions := []string{}
-	if m.open != "" {
+	if m.Open != "" {
 		actions = []string{"open", "Open shuttle"}
 	}
 	var id uint32
 	err := s.obj.CallWithContext(ctx, busName+".Notify", 0,
-		appName, s.ids[m.key], m.icon, m.summary, body, actions, hints, int32(-1)).Store(&id)
+		appName, s.ids[m.Key], m.icon, m.Summary, body, actions, hints, int32(-1)).Store(&id)
 	if err != nil {
 		return err
 	}
-	if m.key != "" {
-		s.ids[m.key] = id
+	if m.Key != "" {
+		s.ids[m.Key] = id
 	}
-	if m.open != "" {
-		s.opens[id] = m.open
+	if m.Open != "" {
+		s.opens[id] = m.Open
 	}
 	return nil
 }
 
-// note is what one notification says.
+// note is a notice with the desktop's own hints.
 type note struct {
-	// key: a note replaces the last one with the same key, so a shuttle's
-	// latest error or a share's latest state is shown once, not stacked.
-	// Conflicts have none: each batch is news of its own.
-	key            string
+	notice.Note
 	icon, category string
-	summary, body  string // body is plain text; call escapes it
-	open           string // the TUI tab its "Open shuttle" button opens; "" for none
 }
 
-// message words an event.
+// message words an event, with the icon and category the desktop's
+// notification server shows it by.
 func message(e *daemon.Event) note {
+	n := note{Note: notice.Of(e), icon: "dialog-information-symbolic"}
 	switch e.Kind {
-	case daemon.EventError:
-		lines := []string{e.Error}
-		lines = append(lines, issueLines(e.Errors, func(i engine.Issue) string { return i.Reason })...)
-		return note{key: "error/" + e.Shuttle, icon: "dialog-error-symbolic", category: "transfer.error",
-			summary: e.Shuttle + ": sync failed", body: strings.Join(lines, "\n")}
-	case daemon.EventConflicts:
-		open := ""
-		if slices.ContainsFunc(e.Conflicts, func(i engine.Issue) bool { return i.Outcome == "held" }) {
-			open = "conflicts" // it waits for the user
-		}
-		return note{icon: "dialog-warning-symbolic", category: "transfer", open: open,
-			summary: fmt.Sprintf("%s: %s", e.Shuttle, plural(len(e.Conflicts), "conflict")),
-			body: strings.Join(issueLines(e.Conflicts, func(i engine.Issue) string {
-				if i.Outcome == "held" {
-					return "waiting for you"
-				}
-				return i.Outcome
-			}), "\n")}
-	case daemon.EventDeletionsHeld:
-		return note{key: "deletions/" + e.Shuttle, icon: "dialog-warning-symbolic", category: "transfer", open: "conflicts",
-			summary: fmt.Sprintf("%s: %s held back", e.Shuttle, plural(e.HeldDeletions, "deletion")),
-			body: "More files would be deleted at once than the deletion guard allows, so none were. " +
-				"Check that both folders are there and mounted before allowing them."}
+	case daemon.EventError, daemon.EventConfigError:
+		n.icon, n.category = "dialog-error-symbolic", "transfer.error"
+	case daemon.EventConflicts, daemon.EventDeletionsHeld:
+		n.icon, n.category = "dialog-warning-symbolic", "transfer"
 	case daemon.EventCompleted:
-		return note{key: "completed/" + e.Shuttle, icon: "io.github.fqazzazee.Shuttle", category: "transfer.complete",
-			summary: e.Shuttle + ": synced", body: done(e.Copied, e.Deleted)}
+		n.icon, n.category = "io.github.fqazzazee.Shuttle", "transfer.complete"
 	case daemon.EventShareLost:
-		return note{key: "share/" + e.Share, icon: "network-offline-symbolic", category: "network.disconnected",
-			summary: "Share " + e.Share + " lost", body: "Waiting for it: " + names(e.Shuttles) + "."}
-	case daemon.EventConfigError:
-		return note{key: "config", icon: "dialog-error-symbolic", category: "transfer.error",
-			summary: "shuttle: config not loaded", body: e.Error + "\nThe previous settings stay in use until it is fixed."}
+		n.icon, n.category = "network-offline-symbolic", "network.disconnected"
 	case daemon.EventShareConnected:
-		return note{key: "share/" + e.Share, icon: "network-server-symbolic", category: "network.connected",
-			summary: "Share " + e.Share + " connected", body: "Can sync again: " + names(e.Shuttles) + "."}
+		n.icon, n.category = "network-server-symbolic", "network.connected"
 	}
-	return note{icon: "dialog-information-symbolic", summary: string(e.Kind), body: e.Shuttle}
-}
-
-// maxLines is how many paths a note lists before "and N more".
-const maxLines = 3
-
-func issueLines(issues []engine.Issue, what func(engine.Issue) string) []string {
-	var lines []string
-	for i, is := range issues {
-		if i == maxLines {
-			lines = append(lines, fmt.Sprintf("and %d more", len(issues)-maxLines))
-			break
-		}
-		lines = append(lines, clip(is.Path)+": "+what(is))
-	}
-	return lines
-}
-
-// clip shortens a path from the share to something a notification can show.
-func clip(s string) string {
-	const most = 80
-	if r := []rune(s); len(r) > most {
-		return "…" + string(r[len(r)-most+1:])
-	}
-	return s
-}
-
-func done(copied, deleted int) string {
-	switch {
-	case copied > 0 && deleted > 0:
-		return fmt.Sprintf("Copied %s and deleted %d.", plural(copied, "file"), deleted)
-	case copied > 0:
-		return "Copied " + plural(copied, "file") + "."
-	case deleted > 0:
-		return "Deleted " + plural(deleted, "file") + "."
-	}
-	return "Nothing to do: already in step."
-}
-
-func names(n []string) string {
-	switch {
-	case len(n) == 0:
-		return "no shuttles"
-	case len(n) > 4:
-		return strings.Join(n[:3], ", ") + fmt.Sprintf(" and %d more", len(n)-3)
-	case len(n) == 1:
-		return n[0]
-	}
-	return strings.Join(n[:len(n)-1], ", ") + " and " + n[len(n)-1]
-}
-
-func plural(n int, thing string) string {
-	if n == 1 {
-		return "1 " + thing
-	}
-	return fmt.Sprintf("%d %ss", n, thing)
+	return n
 }

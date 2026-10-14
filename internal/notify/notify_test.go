@@ -16,53 +16,26 @@ import (
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/dbustest"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/notice"
 	"github.com/fqazzazee/shuttle/internal/notify/notifytest"
 )
 
-func TestMessage(t *testing.T) {
-	conflicts := []engine.Issue{
-		{Path: "a.txt", Outcome: "held"},
-		{Path: "b.txt", Outcome: "kept both: the nas copy is now b (nas).txt"},
-		{Path: "c.txt", Outcome: "held"},
-		{Path: "d.txt", Outcome: "held"},
-	}
-	for _, tc := range []struct {
-		e                      daemon.Event
-		key, summary, body, ct string
-	}{
-		{daemon.Event{Kind: daemon.EventError, Shuttle: "docs", Error: "2 paths could not be synced",
-			Errors: []engine.Issue{{Path: "x", Reason: "permission denied"}, {Path: "y", Reason: "busy"}}},
-			"error/docs", "docs: sync failed", "2 paths could not be synced\nx: permission denied\ny: busy", "transfer.error"},
-		{daemon.Event{Kind: daemon.EventConflicts, Shuttle: "docs", Conflicts: conflicts},
-			"", "docs: 4 conflicts", "a.txt: waiting for you\nb.txt: kept both: the nas copy is now b (nas).txt\nc.txt: waiting for you\nand 1 more", "transfer"},
-		{daemon.Event{Kind: daemon.EventDeletionsHeld, Shuttle: "docs", HeldDeletions: 15},
-			"deletions/docs", "docs: 15 deletions held back", "More files would be deleted", "transfer"},
-		{daemon.Event{Kind: daemon.EventCompleted, Shuttle: "docs", Copied: 3, Deleted: 1},
-			"completed/docs", "docs: synced", "Copied 3 files and deleted 1.", "transfer.complete"},
-		{daemon.Event{Kind: daemon.EventCompleted, Shuttle: "docs", Copied: 1},
-			"completed/docs", "docs: synced", "Copied 1 file.", "transfer.complete"},
-		{daemon.Event{Kind: daemon.EventCompleted, Shuttle: "docs"},
-			"completed/docs", "docs: synced", "Nothing to do: already in step.", "transfer.complete"},
-		{daemon.Event{Kind: daemon.EventShareLost, Share: "nas", Shuttles: []string{"docs", "music", "photos"}},
-			"share/nas", "Share nas lost", "Waiting for it: docs, music and photos.", "network.disconnected"},
-		{daemon.Event{Kind: daemon.EventConfigError, Error: `shuttles.docs.mode: "both" must be one of push, pull, sync`},
-			"config", "shuttle: config not loaded", "shuttles.docs.mode: \"both\" must be one of push, pull, sync\nThe previous settings stay in use", "transfer.error"},
-		{daemon.Event{Kind: daemon.EventShareConnected, Share: "nas", Shuttles: []string{"docs"}},
-			"share/nas", "Share nas connected", "Can sync again: docs.", "network.connected"},
+// The desktop's hints for each kind of event; the words are notice's.
+func TestMessageHints(t *testing.T) {
+	for kind, category := range map[daemon.EventKind]string{
+		daemon.EventError:          "transfer.error",
+		daemon.EventConfigError:    "transfer.error",
+		daemon.EventConflicts:      "transfer",
+		daemon.EventDeletionsHeld:  "transfer",
+		daemon.EventCompleted:      "transfer.complete",
+		daemon.EventShareLost:      "network.disconnected",
+		daemon.EventShareConnected: "network.connected",
 	} {
-		t.Run(string(tc.e.Kind), func(t *testing.T) {
-			m := message(&tc.e)
-			if m.key != tc.key || m.summary != tc.summary || !strings.HasPrefix(m.body, tc.body) || m.category != tc.ct || m.icon == "" {
-				t.Errorf("message = %+v\nwant key %q, summary %q, body %q, category %q", m, tc.key, tc.summary, tc.body, tc.ct)
-			}
-		})
-	}
-}
-
-func TestClipKeepsTheFileName(t *testing.T) {
-	long := strings.Repeat("deep/", 40) + "report.odt"
-	if got := clip(long); len([]rune(got)) != 80 || !strings.HasSuffix(got, "/report.odt") || !strings.HasPrefix(got, "…") {
-		t.Errorf("clip = %q", got)
+		e := daemon.Event{Kind: kind, Shuttle: "docs", Share: "nas"}
+		m := message(&e)
+		if m.category != category || m.icon == "" || m.Summary != notice.Of(&e).Summary {
+			t.Errorf("%s: %+v, want category %q, an icon, and notice's words", kind, m, category)
+		}
 	}
 }
 
