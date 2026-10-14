@@ -21,7 +21,11 @@ builds:
 archives:
   - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files: [LICENSE, README.md]
+    files:
+      - LICENSE
+      - README.md
+      - src: build/package/THIRD_PARTY_NOTICES
+        strip_parent: true
 
 checksum:
   name_template: checksums.txt
@@ -58,11 +62,12 @@ nfpms:
       - src: extension/LICENSE
         dst: /usr/share/licenses/shuttle/LICENSE.extension
         packager: rpm
-      - src: LICENSE
+      - src: build/package/THIRD_PARTY_NOTICES
+        dst: /usr/share/licenses/shuttle/THIRD_PARTY_NOTICES
+        packager: rpm
+      # Debian's one copyright file: LICENSE, the extension's, the notices.
+      - src: build/package/copyright
         dst: /usr/share/doc/shuttle/copyright
-        packager: deb
-      - src: extension/LICENSE
-        dst: /usr/share/doc/shuttle/LICENSE.extension
         packager: deb
 
 # Release notes come from conventional commit subjects (squash merges keep them

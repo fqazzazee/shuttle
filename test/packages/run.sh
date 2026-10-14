@@ -18,6 +18,23 @@ if [ ${#rpms[@]} -ne 1 ] || [ ${#debs[@]} -ne 1 ]; then
 	exit 1
 fi
 
+# The notices name every module built into each binary, as the binary
+# itself lists them, and every tarball carries them.
+notices=$root/build/package/THIRD_PARTY_NOTICES
+bins=("$root"/dist/shuttle_linux_*/shuttle)
+[ ${#bins[@]} -ge 2 ] || { echo "want the amd64 and arm64 binaries in dist/"; exit 1; }
+for bin in "${bins[@]}"; do
+	while read -r kind path version _; do
+		[ "$kind" = dep ] || continue
+		grep -qxF "== $path $version" "$notices" || { echo "FAIL: $path $version, in $bin, is not in the notices"; exit 1; }
+	done < <(go version -m "$bin")
+done
+for tarball in "$root"/dist/shuttle_*.tar.gz; do
+	# grep reads it all: -q would stop early, and pipefail take tar's SIGPIPE for a failure.
+	tar tzf "$tarball" | grep -x THIRD_PARTY_NOTICES >/dev/null || { echo "FAIL: $tarball has no THIRD_PARTY_NOTICES"; exit 1; }
+done
+echo "notices: every module of ${#bins[@]} binaries, in every tarball"
+
 # check <image> <package>
 check() {
 	printf '\n== %s: %s\n' "$1" "$(basename "$2")"
