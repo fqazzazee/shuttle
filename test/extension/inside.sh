@@ -358,6 +358,23 @@ shows error
 row docs "r.state === 'error' && r.detail.includes('is the share mounted?')"
 snap error
 
+step "preferences: GNOME's Extensions app opens them, without an error"
+gnome-extensions prefs "$uuid"
+win="global.display.list_all_windows().find(w => w.title === 'Shuttle')"
+for _ in $(seq 100); do [ "$(ev "!!$win")" = true ] && break; sleep 0.2; done
+is "!!$win" true
+sleep 1 # its pages filled from the daemon
+snap prefs none
+if grep -iE "prefs\.js|settingsPage\.js|daemon\.js" "$tmp/session.log" | grep -iqE "error|exception"; then
+	fail "the preferences logged an error: $(grep -iE 'prefs\.js|settingsPage\.js' "$tmp/session.log" | tail -3)"
+fi
+ev "$win.delete(global.get_current_time())" >/dev/null
+for _ in $(seq 50); do [ "$(ev "!!$win")" = false ] && break; sleep 0.2; done
+
+step "preferences: a shuttle's settings, edited through the daemon, as on disk"
+gjs -m "$root/test/extension/prefs.js" "$XDG_CONFIG_HOME/shuttle/config.toml" \
+	${SHUTTLE_EXT_SCREENSHOTS:+"$SHUTTLE_EXT_SCREENSHOTS/prefs-docs.png"} || fail "the preferences' pages"
+
 step "the daemon stops: not running"
 kill "$daemon"
 wait "$daemon" 2>/dev/null || true

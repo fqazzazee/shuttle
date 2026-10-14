@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // Daemon follows the shuttle daemon over D-Bus for the indicator and the
-// Quick Settings toggle, so both show the same thing from one connection.
-// It imports nothing from GNOME Shell.
+// Quick Settings toggle, so both show the same thing from one connection,
+// and edits shuttles' settings for the preferences window. It imports
+// nothing from GNOME Shell: the preferences run in a process of their own.
 
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -22,6 +23,8 @@ export const Daemon = GObject.registerClass({
         'shuttle-removed': {param_types: [GObject.TYPE_STRING]},
         // The list of shuttles has arrived: no shuttles now means none.
         'listed': {},
+        // The settings on disk are those the daemon runs: after any change.
+        'config-reloaded': {},
     },
 }, class Daemon extends GObject.Object {
     constructor() {
@@ -93,8 +96,26 @@ export const Daemon = GObject.registerClass({
         return this._call('SetPaused', new GLib.Variant('(sb)', [name, paused]));
     }
 
-    // _call calls a method of the daemon. The promise fails with the
-    // daemon's own words, e.g. that the shuttle is turned off.
+    // shuttleSettings are the named shuttle's settings as the rows of its
+    // editor (internal/bus: ShuttleSettings): objects of key, label, hint,
+    // kind, choices, value, inherited, from and off.
+    async shuttleSettings(name) {
+        const reply = await this._call('ShuttleSettings', new GLib.Variant('(s)', [name]));
+        const [rows] = reply.recursiveUnpack();
+        return rows.map(([key, label, hint, kind, choices, value, inherited, from, off]) =>
+            ({key, label, hint, kind, choices, value, inherited, from, off}));
+    }
+
+    // setShuttleSetting sets one of the named shuttle's settings, as typed in
+    // its row; "" removes the shuttle's own, so its profile's or the default
+    // applies again.
+    setShuttleSetting(name, key, value) {
+        return this._call('SetShuttleSetting', new GLib.Variant('(sss)', [name, key, value]));
+    }
+
+    // _call calls a method of the daemon, and resolves with its reply. The
+    // promise fails with the daemon's own words, e.g. that the shuttle is
+    // turned off.
     _call(method, params) {
         return new Promise((resolve, reject) => {
             if (!this.running) {
@@ -103,8 +124,7 @@ export const Daemon = GObject.registerClass({
             }
             this._proxy.call(method, params, Gio.DBusCallFlags.NONE, -1, this._cancellable, (proxy, result) => {
                 try {
-                    proxy.call_finish(result);
-                    resolve();
+                    resolve(proxy.call_finish(result));
                 } catch (e) {
                     Gio.DBusError.strip_remote_error(e);
                     reject(e);
@@ -155,6 +175,8 @@ export const Daemon = GObject.registerClass({
         } else if (signal === 'ShuttleRemoved') {
             const [name] = params.recursiveUnpack();
             this._remove(name);
+        } else if (signal === 'ConfigReloaded') {
+            this.emit('config-reloaded');
         }
     }
 
