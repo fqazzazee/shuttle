@@ -1,0 +1,92 @@
+<!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
+<!-- shuttle's social preview, 1280x640, in the TUI's dark palette: the
+     source of social-preview.png, which GitHub and the project page use. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="27" y2="0">
+      <stop offset="0" stop-color="#61afef"/>
+      <stop offset="0.33" stop-color="#56c2cf"/>
+      <stop offset="0.66" stop-color="#98c379"/>
+      <stop offset="1" stop-color="#f5c451"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#61afef"/>
+      <stop offset="0.33" stop-color="#56c2cf"/>
+      <stop offset="0.66" stop-color="#98c379"/>
+      <stop offset="1" stop-color="#f5c451"/>
+    </linearGradient>
+    <clipPath id="frame"><rect x="40" y="40" width="1200" height="560" rx="22"/></clipPath>
+  </defs>
+  <rect width="1280" height="640" fill="#1b1e26"/>
+  <rect x="40" y="40" width="1200" height="560" rx="22" fill="#22252d" stroke="#3a4252" stroke-width="2"/>
+
+  <!-- The bus, as on the project page. -->
+  <g transform="translate(112 150) scale(1.75)">
+    <rect x="14" y="6" width="92" height="88" rx="14" fill="none" stroke="#61afef" stroke-width="5"/>
+    <path d="M0 48H14M106 48H120" stroke="#61afef" stroke-width="6"/>
+    <rect x="36" y="14" width="48" height="20" rx="4" fill="#13151b"/>
+    <text x="60" y="29" text-anchor="middle" fill="#f5c451" font-family="DejaVu Sans Mono, monospace" font-weight="700" font-size="15">⇄</text>
+    <rect x="27" y="42" width="66" height="24" rx="4" fill="#cde3fb"/>
+    <circle cx="34" cy="80" r="5.5" fill="#f5c451"/>
+    <circle cx="86" cy="80" r="5.5" fill="#f5c451"/>
+    <rect x="50" y="78" width="20" height="4" rx="2" fill="#8e97a9"/>
+    <rect x="24" y="96" width="14" height="12" rx="2" fill="#8e97a9"/>
+    <rect x="82" y="96" width="14" height="12" rx="2" fill="#8e97a9"/>
+  </g>
+
+  <!-- The wordmark, block for block as the TUI draws it. -->
+  <g transform="translate(372 168) scale(29)" fill="url(#g)" shape-rendering="crispEdges">
+    <rect x="0" y="0" width="3" height="1"/>
+    <rect x="4" y="0" width="1" height="1"/>
+    <rect x="6" y="0" width="1" height="1"/>
+    <rect x="8" y="0" width="1" height="1"/>
+    <rect x="10" y="0" width="1" height="1"/>
+    <rect x="12" y="0" width="3" height="1"/>
+    <rect x="16" y="0" width="3" height="1"/>
+    <rect x="20" y="0" width="1" height="1"/>
+    <rect x="24" y="0" width="3" height="1"/>
+    <rect x="0" y="1" width="1" height="1"/>
+    <rect x="4" y="1" width="1" height="1"/>
+    <rect x="6" y="1" width="1" height="1"/>
+    <rect x="8" y="1" width="1" height="1"/>
+    <rect x="10" y="1" width="1" height="1"/>
+    <rect x="13" y="1" width="1" height="1"/>
+    <rect x="17" y="1" width="1" height="1"/>
+    <rect x="20" y="1" width="1" height="1"/>
+    <rect x="24" y="1" width="1" height="1"/>
+    <rect x="0" y="2" width="3" height="1"/>
+    <rect x="4" y="2" width="3" height="1"/>
+    <rect x="8" y="2" width="1" height="1"/>
+    <rect x="10" y="2" width="1" height="1"/>
+    <rect x="13" y="2" width="1" height="1"/>
+    <rect x="17" y="2" width="1" height="1"/>
+    <rect x="20" y="2" width="1" height="1"/>
+    <rect x="24" y="2" width="3" height="1"/>
+    <rect x="2" y="3" width="1" height="1"/>
+    <rect x="4" y="3" width="1" height="1"/>
+    <rect x="6" y="3" width="1" height="1"/>
+    <rect x="8" y="3" width="1" height="1"/>
+    <rect x="10" y="3" width="1" height="1"/>
+    <rect x="13" y="3" width="1" height="1"/>
+    <rect x="17" y="3" width="1" height="1"/>
+    <rect x="20" y="3" width="1" height="1"/>
+    <rect x="24" y="3" width="1" height="1"/>
+    <rect x="0" y="4" width="3" height="1"/>
+    <rect x="4" y="4" width="1" height="1"/>
+    <rect x="6" y="4" width="1" height="1"/>
+    <rect x="8" y="4" width="3" height="1"/>
+    <rect x="13" y="4" width="1" height="1"/>
+    <rect x="17" y="4" width="1" height="1"/>
+    <rect x="20" y="4" width="3" height="1"/>
+    <rect x="24" y="4" width="3" height="1"/>
+  </g>
+
+  <text x="372" y="408" fill="#eef1f6" font-family="Noto Sans, Cantarell, DejaVu Sans, sans-serif" font-size="40" font-weight="600">Push, pull and sync folders with your NAS</text>
+  <text x="372" y="458" fill="#8e97a9" font-family="Noto Sans, Cantarell, DejaVu Sans, sans-serif" font-size="27">over SMB and NFS · no mounts, no root · a TUI and GNOME</text>
+
+  <text x="112" y="548" font-family="JetBrains Mono, DejaVu Sans Mono, monospace" font-size="24" fill="#8e97a9"><tspan fill="#f5c451" font-weight="700">↑</tspan> push<tspan dx="34" fill="#f5c451" font-weight="700">↓</tspan> pull<tspan dx="34" fill="#f5c451" font-weight="700">⇅</tspan> sync</text>
+  <text x="1168" y="548" text-anchor="end" font-family="JetBrains Mono, DejaVu Sans Mono, monospace" font-size="24" fill="#61afef">fqazzazee.github.io/shuttle</text>
+
+  <!-- The TUI's progress bar, along the bottom edge. -->
+  <rect x="40" y="588" width="1200" height="12" fill="url(#bar)" clip-path="url(#frame)"/>
+</svg>
