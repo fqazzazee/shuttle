@@ -34,6 +34,19 @@ func TestLocalContract(t *testing.T) {
 	})
 }
 
+// TestLocalAndroidSharedStorageContract holds a folder that refuses what
+// the phone's shared storage refuses to the same contract.
+func TestLocalAndroidSharedStorageContract(t *testing.T) {
+	fsystest.Run(t, func(t *testing.T) fsys.FS {
+		l, err := fsys.OpenLocalWith(t.TempDir(), fsys.AndroidSharedStorage)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { l.Close() })
+		return l
+	})
+}
+
 // smbOptions points at the Samba container from `make samba-up`.
 func smbOptions(t *testing.T) *fsys.SMBOptions {
 	return &fsys.SMBOptions{

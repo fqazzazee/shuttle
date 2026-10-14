@@ -82,6 +82,27 @@ func FoldsCase(f FS) bool {
 	return ok && c.FoldsCase()
 }
 
+// ErrRefusedName is returned for a valid path whose name the file system
+// cannot hold: Android's shared storage refuses ":" in a name, for one.
+var ErrRefusedName = errors.New("name refused")
+
+// NameRefuser is implemented by file systems that cannot hold every name
+// Linux can.
+type NameRefuser interface {
+	// RefuseName says why name, a valid path, cannot be created here, as an
+	// error wrapping ErrRefusedName, or nil if it can.
+	RefuseName(name string) error
+}
+
+// RefuseName says why f cannot hold name, or nil if it can.
+func RefuseName(f FS, name string) error {
+	r, ok := f.(NameRefuser)
+	if !ok {
+		return nil
+	}
+	return r.RefuseName(name)
+}
+
 // Space is how much room a file system has, in bytes: Free for the user
 // writing to it, out of Total. Zero is not known.
 type Space struct {

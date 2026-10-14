@@ -271,3 +271,43 @@ func TestLocalOpenReadsContent(t *testing.T) {
 		t.Errorf("read %q, want %q", b, "content")
 	}
 }
+
+// TestAndroidSharedStorageNames is what a Galaxy SM-S948U1 on Android 17 did when
+// asked to create each name in /sdcard.
+func TestAndroidSharedStorageNames(t *testing.T) {
+	l, err := OpenLocalWith(t.TempDir(), AndroidSharedStorage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	if !FoldsCase(l) {
+		t.Error("FoldsCase = false, want true")
+	}
+	refused := []string{"a:b", "a?b", "a*b", `a"b`, "a<b", "a>b", "a|b", `a\b`, "a\x01b", "a\x1fb", "a\x7fb", "ok/a:b", "a:b/ok"}
+	for _, name := range refused {
+		if err := RefuseName(l, name); !errors.Is(err, ErrRefusedName) {
+			t.Errorf("RefuseName(%q) = %v, want ErrRefusedName", name, err)
+		}
+	}
+	accepted := []string{"trail.", "trail ", " lead", "CON", "nul.txt", "é.txt", "straße", "ſ"}
+	for _, name := range accepted {
+		if err := RefuseName(l, name); err != nil {
+			t.Errorf("RefuseName(%q) = %v, want nil", name, err)
+		}
+	}
+	if err := RefuseName(l, "a:b"); err == nil || err.Error() != "name refused: it contains ':'" {
+		t.Errorf("RefuseName(a:b) = %v", err)
+	}
+}
+
+func TestLocalRefusesNothingByDefault(t *testing.T) {
+	l, _ := newLocal(t)
+	if FoldsCase(l) {
+		t.Error("FoldsCase = true, want false")
+	}
+	for _, name := range []string{"a:b", "a\x01b", `a\b`} {
+		if err := RefuseName(l, name); err != nil {
+			t.Errorf("RefuseName(%q) = %v, want nil", name, err)
+		}
+	}
+}

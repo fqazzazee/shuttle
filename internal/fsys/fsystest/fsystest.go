@@ -190,6 +190,50 @@ func Run(t *testing.T, newFS func(t *testing.T) fsys.FS) {
 		}
 	})
 
+	t.Run("refused names", func(t *testing.T) {
+		f := newFS(t)
+		if _, ok := f.(fsys.NameRefuser); !ok {
+			t.Skip("refuses no names")
+		}
+		put(t, f, "ok", "ok")
+		for _, name := range []string{"a:b", "a?b", "a*b", "a\"b", "a<b", "a>b", "a|b", "a\\b", "a\x01b", "a\x7fb", "trail.", "trail ", "CON"} {
+			if fsys.RefuseName(f, name) == nil {
+				put(t, f, name, name)
+				if got := get(t, f, name); got != name {
+					t.Errorf("%q read back as %q", name, got)
+				}
+				if err := f.Remove(ctx, name); err != nil {
+					t.Error(err)
+				}
+				continue
+			}
+			// Whatever a backend says it refuses, it must refuse the same
+			// way however the name is made, and leave nothing behind.
+			if err := fsys.RefuseName(f, "dir/"+name+"/x"); !errors.Is(err, fsys.ErrRefusedName) {
+				t.Errorf("RefuseName(dir/%q/x) = %v, want ErrRefusedName", name, err)
+			}
+			if _, err := f.Create(ctx, name); !errors.Is(err, fsys.ErrRefusedName) {
+				t.Errorf("Create(%q) = %v, want ErrRefusedName", name, err)
+			}
+			if err := f.MkdirAll(ctx, name+"/x"); !errors.Is(err, fsys.ErrRefusedName) {
+				t.Errorf("MkdirAll(%q/x) = %v, want ErrRefusedName", name, err)
+			}
+			if err := f.Rename(ctx, "ok", name); !errors.Is(err, fsys.ErrRefusedName) {
+				t.Errorf("Rename(ok, %q) = %v, want ErrRefusedName", name, err)
+			}
+			if _, err := fsys.WriteFile(ctx, f, name, strings.NewReader(name), time.Now()); !errors.Is(err, fsys.ErrRefusedName) {
+				t.Errorf("WriteFile(%q) = %v, want ErrRefusedName", name, err)
+			}
+		}
+		entries, err := f.ReadDir(ctx, ".")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 1 || entries[0].Name != "ok" {
+			t.Errorf("left behind: %v", entries)
+		}
+	})
+
 	t.Run("invalid paths", func(t *testing.T) {
 		f := newFS(t)
 		for _, name := range []string{"../escape", "/etc/passwd", "a/../../b", ""} {
