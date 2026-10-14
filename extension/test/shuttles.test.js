@@ -39,6 +39,14 @@ test('attention, most pressing first', () => {
     equal(attention({}), '', 'nothing');
 });
 
+test('attention, metered: why it waits, as the TUI says', () => {
+    equal(attention({Metered: true, Pending: true}), 'a run waits for a connection that is not metered');
+    equal(attention({Metered: true}), 'paused while the connection is metered');
+    equal(attention({Pending: true}), 'a run is waiting', 'not metered');
+    equal(row('docs', {State: 'paused', Mode: 'push', Metered: true, Pending: true}, now).detail,
+        'a run waits for a connection that is not metered', 'in the dropdown row');
+});
+
 test('mode arrows', () => {
     equal(modeArrow('push'), '↑');
     equal(modeArrow('pull'), '↓');
