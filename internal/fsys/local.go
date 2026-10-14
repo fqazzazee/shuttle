@@ -30,8 +30,9 @@ var _ FS = (*Local)(nil)
 // they are stricter than Linux's. Nothing on the folder says so: Android's
 // shared storage is a FUSE mount like any other.
 type Names struct {
-	// FoldCase is whether names differing only in case are one file.
-	FoldCase bool
+	// Fold is how the file system compares names (see FullFold), or nil if
+	// it keeps names differing only in case apart.
+	Fold func(name string) string
 	// Refuse says why one element of a path cannot be a name here, wrapping
 	// ErrRefusedName, or nil if it can. A nil Refuse refuses nothing.
 	Refuse func(elem string) error
@@ -41,7 +42,7 @@ type Names struct {
 // as measured on Android 17. It folds case fully ("straße" is "STRASSE") and
 // takes the NFC and NFD spellings of a name as one, and it refuses the
 // characters FAT does.
-var AndroidSharedStorage = Names{FoldCase: true, Refuse: refuseFAT}
+var AndroidSharedStorage = Names{Fold: FullFold, Refuse: refuseFAT}
 
 func refuseFAT(elem string) error {
 	for _, r := range elem {
@@ -69,7 +70,15 @@ func OpenLocalWith(dir string, n Names) (*Local, error) {
 }
 
 // FoldsCase is what the folder's Names say.
-func (l *Local) FoldsCase() bool { return l.names.FoldCase }
+func (l *Local) FoldsCase() bool { return l.names.Fold != nil }
+
+// FoldKey is name under the folder's Names.
+func (l *Local) FoldKey(name string) string {
+	if l.names.Fold == nil {
+		return name
+	}
+	return l.names.Fold(name)
+}
 
 // RefuseName refuses name if its Names refuse any element of it.
 func (l *Local) RefuseName(name string) error {

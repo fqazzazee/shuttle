@@ -147,13 +147,14 @@ func (e *executor) removeStaleTemps(f fsys.FS, temps []fsys.FileInfo) {
 	}
 }
 
-// plan is Plan for a run: on a remote side that ignores case, the two scans
-// are first lined up by matchCase.
+// plan is Plan for a run: where a side ignores case, the two scans are
+// first lined up by matchCase.
 func plan(o *Options, local, remote map[string]fsys.FileInfo, records map[string]state.Record) []Action {
-	if !fsys.FoldsCase(o.Remote) {
+	fo := foldingOf(o)
+	if !fo.local && !fo.remote {
 		return Plan(o.Settings.Mode, o.Settings.Deletions, local, remote, records)
 	}
-	m := matchCase(local, remote, records)
+	m := matchCase(local, remote, records, fo)
 	actions := slices.Concat(m.held, Plan(o.Settings.Mode, o.Settings.Deletions, m.local, m.remote, m.records))
 	slices.SortStableFunc(actions, executionOrder)
 	return actions

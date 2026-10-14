@@ -212,6 +212,9 @@ func (s *SMB) Space(ctx context.Context) (Space, error) {
 // default (Windows always; Samba and NAS devices unless configured otherwise).
 func (s *SMB) FoldsCase() bool { return true }
 
+// FoldKey is name as an SMB server compares it.
+func (s *SMB) FoldKey(name string) string { return SimpleFold(name) }
+
 func (s *SMB) Close() error {
 	return errors.Join(s.share.Umount(), s.session.Logoff())
 }

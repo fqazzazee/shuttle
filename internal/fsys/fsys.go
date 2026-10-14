@@ -15,6 +15,10 @@ import (
 	"io/fs"
 	"strings"
 	"time"
+	"unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/unicode/norm"
 )
 
 // Kind is what sort of entry a path names.
@@ -71,15 +75,43 @@ type FS interface {
 }
 
 // CaseInsensitive is implemented by file systems that may treat names
-// differing only in case as the same file.
+// differing only in case as the same file. FoldKey says which: two names
+// with the same key are one file there.
 type CaseInsensitive interface {
 	FoldsCase() bool
+	FoldKey(name string) string
 }
 
 // FoldsCase reports whether f treats names differing only in case as one.
 func FoldsCase(f FS) bool {
 	c, ok := f.(CaseInsensitive)
 	return ok && c.FoldsCase()
+}
+
+// FoldKey is how f sees name: names with the same key are one file there.
+// On a file system that keeps case apart, it is name itself.
+func FoldKey(f FS, name string) string {
+	c, ok := f.(CaseInsensitive)
+	if !ok || !c.FoldsCase() {
+		return name
+	}
+	return c.FoldKey(name)
+}
+
+// SimpleFold is how SMB servers compare names: each rune upper- then
+// lower-cased, which also folds the odd ones out, like "ſ" (long s) and "s".
+// It keeps "straße" and "STRASSE" apart, as Samba and Windows do.
+func SimpleFold(name string) string {
+	return strings.Map(func(r rune) rune { return unicode.ToLower(unicode.ToUpper(r)) }, name)
+}
+
+// FullFold is how Linux's case-insensitive file systems compare names,
+// Android's shared storage among them: Unicode's full case folding ("ß" is
+// "ss"), then the decomposed form, so that the two ways of spelling "é" are
+// one name.
+func FullFold(name string) string {
+	// A Caser keeps state between calls, so each call gets its own.
+	return norm.NFD.String(cases.Fold().String(name))
 }
 
 // ErrRefusedName is returned for a valid path whose name the file system
