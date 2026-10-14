@@ -311,3 +311,32 @@ func TestLocalRefusesNothingByDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestFolds(t *testing.T) {
+	const nfc, nfd = "\u00e9", "e\u0301" // é, composed and decomposed
+	tests := []struct {
+		name     string
+		fold     func(string) string
+		one, two [][2]string
+	}{
+		{"SimpleFold", SimpleFold,
+			[][2]string{{"README.md", "readme.md"}, {"Docs/Report.PDF", "docs/report.pdf"}, {"ſ", "s"}, {"ÉTÉ", "été"}},
+			[][2]string{{"a.txt", "b.txt"}, {"straße", "STRASSE"}, {nfc, nfd}}},
+		// What the phone's shared storage took as one name.
+		{"FullFold", FullFold,
+			[][2]string{{"README.md", "readme.md"}, {"É.txt", "é.txt"}, {"straße", "STRASSE"}, {"STRAßE", "strasse"}, {"ſ", "s"}, {nfc, nfd}, {"Dir/" + nfc, "dir/" + nfd}},
+			[][2]string{{"a.txt", "b.txt"}, {"a/b", "a.b"}}},
+	}
+	for _, tt := range tests {
+		for _, p := range tt.one {
+			if tt.fold(p[0]) != tt.fold(p[1]) {
+				t.Errorf("%s: %q and %q should be one name", tt.name, p[0], p[1])
+			}
+		}
+		for _, p := range tt.two {
+			if tt.fold(p[0]) == tt.fold(p[1]) {
+				t.Errorf("%s: %q and %q should be two names", tt.name, p[0], p[1])
+			}
+		}
+	}
+}

@@ -104,6 +104,32 @@ func TestSMBRejectsBackslashNames(t *testing.T) {
 	}
 }
 
+// TestSMBFoldsAsFoldKeySays holds FoldKey to what the server does: names
+// with one key are one file there, names with different keys two.
+func TestSMBFoldsAsFoldKeySays(t *testing.T) {
+	s := newSMB(t)
+	ctx := context.Background()
+	for _, pair := range [][2]string{
+		{"README.md", "readme.md"},
+		{"ÉTÉ", "été"},
+		{"straße", "STRASSE"},
+		{"\u00e9", "e\u0301"}, // é, composed and decomposed
+	} {
+		w, err := s.Create(ctx, pair[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Close()
+		_, err = s.Stat(ctx, pair[1])
+		if same := s.FoldKey(pair[0]) == s.FoldKey(pair[1]); same != (err == nil) {
+			t.Errorf("FoldKey says %q and %q are one: %v; Stat(%q) = %v", pair[0], pair[1], same, pair[1], err)
+		}
+		if err := s.Remove(ctx, pair[0]); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestSMBDialErrors(t *testing.T) {
 	ctx := context.Background()
 	const secret = "wr0ng-s3cret-value"

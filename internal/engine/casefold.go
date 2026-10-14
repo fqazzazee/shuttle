@@ -6,70 +6,72 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
 
-// foldKey is how a case-insensitive file system sees a name: two paths with
-// the same key are the same file there. Upper- then lower-casing each rune
-// also folds the odd ones out, like "ſ" (long s) and "s".
-func foldKey(p string) string {
-	return strings.Map(func(r rune) rune { return unicode.ToLower(unicode.ToUpper(r)) }, p)
+// folding is which sides of a run ignore case, and the key under which
+// names are one file on either side that does.
+type folding struct {
+	local, remote bool
+	key           func(string) string
 }
 
-// caseMatched is a scan of both sides lined up for a remote side that
+// foldingOf is the folding of a run between o's two sides. Where both
+// sides ignore case, a name's key is its key on each in turn, so names
+// either side takes as one are matched.
+func foldingOf(o *Options) folding {
+	return folding{
+		local:  fsys.FoldsCase(o.Local),
+		remote: fsys.FoldsCase(o.Remote),
+		key:    func(p string) string { return fsys.FoldKey(o.Local, fsys.FoldKey(o.Remote, p)) },
+	}
+}
+
+// caseMatched is a scan of both sides lined up for a run where a side
 // ignores case.
 type caseMatched struct {
 	local, remote map[string]fsys.FileInfo
 	records       map[string]state.Record
-	held          []Action // names the share cannot hold apart
+	held          []Action // names a side cannot hold apart
 }
 
-// matchCase lines up a case-insensitive remote side with the local names, so
-// that planning, which compares paths exactly, sees the right pairs. It does
-// no I/O and leaves its inputs alone.
+// matchCase lines up the two scans of a run where one side or both ignore
+// case, so that planning, which compares paths exactly, sees the right
+// pairs. It does no I/O and leaves its inputs alone.
 //
-//   - A remote entry whose name differs only in case from exactly one local
-//     name is taken to be that file, under the local name. Its state record
-//     moves with it, so renaming readme.md to README.md locally is one file
-//     keeping its history, not a deletion plus a new file.
-//   - Two or more local names that differ only in case cannot both live on
-//     the share. They, their counterpart on the share and everything under
-//     them are held as conflicts until the user renames one.
-//   - If the share itself lists two names with the same key, it does not
-//     ignore case after all; those names are left as they are.
-func matchCase(local, remote map[string]fsys.FileInfo, records map[string]state.Record) caseMatched {
+//   - An entry whose name differs only in case from exactly one name on the
+//     other side is taken to be that file. Both go by the local spelling when
+//     the share ignores case, so renaming readme.md to README.md locally is
+//     one file keeping its history, not a deletion plus a new file. When only
+//     the local side ignores case, both go by the share's spelling, the one a
+//     case-sensitive share needs. The state record moves with the name.
+//   - Two or more names on one side that differ only in case cannot both live
+//     on the other side if it ignores case. They, their counterpart there and
+//     everything under them are held as conflicts until the user renames one.
+//   - Two names with one key on a side whose other side keeps case are left
+//     as they are: that side can hold them apart. A share that ignores case
+//     and still lists two such names does not ignore case after all.
+func matchCase(local, remote map[string]fsys.FileInfo, records map[string]state.Record, fo folding) caseMatched {
 	out := caseMatched{local: maps.Clone(local), remote: maps.Clone(remote), records: maps.Clone(records)}
-
-	localByKey := map[string][]string{}
-	for p := range local {
-		k := foldKey(p)
-		localByKey[k] = append(localByKey[k], p)
-	}
-	remoteByKey := map[string][]string{}
-	for p := range remote {
-		k := foldKey(p)
-		remoteByKey[k] = append(remoteByKey[k], p)
-	}
-	// Sorted, so the outcome never depends on map order.
-	for _, m := range []map[string][]string{localByKey, remoteByKey} {
-		for k := range m {
-			slices.Sort(m[k])
-		}
-	}
+	localByKey, remoteByKey := byKey(local, fo.key), byKey(remote, fo.key)
 
 	// Hold every clash, and everything below a clashing folder.
-	var clashes []string // keys
+	clashed := map[string]bool{}
 	for k, names := range localByKey {
-		if len(names) > 1 {
-			clashes = append(clashes, k)
+		if fo.remote && len(names) > 1 {
+			clashed[k] = true
 		}
 	}
-	slices.Sort(clashes)
+	for k, names := range remoteByKey {
+		if fo.local && len(names) > 1 {
+			clashed[k] = true
+		}
+	}
+	clashes := slices.Sorted(maps.Keys(clashed))
 	underClash := func(p string) bool {
-		k := foldKey(p)
+		k := fo.key(p)
 		for _, c := range clashes {
 			if strings.HasPrefix(k, c+"/") {
 				return true
@@ -78,23 +80,32 @@ func matchCase(local, remote map[string]fsys.FileInfo, records map[string]state.
 		return false
 	}
 	for _, k := range clashes {
-		names := localByKey[k]
+		// The side listing the names holds them; the other side's spelling
+		// goes with them.
+		names, other, otherNames := localByKey[k], out.remote, remoteByKey[k]
+		where := "the share sees them as one name, so rename one of them"
+		if !fo.remote || len(names) < 2 {
+			names, other, otherNames = remoteByKey[k], out.local, localByKey[k]
+			where = "the local folder sees them as one name, so rename one of them on the share"
+		}
 		for _, p := range names {
 			others := slices.DeleteFunc(slices.Clone(names), func(o string) bool { return o == p })
-			info := local[p]
-			a := Action{Op: OpConflict, Path: p, Local: &info, alwaysHold: true,
-				Reason: "differs only in case from " + strings.Join(others, ", ") +
-					"; the share sees them as one name, so rename one of them"}
-			if r, ok := remote[p]; ok {
-				a.Remote = &r
+			a := Action{Op: OpConflict, Path: p, alwaysHold: true,
+				Reason: "differs only in case from " + strings.Join(others, ", ") + "; " + where}
+			if info, ok := local[p]; ok {
+				a.Local = &info
+			}
+			if info, ok := remote[p]; ok {
+				a.Remote = &info
 			}
 			out.held = append(out.held, a)
 			delete(out.local, p)
+			delete(out.remote, p)
 			delete(out.records, p)
 		}
-		for _, r := range remoteByKey[k] {
-			delete(out.remote, r)
-			delete(out.records, r)
+		for _, p := range otherNames {
+			delete(other, p)
+			delete(out.records, p)
 		}
 	}
 	for _, m := range []map[string]fsys.FileInfo{out.local, out.remote} {
@@ -106,27 +117,44 @@ func matchCase(local, remote map[string]fsys.FileInfo, records map[string]state.
 		}
 	}
 
-	// Rename remote entries to the local spelling where that is unambiguous.
+	// Give the two spellings of one file one name, where that is unambiguous.
 	for k, rnames := range remoteByKey {
 		lnames := localByKey[k]
 		if len(rnames) != 1 || len(lnames) != 1 || rnames[0] == lnames[0] {
 			continue
 		}
-		r, l := rnames[0], lnames[0]
-		info, ok := out.remote[r]
+		from, to, m := rnames[0], lnames[0], out.remote
+		if !fo.remote {
+			from, to, m = lnames[0], rnames[0], out.local
+		}
+		info, ok := m[from]
 		if !ok {
 			continue // held above
 		}
-		delete(out.remote, r)
-		info.Name = l
-		out.remote[l] = info
-		if rec, ok := out.records[r]; ok {
-			if _, has := out.records[l]; !has {
-				rec.Path = l
-				out.records[l] = rec
+		delete(m, from)
+		info.Name = to
+		m[to] = info
+		if rec, ok := out.records[from]; ok {
+			if _, has := out.records[to]; !has {
+				rec.Path = to
+				out.records[to] = rec
 			}
-			delete(out.records, r)
+			delete(out.records, from)
 		}
 	}
 	return out
+}
+
+// byKey groups the names in entries by key, each group sorted so that the
+// outcome never depends on map order.
+func byKey(entries map[string]fsys.FileInfo, key func(string) string) map[string][]string {
+	m := map[string][]string{}
+	for p := range entries {
+		k := key(p)
+		m[k] = append(m[k], p)
+	}
+	for k := range m {
+		slices.Sort(m[k])
+	}
+	return m
 }
