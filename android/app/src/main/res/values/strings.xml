@@ -8,6 +8,9 @@
     <string name="service_title">Syncing in real time</string>
     <string name="service_text">shuttle is watching your real-time shuttles. Tap to open.</string>
 
+    <string name="force_stopped_title">Syncing was stopped</string>
+    <string name="force_stopped_text">shuttle was force-stopped, so nothing synced until you opened it. Syncing has started again.</string>
+    <string name="ok">OK</string>
     <string name="perm_heading">Before you start</string>
     <string name="perm_intro">shuttle needs three permissions to sync. You can give them now or later; until you do, the shuttles that need one wait and say which.</string>
     <string name="perm_files">All files access</string>

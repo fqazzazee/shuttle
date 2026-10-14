@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,14 +14,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -40,6 +45,7 @@ import org.json.JSONObject
 class MainActivity : ComponentActivity() {
     private var access by mutableStateOf(Access(files = false, localNetwork = false, notifications = false))
     private var firstRunSeen by mutableStateOf(false)
+    private var forceStopped by mutableStateOf(false)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -50,6 +56,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         firstRunSeen = prefs.getBoolean(FIRST_RUN_SEEN, false)
+        // Opening the app after a force stop starts syncing again (the screen holds the daemon,
+        // which starts the service and plans the jobs); say that it had stopped.
+        val lastSeen = prefs.getLong(LAST_EXIT_SEEN, 0)
+        val exits = recentExits(this)
+        forceStopped = forceStoppedSince(exits, lastSeen)
+        if (forceStopped) Log.i("shuttle", "force stop noticed; syncing starts again")
+        prefs.edit { putLong(LAST_EXIT_SEEN, newestExit(exits, lastSeen)) }
         setContent {
             ShuttleTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -59,7 +72,7 @@ class MainActivity : ComponentActivity() {
                             firstRunSeen = true
                         }
                     } else {
-                        Main(access, Core.statuses, Core.startError, ::allow)
+                        Main(access, Core.statuses, Core.startError, forceStopped, { forceStopped = false }, ::allow)
                     }
                 }
             }
@@ -105,17 +118,26 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val FIRST_RUN_SEEN = "first_run_seen"
         const val SCREEN = "screen"
+        const val LAST_EXIT_SEEN = "last_exit_seen"
     }
 }
 
 /** Until the shuttle list (step 14): each shuttle's name and state, and why it waits. */
 @Composable
-private fun Main(access: Access, statuses: Map<String, String>, startError: String?, onAllow: (Permission) -> Unit) {
+private fun Main(
+    access: Access,
+    statuses: Map<String, String>,
+    startError: String?,
+    forceStopped: Boolean,
+    onSeen: () -> Unit,
+    onAllow: (Permission) -> Unit,
+) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+        if (forceStopped && statuses.isNotEmpty()) ForceStopped(onSeen)
         MissingPermissions(access, onAllow)
         startError?.let { Text(stringResource(R.string.start_failed, it), color = MaterialTheme.colorScheme.error) }
         if (statuses.isEmpty()) Text(stringResource(R.string.not_set_up))
@@ -123,6 +145,20 @@ private fun Main(access: Access, statuses: Map<String, String>, startError: Stri
             val st = JSONObject(json)
             val waiting = st.optString("Waiting")
             Text(if (waiting.isEmpty()) "$name: ${st.getString("State")}" else "$name: $waiting")
+        }
+    }
+}
+
+/** After a force stop: nothing synced while the app was stopped, and it syncs again now. */
+@Composable
+private fun ForceStopped(onSeen: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.force_stopped_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.force_stopped_text))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onSeen) { Text(stringResource(R.string.ok)) }
+            }
         }
     }
 }
