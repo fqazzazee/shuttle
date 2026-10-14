@@ -3,6 +3,9 @@
 Push, pull and sync folders between SMB/NFS network shares and local storage, from a
 terminal UI, with a GNOME top-bar indicator and a Quick Settings toggle.
 
+**[The project page](https://fqazzazee.github.io/shuttle/)** shows what shuttle is for and what it
+does, at a glance.
+
 [![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Bubble Tea v2](https://img.shields.io/badge/Bubble%20Tea-v2-FF5F87)](https://github.com/charmbracelet/bubbletea)
 [![Lip Gloss v2](https://img.shields.io/badge/Lip%20Gloss-v2-FF87D7)](https://github.com/charmbracelet/lipgloss)
