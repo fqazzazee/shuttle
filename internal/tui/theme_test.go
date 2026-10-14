@@ -104,12 +104,14 @@ func TestThemeFor(t *testing.T) {
 // reverse matches an SGR sequence that turns reverse on.
 var reverse = regexp.MustCompile(`\x1b\[(\d+;)*7(;\d+)*m`)
 
-// Without colors (NO_COLOR), the selected row, the chosen tab and the
-// bus's sign still show: in reverse.
+// Without colors (NO_COLOR), the selected row, the chosen tab, the bus's
+// sign and its windscreen still show: in reverse.
 func TestSelectionShowsWithoutColor(t *testing.T) {
 	t.Cleanup(func() { useTheme(&darkPalette) })
 	useTheme(nil)
-	for name, s := range map[string]lipgloss.Style{"selected": selected, "activeTab": activeTab, "signStyle": signStyle} {
+	for name, s := range map[string]lipgloss.Style{
+		"selected": selected, "activeTab": activeTab, "signStyle": signStyle, "windowStyle": windowStyle,
+	} {
 		var b strings.Builder
 		w := &colorprofile.Writer{Forward: &b, Profile: colorprofile.ASCII}
 		if _, err := w.WriteString(s.Render("row")); err != nil {

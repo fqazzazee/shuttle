@@ -80,6 +80,7 @@ var (
 	busStyle    lipgloss.Style
 	signStyle   lipgloss.Style
 	glassStyle  lipgloss.Style
+	windowStyle lipgloss.Style // the big bus's windscreen: spaces, filled
 	lightStyle  lipgloss.Style
 	keyStyle    lipgloss.Style
 	stateStyles map[daemon.State]lipgloss.Style
@@ -129,6 +130,7 @@ func useTheme(p *palette) {
 		busStyle = s.Foreground(lipgloss.Color("4"))
 		signStyle = s.Bold(true).Reverse(true)
 		glassStyle = busStyle
+		windowStyle = s.Reverse(true)
 		lightStyle = heldStyle
 		keyStyle = s.Bold(true)
 		wordColors = nil
@@ -145,6 +147,7 @@ func useTheme(p *palette) {
 		busStyle = s.Foreground(p.sky)
 		signStyle = s.Bold(true).Foreground(p.yellow).Background(p.sign)
 		glassStyle = s.Foreground(p.glass)
+		windowStyle = s.Background(p.glass)
 		lightStyle = s.Foreground(p.amber)
 		keyStyle = s.Bold(true).Foreground(p.amber)
 		wordColors = lipgloss.Blend1D(lipgloss.Width(wordmark[0]), p.sky, p.teal, p.mint, p.amber)

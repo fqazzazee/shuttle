@@ -33,3 +33,34 @@ func TestNoShuttlesYet(t *testing.T) {
 		}
 	}
 }
+
+// The bus in color is the bus: the CLI prints present.Bus, and the two
+// must not drift apart.
+func TestBigBusIsTheBus(t *testing.T) {
+	got := bigBus()
+	if len(got) != len(present.Bus) {
+		t.Fatalf("%d rows, want %d", len(got), len(present.Bus))
+	}
+	for i, l := range got {
+		if s := ansi.Strip(l); s != present.Bus[i] {
+			t.Errorf("row %d %q, want %q", i, s, present.Bus[i])
+		}
+	}
+}
+
+// The first screen shows the bus in its colors: the sign, the windscreen,
+// the lights.
+func TestNoShuttlesYetInColor(t *testing.T) {
+	f := newFake()
+	f.shuttles = nil
+	s := start(t, f, 100, 30).View().Content
+	for _, want := range []string{
+		signStyle.Render("[ ⇄  ]"),
+		windowStyle.Render("      "),
+		lightStyle.Render("o") + "  " + faint.Render("==") + "  " + lightStyle.Render("o"),
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("no %q on the screen", want)
+		}
+	}
+}
