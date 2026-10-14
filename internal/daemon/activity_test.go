@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -89,11 +90,18 @@ func TestActivityOfProblems(t *testing.T) {
 		}
 	}
 
-	if err := f.d.Resolve(context.Background(), "s", "clash.txt", engine.KeepLocal); err != nil {
-		t.Fatal(err)
-	}
-	if got := texts(f.activity("s")); !strings.HasPrefix(got, "conflict clash.txt: resolved: kept this computer's copy\n") {
-		t.Errorf("activity after resolving:\n%s", got)
+	// Resolving starts a run, whose entries come after: the locked file's
+	// error again. Wait for it, so the log is whole when it is read and the
+	// next run is the test's own.
+	f.ranAfter(func() {
+		if err := f.d.Resolve(context.Background(), "s", "clash.txt", engine.KeepLocal); err != nil {
+			t.Fatal(err)
+		}
+	})
+	es := f.activity("s")
+	if i := slices.IndexFunc(es, func(e activity.Entry) bool { return e.Path == "clash.txt" }); i < 0 ||
+		es[i].Kind != activity.KindConflict || es[i].Text != "resolved: kept this computer's copy" {
+		t.Errorf("activity after resolving:\n%s", texts(es))
 	}
 
 	// A run that fails as a whole says why.
