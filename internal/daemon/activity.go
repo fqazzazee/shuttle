@@ -106,6 +106,7 @@ func (r *runner) logRun(res *engine.Result, err error) {
 			}
 			r.addActivity(activity.KindConflict, c.Path, text)
 		}
+		r.logRefused(res.Refused)
 		if n := len(res.HeldDeletions); n > 0 {
 			r.addActivity(activity.KindHeld, "", fmt.Sprintf(
 				"%d deletions held by the deletion guard: too many at once; allow them to let them go ahead", n))
@@ -117,6 +118,19 @@ func (r *runner) logRun(res *engine.Result, err error) {
 	if err := r.activity.Trim(r.d.o.Now()); err != nil {
 		r.d.o.Log.Warn("activity log", "shuttle", r.shuttle.Name, "err", err)
 	}
+}
+
+// logRefused logs the names a run left out that the run before did not:
+// a real-time shuttle runs every minute, and they stay left out.
+func (r *runner) logRefused(refused []engine.Issue) {
+	seen := make(map[string]bool, len(refused))
+	for _, i := range refused {
+		seen[i.Path] = true
+		if !r.refused[i.Path] {
+			r.addActivity(activity.KindLeftOut, i.Path, i.Reason+"; left out, and not deleted on either side")
+		}
+	}
+	r.refused = seen
 }
 
 // runSummary sums up what a run did, after prefix; "" if it did nothing.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
 // texts is a log as "kind path: text" lines, newest first.
@@ -112,6 +113,46 @@ func TestActivityOfProblems(t *testing.T) {
 	f.syncNow()
 	if es := f.activity("s"); es[0].Kind != activity.KindError || !strings.Contains(es[0].Text, "the run failed: local folder") {
 		t.Errorf("newest entry = %+v, want the failed run", es[0])
+	}
+}
+
+// A local folder that refuses what the phone's shared storage refuses: the
+// run leaves those names out, the status lists them, and the log says so
+// once.
+func TestActivityOfRefusedNames(t *testing.T) {
+	f := newFixture(t, "sync", "")
+	write(t, f.mount, "ok.txt", "ok")
+	write(t, f.mount, "a:b.txt", "colon")
+	f.build()
+	f.d.o.LocalNames = func(dir string) fsys.Names {
+		if dir != f.local {
+			t.Errorf("LocalNames(%q), want the shuttle's folder", dir)
+		}
+		return fsys.Names{Refuse: fsys.AndroidSharedStorage.Refuse}
+	}
+	f.run()
+	st := f.syncNow()
+	if st.State != StateIdle || len(st.Refused) != 1 || st.Refused[0].Path != "a:b.txt" {
+		t.Errorf("status = %s, refused %+v; want idle with a:b.txt left out", st.State, st.Refused)
+	}
+	want := "left-out a:b.txt: the local folder cannot hold this name: it contains ':'; left out, and not deleted on either side\n"
+	if got := texts(f.activity("s")); !strings.Contains(got, want) {
+		t.Errorf("activity lacks %q:\n%s", want, got)
+	}
+
+	// Still left out by the next run, which logs it no more.
+	write(t, f.mount, "new.txt", "new")
+	if st := f.syncNow(); len(st.Refused) != 1 {
+		t.Errorf("refused = %+v after another run", st.Refused)
+	}
+	if n := strings.Count(texts(f.activity("s")), "left-out"); n != 1 {
+		t.Errorf("logged %d times, want once:\n%s", n, texts(f.activity("s")))
+	}
+	if _, err := os.Stat(filepath.Join(f.mount, "a:b.txt")); err != nil {
+		t.Errorf("the share's a:b.txt: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(f.local, "a:b.txt")); err == nil {
+		t.Error("a:b.txt was written to the local folder")
 	}
 }
 

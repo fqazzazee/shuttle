@@ -114,6 +114,9 @@ type Result struct {
 	Skipped       []Issue // changed during the run
 	Errors        []Issue
 	Unsupported   []string // symlinks, devices and the like: never synced
+	// Refused are names one side cannot hold, such as "a:b" on the phone's
+	// shared storage: left out of the run, so never copied or deleted.
+	Refused []Issue
 }
 
 func newExecutor(ctx context.Context, o *Options, res *Result) *executor {
@@ -191,6 +194,7 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
+	leaveOutRefused(o, &local, &remote)
 	records, err := o.State.All()
 	if err != nil {
 		return nil, err
@@ -212,6 +216,7 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 		return res, err
 	}
 	res.Unsupported = slices.Concat(local.unsupported, remote.unsupported)
+	res.Refused = leaveOutRefused(o, &local, &remote)
 	records, err := o.State.All()
 	if err != nil {
 		return res, err
