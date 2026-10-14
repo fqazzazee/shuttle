@@ -96,3 +96,20 @@ func TestSynced(t *testing.T) {
 		}
 	}
 }
+
+// A shuttle waiting on a metered connection says so, rather than only that a
+// run waits.
+func TestAttentionMetered(t *testing.T) {
+	for _, tc := range []struct {
+		st   daemon.Status
+		want string
+	}{
+		{daemon.Status{Pending: true}, "a run is waiting"},
+		{daemon.Status{Metered: true, Pending: true}, "a run waits for a connection that is not metered"},
+		{daemon.Status{Metered: true}, "paused while the connection is metered"},
+	} {
+		if got := Attention(&tc.st); got != tc.want {
+			t.Errorf("Attention(%+v) = %q, want %q", tc.st, got, tc.want)
+		}
+	}
+}

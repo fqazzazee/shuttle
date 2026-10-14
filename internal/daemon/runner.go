@@ -47,6 +47,7 @@ type runner struct {
 	paused    bool // this shuttle, by itself
 	pending   bool
 	requested bool            // the user asked for the pending run (SyncNow)
+	asked     bool            // the user asked for the run in progress: a metered connection does not stop it
 	attempted time.Time       // when a run was last triggered by the schedule, or completed before start
 	own       map[string]bool // local paths this shuttle's run wrote; see startOwnWrites
 	ownUntil  time.Time
@@ -128,9 +129,22 @@ func (r *runner) isPaused() bool {
 	return r.isPausedLocked()
 }
 
+// meteredLocked says whether a metered connection holds the shuttle's runs:
+// it is set to pause on one, and the connection is one. The user's own
+// runs (SyncNow) are not held.
+func (r *runner) meteredLocked() bool {
+	return r.shuttle.Settings.Metered == config.MeteredPause && r.d.isMetered()
+}
+
 // shouldStop is the engine's Stop: pausing or shutting down ends a run after
-// the file in progress.
-func (r *runner) shouldStop() bool { return r.isPaused() || r.isStopping() }
+// the file in progress; so does a metered connection, unless the user asked
+// for the run.
+func (r *runner) shouldStop() bool {
+	r.mu.Lock()
+	metered := r.meteredLocked() && !r.asked
+	r.mu.Unlock()
+	return metered || r.isPaused() || r.isStopping()
+}
 
 func (r *runner) isStopping() bool {
 	r.mu.Lock()
@@ -144,12 +158,12 @@ func (r *runner) loop() {
 			return
 		}
 		r.mu.Lock()
-		run := r.pending && !r.isPausedLocked()
 		requested := r.requested
+		run := r.pending && !r.isPausedLocked() && (requested || !r.meteredLocked())
 		if run {
 			// Together, under one lock: in between, the status would claim
 			// "idle, nothing pending" while a run is about to start.
-			r.pending, r.requested = false, false
+			r.pending, r.requested, r.asked = false, false, requested
 			r.st.State = StateRunning
 		}
 		r.mu.Unlock()
@@ -167,7 +181,8 @@ func (r *runner) status() Status {
 	st := r.st
 	st.Pending = r.pending
 	st.Paused = r.isPausedLocked()
-	if st.Paused && st.State != StateRunning && st.State != StateDisabled {
+	st.Metered = r.meteredLocked() && st.State != StateRunning && st.State != StateDisabled
+	if (st.Paused || st.Metered) && st.State != StateRunning && st.State != StateDisabled {
 		st.State = StatePaused
 	}
 	return st

@@ -164,12 +164,50 @@ remote = "nas:"
 	if s.Remote != "." {
 		t.Errorf("remote %q, want the share root \".\"", s.Remote)
 	}
+	if s.Settings.Metered != MeteredPause {
+		t.Errorf("metered %q: a metered connection pauses unless asked otherwise", s.Settings.Metered)
+	}
+}
+
+// What a shuttle does on a metered connection comes from its profile, unless
+// it says otherwise itself.
+func TestMetered(t *testing.T) {
+	cfg := parse(t, minimalShare+`
+[profiles.roam]
+mode = "sync"
+metered = "run"
+
+[shuttles.inherits]
+profile = "roam"
+local = "/a"
+remote = "nas:a"
+
+[shuttles.overrides]
+profile = "roam"
+metered = "pause"
+local = "/b"
+remote = "nas:b"
+`)
+	for _, tc := range []struct {
+		name string
+		want MeteredMode
+		src  Source
+	}{
+		{"inherits", MeteredRun, SourceProfile},
+		{"overrides", MeteredPause, SourceShuttle},
+	} {
+		s := mustShuttle(t, cfg, tc.name)
+		if s.Settings.Metered != tc.want || s.Sources["metered"] != tc.src {
+			t.Errorf("%s: metered %q from %v, want %q from %v", tc.name, s.Settings.Metered, s.Sources["metered"], tc.want, tc.src)
+		}
+	}
 }
 
 func settingsEqual(a, b *Settings) bool {
 	return a.Mode == b.Mode && slices.Equal(a.Triggers, b.Triggers) && a.PollInterval == b.PollInterval &&
 		a.Interval == b.Interval && slices.Equal(a.At, b.At) && a.Conflicts == b.Conflicts &&
 		a.ConflictHold == b.ConflictHold && a.Deletions == b.Deletions && a.DeletionGuard == b.DeletionGuard &&
+		a.Metered == b.Metered &&
 		a.Versioning == b.Versioning && slices.Equal(a.Ignore, b.Ignore) && slices.Equal(a.Include, b.Include) &&
 		slices.Equal(a.Exclude, b.Exclude) && a.Bandwidth == b.Bandwidth &&
 		a.Notify == b.Notify
@@ -261,6 +299,12 @@ remote = "nas:"`, "mode is not set"},
 mode = "both"
 local = "/d"
 remote = "nas:"`, `mode: "both" must be one of push, pull, sync`},
+		{"bad metered", minimalShare + `
+[shuttles.s]
+mode = "push"
+metered = "sometimes"
+local = "/d"
+remote = "nas:"`, `metered: "sometimes" must be pause or run`},
 		{"bad trigger", minimalShare + `
 [shuttles.s]
 mode = "sync"

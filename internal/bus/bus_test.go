@@ -420,7 +420,7 @@ func TestSetEnabledOverTheBus(t *testing.T) {
 
 func TestStatusRoundTrip(t *testing.T) {
 	st := daemon.Status{
-		Name: "s", Mode: config.ModeSync, State: daemon.StateRunning, Paused: true, Pending: true, Share: daemon.ShareOnline,
+		Name: "s", Mode: config.ModeSync, State: daemon.StateRunning, Paused: true, Metered: true, Pending: true, Share: daemon.ShareOnline,
 		Note: "n", Error: "e", LastRun: time.Unix(1000, 0), LastOK: time.Unix(900, 0),
 		NextRun: time.Unix(4600, 0), Copied: 3, Deleted: 2, HeldDeletions: 1,
 		Conflicts: []engine.Issue{
