@@ -156,6 +156,28 @@ func TestActivityOfRefusedNames(t *testing.T) {
 	}
 }
 
+// The app names the phone by the device's name: conflict copies carry it,
+// not the "localhost" Android gives as the host name.
+func TestDeviceNameInConflictCopies(t *testing.T) {
+	f := newFixture(t, "sync", `conflicts = "keep-both"`)
+	f.deviceName = "Téléphone de Zoé"
+	write(t, f.local, "clash.txt", "local")
+	write(t, f.mount, "clash.txt", "remote, newer")
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(f.local, "clash.txt"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	f.start()
+	st := f.syncNow()
+	if len(st.Conflicts) != 1 || !strings.Contains(st.Conflicts[0].Outcome, "the Téléphone-de-Zoé copy is now clash.sync-conflict-") {
+		t.Fatalf("conflicts = %+v", st.Conflicts)
+	}
+	saved, err := filepath.Glob(filepath.Join(f.local, "clash.sync-conflict-*-Téléphone-de-Zoé.txt"))
+	if err != nil || len(saved) != 1 {
+		t.Errorf("conflict copy: %v, %v", saved, err)
+	}
+}
+
 func TestActivityOfEveryShuttle(t *testing.T) {
 	quickReloads(t)
 	f := newFixture(t, "push", "")

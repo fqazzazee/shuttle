@@ -54,7 +54,7 @@ type Options struct {
 	State         *state.DB
 	Settings      *config.Settings
 	// LocalName and RemoteName label each side in conflict file names, e.g.
-	// the machine's host name and the share's name. Empty means "local" and
+	// the device's name and the share's name. Empty means "local" and
 	// "remote".
 	LocalName, RemoteName string
 	// Cap limits transfers across every shuttle (the global bandwidth cap),

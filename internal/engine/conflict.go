@@ -135,7 +135,10 @@ func (e *executor) freeConflictName(p, side string) (string, error) {
 	return "", fmt.Errorf("no free conflict name for %s", p)
 }
 
-var unsafeLabel = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+// unsafeLabel is what a side's name loses in a conflict file name: anything
+// but letters, digits, ".", "_" and "-". Letters of any script stay, so a
+// phone named "Телефон" is not "unknown"; no file system refuses them.
+var unsafeLabel = regexp.MustCompile(`[^\p{L}\p{M}\p{N}._-]+`)
 
 // conflictName is where the losing copy of p goes:
 // "dir/report.sync-conflict-20261011-153000-laptop.pdf".
