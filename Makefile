@@ -18,7 +18,7 @@ GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v
 # Keep in step with the release workflow. Not newer: from v2.18 it needs Go 1.27.
 GORELEASER    ?= go run github.com/goreleaser/goreleaser/v2@v2.17.1
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar test-android samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar test-android test-android-device samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -112,9 +112,26 @@ aar:
 		-javapkg io.github.fqazzazee.shuttle -o $(AAR) ./mobile
 
 # The app in android/, on that .aar: a debug APK, its unit tests and Android
-# lint. Gradle comes from the wrapper, at the version and checksum it pins.
+# lint, and its tests on a phone built (they run in test-android-device).
+# Gradle comes from the wrapper, at the version and checksum it pins.
 test-android: aar
-	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug
+	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug \
+		assembleDebugAndroidTest
+
+# The app's tests on a phone or emulator, through adb (ANDROID_SERIAL picks
+# one). They touch only the app's own private storage. adb, not Gradle's
+# connectedDebugAndroidTest: on a phone with a work profile or a secure
+# folder, that reported a failure after every test had passed.
+ANDROID_APK      := android/app/build/outputs/apk/debug/app-debug.apk
+ANDROID_TEST_APK := android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+test-android-device: aar
+	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+	adb install -r --user 0 $(ANDROID_APK)
+	adb install -r -t --user 0 $(ANDROID_TEST_APK)
+	adb shell am instrument -w --user 0 io.github.fqazzazee.shuttle.test/androidx.test.runner.AndroidJUnitRunner \
+		| tee /dev/stderr | grep -q '^OK ('
+
 
 # SMB integration tests run against a throwaway Samba container.
 CONTAINER    ?= podman
