@@ -11,6 +11,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Every color stays readable on the backgrounds terminals commonly have:
@@ -120,5 +121,35 @@ func TestSelectionShowsWithoutColor(t *testing.T) {
 		if !reverse.MatchString(b.String()) {
 			t.Errorf("%s without colors: %q, not in reverse", name, b.String())
 		}
+	}
+}
+
+// The bar fills an eighth of a column at a time, along the gradient: each
+// column its own color. Without colors, its track still shows.
+func TestBarFillsByEighths(t *testing.T) {
+	for _, tc := range []struct {
+		done float64
+		want string
+	}{
+		{0, "        "},
+		{1.0 / 64, "▏       "},
+		{0.45, "███▌    "},
+		{63.0 / 64, "███████▉"},
+		{1, "████████"},
+		{1.5, "████████"},
+		{-1, "        "},
+	} {
+		if got := ansi.Strip(bar(tc.done)); got != tc.want {
+			t.Errorf("bar(%v) = %q, want %q", tc.done, got, tc.want)
+		}
+	}
+	if barCells[0][8] == barCells[barWidth-1][8] {
+		t.Error("the bar's first and last columns are in one color")
+	}
+
+	t.Cleanup(func() { useTheme(&darkPalette) })
+	useTheme(nil)
+	if got := ansi.Strip(bar(0.5)); got != "████░░░░" {
+		t.Errorf("without colors, bar(0.5) = %q", got)
 	}
 }

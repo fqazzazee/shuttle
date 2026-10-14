@@ -66,6 +66,12 @@ var (
 	}
 )
 
+// gradient is shuttle's gradient in steps colors: sky through teal and
+// mint to amber, the wordmark's and the progress bar's.
+func (p *palette) gradient(steps int) []color.Color {
+	return lipgloss.Blend1D(steps, p.sky, p.teal, p.mint, p.amber)
+}
+
 // The styles, set by useTheme.
 var (
 	titleStyle  lipgloss.Style
@@ -86,6 +92,7 @@ var (
 	stateStyles map[daemon.State]lipgloss.Style
 	kindStyles  map[activity.Kind]lipgloss.Style
 	wordColors  []color.Color // the wordmark's, a column each; nil for the terminal's own
+	barCells    [barWidth][9]string
 )
 
 // Tests see the dark palette; Run picks one for the terminal.
@@ -150,7 +157,7 @@ func useTheme(p *palette) {
 		windowStyle = s.Background(p.glass)
 		lightStyle = s.Foreground(p.amber)
 		keyStyle = s.Bold(true).Foreground(p.amber)
-		wordColors = lipgloss.Blend1D(lipgloss.Width(wordmark[0]), p.sky, p.teal, p.mint, p.amber)
+		wordColors = p.gradient(lipgloss.Width(wordmark[0]))
 	}
 	stateStyles = map[daemon.State]lipgloss.Style{
 		daemon.StateError:    badStyle,
@@ -167,4 +174,5 @@ func useTheme(p *palette) {
 		activity.KindSkipped:  faint,
 		activity.KindRun:      headStyle,
 	}
+	barCells = barCellsFor(p)
 }
