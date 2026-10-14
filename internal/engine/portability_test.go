@@ -23,6 +23,7 @@ func TestCoreHasNoDesktopDependencies(t *testing.T) {
 	for _, p := range core {
 		args = append(args, "github.com/fqazzazee/shuttle/internal/"+p)
 	}
+	args = append(args, "github.com/fqazzazee/shuttle/mobile") // the Android app's binding
 	out, err := exec.Command(goBin, args...).Output()
 	if err != nil {
 		t.Fatalf("go list: %v", err)
