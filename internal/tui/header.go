@@ -4,7 +4,9 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 
@@ -12,22 +14,18 @@ import (
 	"github.com/fqazzazee/shuttle/internal/present"
 )
 
-// part is a run of a drawing in one style; nil for the bus's body, which
-// is drawn in the daemon's state (busTint).
-type part struct {
-	style *lipgloss.Style
-	text  string
-}
-
-// smallBus is shuttle's icon in five rows, for the header: the front of
-// the bus, the sync arrows on its destination sign, its windscreen, lights
-// and wheels. Every row is busWidth columns, one a character.
-var smallBus = [][]part{
-	{{nil, " ╭───────╮ "}},
-	{{nil, " │  "}, {&signStyle, " ⇄ "}, {nil, "  │ "}},
-	{{nil, "━┥ "}, {&glassStyle, "▐███▌"}, {nil, " ┝━"}},
-	{{nil, " │ "}, {&lightStyle, "●"}, {&faint, " ═ "}, {&lightStyle, "●"}, {nil, " │ "}},
-	{{nil, " ╰─"}, {&faint, "▀"}, {nil, "───"}, {&faint, "▀"}, {nil, "─╯ "}},
+// smallBus is shuttle's icon in busHeight rows, for the header: the front
+// of the bus, the sync arrows on its destination sign, its windscreen,
+// lights and wheels; its body in body, its lights in left and right. Every
+// row is busWidth columns, one a character.
+func smallBus(body, left, right *lipgloss.Style) []string {
+	return []string{
+		body.Render(" ╭───────╮ "),
+		body.Render(" │  ") + signStyle.Render(" ⇄ ") + body.Render("  │ "),
+		body.Render("━┥ ") + glassStyle.Render("▐███▌") + body.Render(" ┝━"),
+		body.Render(" │ ") + left.Render("●") + faint.Render(" ═ ") + right.Render("●") + body.Render(" │ "),
+		body.Render(" ╰─") + faint.Render("▀") + body.Render("───") + faint.Render("▀") + body.Render("─╯ "),
+	}
 }
 
 // wordmark is "shuttle" in blocks, three rows high.
@@ -37,10 +35,12 @@ var wordmark = []string{
 	"▀▀▀ ▀ ▀ ▀▀▀  ▀   ▀  ▀▀▀ ▀▀▀",
 }
 
-// busWidth is smallBus's width, and gap what is between it and the rest.
+// busWidth and busHeight are smallBus's size, gap what is between it and
+// the rest.
 const (
-	busWidth = 11
-	gap      = 3
+	busWidth  = 11
+	busHeight = 5
+	gap       = 3
 )
 
 // tallHeight is the least height the tall header is shown at: below it,
@@ -53,25 +53,38 @@ func (m *model) headerLines() []string {
 	if !m.tall() {
 		return []string{m.tabsLine(signStyle.Render(" ⇄ ") + " " + titleStyle.Render("shuttle") + " ")}
 	}
-	right := []string{
+	beside := []string{
 		wordmarkRow(0), wordmarkRow(1), wordmarkRow(2),
 		m.summary(),
 		m.tabsLine(""),
 	}
 	body := m.busTint()
-	lines := make([]string, len(smallBus))
-	for i, row := range smallBus {
-		var b strings.Builder
-		for _, p := range row {
-			style := &body
-			if p.style != nil {
-				style = p.style
-			}
-			b.WriteString(style.Render(p.text))
-		}
-		lines[i] = b.String() + strings.Repeat(" ", gap) + right[i]
+	left, right := m.lights()
+	lines := smallBus(&body, &left, &right)
+	for i := range lines {
+		lines[i] += strings.Repeat(" ", gap) + beside[i]
 	}
 	return lines
+}
+
+// blinkEvery is how long a light of the bus stays on while it blinks.
+const blinkEvery = 500 * time.Millisecond
+
+// lights are the styles of the bus's lights: both on, but while a shuttle
+// runs, whatever the bus's color says, when they take turns.
+func (m *model) lights() (left, right lipgloss.Style) {
+	if !m.running() {
+		return lightStyle, lightStyle
+	}
+	if m.now().UnixMilli()/blinkEvery.Milliseconds()%2 == 0 {
+		return lightStyle, faint
+	}
+	return faint, lightStyle
+}
+
+// running says whether a shuttle runs.
+func (m *model) running() bool {
+	return slices.ContainsFunc(m.shuttles, func(st daemon.Status) bool { return st.State == daemon.StateRunning })
 }
 
 // busTint is the bus's color: the shuttles' state taken together, as the
