@@ -189,6 +189,21 @@ pre.term {
 .not { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .not span { font: 14px var(--mono); border: 1px dashed var(--line); border-radius: 999px; padding: 4px 12px; color: var(--dim); }
 
+/* The FAQ: questions that open, the marker turning as the TUI's tree's does. */
+.faq { display: grid; gap: 10px; margin-top: 24px; max-width: 880px; }
+.faq details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.faq details[open] { border-color: var(--sky); }
+.faq summary {
+  cursor: pointer; list-style: none; padding: 14px 18px; font-weight: 600; color: var(--bright);
+  display: flex; gap: 12px; align-items: baseline;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::before { content: "▸"; font-family: var(--mono); color: var(--amber); transition: transform 0.15s; }
+.faq details[open] summary::before { transform: rotate(90deg); }
+.faq summary:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; border-radius: 8px; }
+.faq details p { margin: 0; padding: 0 18px 16px 42px; font-size: 15.5px; }
+@media (prefers-reduced-motion: reduce) { .faq summary::before { transition: none; } }
+
 /* Contributing: numbered steps, like the TUI's tabs. */
 .steps { list-style: none; padding: 0; margin: 24px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
 .steps li { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
