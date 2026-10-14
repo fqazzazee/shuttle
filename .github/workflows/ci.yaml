@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # By hand, on main or a branch: to check again without a commit to push,
+  # as after Actions was paused.
+  workflow_dispatch:
 
 # Cancel superseded runs on the same ref. Never cancel on main.
 concurrency:
