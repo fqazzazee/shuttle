@@ -377,3 +377,133 @@ func TestSetPermissions(t *testing.T) {
 		t.Errorf("after SetPermissions: %s", m.StatusesJSON())
 	}
 }
+
+func TestWorkJSON(t *testing.T) {
+	f := newFixture(t)
+	// Folders of their own: shuttles may not share one.
+	for _, d := range []string{"s", "w", "l", "m", "o"} {
+		if err := os.Mkdir(filepath.Join(f.local, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(filepath.Join(f.share, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	doc := fmt.Sprintf(`[shares.mnt]
+type = "path"
+path = %[1]q
+
+[shares.nas]
+type = "smb"
+host = "nas.invalid"
+share = "x"
+
+[shuttles.scheduled]
+mode = "push"
+local = "%[2]s/s"
+remote = "mnt:s"
+triggers = ["schedule"]
+interval = "1h"
+metered = "run"
+
+[shuttles.when-there]
+mode = "push"
+local = "%[2]s/w"
+remote = "nas:a"
+triggers = ["share-available"]
+
+[shuttles.live]
+mode = "push"
+local = "%[2]s/l"
+remote = "mnt:l"
+triggers = ["realtime", "schedule"]
+interval = "1h"
+
+[shuttles.manual]
+mode = "push"
+local = "%[2]s/m"
+remote = "mnt:m"
+
+[shuttles.off]
+mode = "push"
+local = "%[2]s/o"
+remote = "mnt:o"
+triggers = ["schedule"]
+interval = "1h"
+enabled = false
+`, f.share, f.local)
+	if err := os.WriteFile(f.opts.ConfigPath, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	if err := m.WaitQuiet(10_000); err != nil {
+		t.Fatal(err)
+	}
+	var got []struct {
+		Name                               string
+		NextRun                            *time.Time
+		ShareAvailable, Network, Unmetered bool
+	}
+	if err := json.Unmarshal([]byte(m.WorkJSON()), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("work = %s, want the scheduled shuttle and the share-available one", m.WorkJSON())
+	}
+	s, w := got[0], got[1]
+	if s.Name != "scheduled" || s.NextRun == nil || time.Until(*s.NextRun) < 59*time.Minute ||
+		s.ShareAvailable || s.Network || s.Unmetered {
+		t.Errorf("scheduled: %+v", s)
+	}
+	if w.Name != "when-there" || w.NextRun != nil || !w.ShareAvailable || !w.Network || !w.Unmetered {
+		t.Errorf("when-there: %+v", w)
+	}
+}
+
+// A worker's daemon runs what is due at start, and WaitQuiet sees it done.
+func TestWaitQuiet(t *testing.T) {
+	f := newFixture(t)
+	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := os.ReadFile(f.opts.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Never ran: due at once.
+	doc = append(doc, "triggers = [\"schedule\"]\ninterval = \"1h\"\n"...)
+	if err := os.WriteFile(f.opts.ConfigPath, doc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	if err := m.WaitQuiet(10_000); err != nil {
+		t.Fatal(err)
+	}
+	var all []daemon.Status
+	if err := json.Unmarshal([]byte(m.StatusesJSON()), &all); err != nil || all[0].Copied != 1 {
+		t.Errorf("after WaitQuiet: %s", m.StatusesJSON())
+	}
+}
+
+func TestQuiet(t *testing.T) {
+	sched := []config.Shuttle{{Name: "s", Settings: config.Settings{Triggers: []config.Trigger{config.TriggerSchedule}}}}
+	next := time.Now().Add(time.Hour)
+	for _, tt := range []struct {
+		name string
+		st   daemon.Status
+		want bool
+	}{
+		{"idle, probed, scheduled", daemon.Status{Name: "s", State: daemon.StateIdle, Share: "online", NextRun: next}, true},
+		{"running", daemon.Status{Name: "s", State: daemon.StateRunning, Share: "online", NextRun: next}, false},
+		{"a run waiting", daemon.Status{Name: "s", State: daemon.StateIdle, Pending: true, Share: "online", NextRun: next}, false},
+		{"a run held back", daemon.Status{Name: "s", State: daemon.StatePaused, Pending: true, Share: "online", NextRun: next}, true},
+		{"not probed yet", daemon.Status{Name: "s", State: daemon.StateIdle, NextRun: next}, false},
+		{"schedule not worked out", daemon.Status{Name: "s", State: daemon.StateIdle, Share: "online"}, false},
+		{"offline", daemon.Status{Name: "s", State: daemon.StateOffline, Share: "offline", NextRun: next}, true},
+		{"disabled", daemon.Status{Name: "s", State: daemon.StateDisabled}, true},
+	} {
+		if got := quiet([]daemon.Status{tt.st}, sched); got != tt.want {
+			t.Errorf("%s: quiet = %v", tt.name, got)
+		}
+	}
+}

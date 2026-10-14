@@ -4,6 +4,7 @@ package daemon
 
 import (
 	"fmt"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -85,5 +86,57 @@ interval = "1h"`)
 	f.waitFor("s", "disabled", func(st Status) bool { return st.State == StateDisabled })
 	if f.d.Triggered(config.TriggerRealtime) {
 		t.Error("a disabled shuttle's trigger counted")
+	}
+}
+
+// ProbeNow finds a share that came back without waiting for the next probe,
+// and a share-available shuttle runs.
+func TestProbeNow(t *testing.T) {
+	fast(t)
+	probeEvery = time.Hour // only the probe at start, and ProbeNow's
+	f := newFixture(t, "push", `triggers = ["share-available"]`)
+	write(t, f.local, "a.txt", "a")
+	gone := f.mount + ".gone"
+	if err := os.Rename(f.mount, gone); err != nil {
+		t.Fatal(err)
+	}
+	f.start()
+	f.waitFor("s", "the probe at start", func(st Status) bool { return st.Share == ShareOffline })
+	if err := os.Rename(gone, f.mount); err != nil {
+		t.Fatal(err)
+	}
+	f.d.ProbeNow()
+	if st := f.waitFor("s", "the share back, and the run", func(st Status) bool { return st.Copied == 1 }); st.Share != ShareOnline {
+		t.Errorf("status = %+v", st)
+	}
+}
+
+func TestConfigAndNextRuns(t *testing.T) {
+	f := newFixture(t, "push", `triggers = ["schedule"]
+interval = "1h"`)
+	f.start()
+	got := f.d.Config().Shuttles
+	if len(got) != 1 || got[0].Name != "s" || got[0].Local != f.local || !got[0].Settings.Has(config.TriggerSchedule) {
+		t.Errorf("Config().Shuttles = %+v", got)
+	}
+	f.settled("s") // the run at start: it never ran before
+	next := f.d.NextRuns()["s"]
+	if d := time.Until(next); d < 59*time.Minute || d > time.Hour {
+		t.Errorf("NextRuns = %v, want an hour after the run", next)
+	}
+}
+
+// A slot the scheduler triggered but whose run has not happened is still
+// due: a daemon the Android app stops at once must not push it an
+// interval away.
+func TestNextRunsCountFromRunsThatEnded(t *testing.T) {
+	f := newFixture(t, "push", `triggers = ["schedule"]
+interval = "1h"`)
+	f.build()
+	f.d.o.Waiting = func(*config.Config, *config.Shuttle) string { return "held, so the due run cannot start" }
+	f.run()
+	f.waitFor("s", "the due run triggered", func(st Status) bool { return st.Pending })
+	if next := f.d.NextRuns()["s"]; time.Until(next) > time.Second {
+		t.Errorf("NextRuns = %v, want now: the run never happened", next)
 	}
 }

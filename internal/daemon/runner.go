@@ -33,6 +33,7 @@ type runner struct {
 	// kick wakes the loop. It holds at most one wake-up, so any number of
 	// triggers during a run add up to one more run.
 	kick     chan struct{}
+	probe    chan struct{}  // asks the share probe to look now (ProbeNow); holds at most one
 	quit     chan struct{}  // closed to stop the triggers
 	bg       sync.WaitGroup // the triggers: share probe, schedule, watcher
 	loopDone chan struct{}  // closed when the loop has returned
@@ -49,6 +50,7 @@ type runner struct {
 	requested bool            // the user asked for the pending run (SyncNow)
 	asked     bool            // the user asked for the run in progress: a metered connection does not stop it
 	attempted time.Time       // when a run was last triggered by the schedule, or completed before start
+	completed time.Time       // when a run last completed, as of start
 	own       map[string]bool // local paths this shuttle's run wrote; see startOwnWrites
 	ownUntil  time.Time
 
@@ -62,7 +64,8 @@ type runner struct {
 }
 
 func newRunner(d *Daemon, cfg *config.Config, s *config.Shuttle) *runner {
-	r := &runner{d: d, cfg: cfg, shuttle: s, kick: make(chan struct{}, 1), quit: make(chan struct{})}
+	r := &runner{d: d, cfg: cfg, shuttle: s, kick: make(chan struct{}, 1), probe: make(chan struct{}, 1),
+		quit: make(chan struct{})}
 	r.st = Status{Name: s.Name, Mode: s.Settings.Mode, State: StateIdle}
 	if !s.Enabled {
 		r.st.State = StateDisabled
@@ -79,6 +82,18 @@ func (r *runner) lastAttempt() time.Time {
 		return r.st.LastRun
 	}
 	return r.attempted
+}
+
+// lastEnded is when the shuttle's last run ended, whether in this daemon or
+// before it started: unlike lastAttempt, not a slot triggered whose run
+// has not happened.
+func (r *runner) lastEnded() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.st.LastRun.After(r.completed) {
+		return r.st.LastRun
+	}
+	return r.completed
 }
 
 func (r *runner) markAttempt(t time.Time) {

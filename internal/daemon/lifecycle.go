@@ -40,8 +40,13 @@ func (r *runner) openState() error {
 	}
 	// The schedule counts from the last complete run, so a slot missed
 	// while the machine was off runs at start.
-	if last, err := db.LastComplete(); err == nil && last.After(r.lastAttempt()) {
-		r.markAttempt(last)
+	if last, err := db.LastComplete(); err == nil {
+		r.mu.Lock()
+		r.completed = last
+		r.mu.Unlock()
+		if last.After(r.lastAttempt()) {
+			r.markAttempt(last)
+		}
 	}
 	r.db = db
 	r.countSynced()
