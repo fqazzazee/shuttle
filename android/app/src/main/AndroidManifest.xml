@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- The three asked for up front (DECISIONS 2026-10-14). All files access, not the
+         Storage Access Framework: real paths for the Go core, and file watching. Play would
+         review it; the app is not on Play, so lint's ScopedStorage warning is beside the point. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Passwords are kept under a Keystore key that a restored phone does not have:
          nothing is backed up, and a restored phone asks for them again (DECISIONS 2026-10-14). -->
