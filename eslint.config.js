@@ -7,8 +7,10 @@
 import js from '@eslint/js';
 
 // What gjs and GNOME Shell provide besides the language. global is the
-// Shell's; the unit tests run in plain gjs, which has the rest.
+// Shell's; the unit tests run in plain gjs, which has the rest, and ARGV
+// for a script's arguments.
 const gjs = {
+    ARGV: 'readonly',
     console: 'readonly',
     global: 'readonly',
     log: 'readonly',
@@ -22,7 +24,7 @@ const gjs = {
 export default [
     js.configs.recommended,
     {
-        files: ['extension/**/*.js'],
+        files: ['extension/**/*.js', 'test/extension/**/*.js'],
         languageOptions: {
             ecmaVersion: 2024,
             sourceType: 'module',

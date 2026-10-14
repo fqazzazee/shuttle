@@ -194,8 +194,10 @@ On GNOME 50, an extension shows shuttle in the top bar and in Quick Settings: an
 the overall state (pulsing while it syncs, with the transfer rate beside it) and a list of
 the shuttles with what each is doing; a toggle that pauses and resumes every shuttle, a switch
 and a "Sync now" button for each, and "Open shuttle". The top bar's menu has the same
-controls as the Quick Settings toggle. It only talks to the running service; settings stay in
-the terminal interface.
+controls as the Quick Settings toggle. Its preferences, in GNOME's Extensions app, edit each
+shuttle's settings, each showing what applies when the shuttle sets none, written to the config
+file as the terminal interface writes them. Adding shuttles, shares and passwords is the terminal
+interface's.
 
 The extension comes from this repository: the RPM and DEB install it for every user, and
 from a checkout it installs for you alone. It is not on extensions.gnome.org.

@@ -177,7 +177,7 @@ uninstall-extension:
 # The GNOME extension's lint: eslint from package-lock.json, installed with
 # no package's install scripts run. Needs node 20.19+ and npm.
 lint-extension: node_modules
-	npx eslint extension/
+	npx eslint extension/ test/extension/
 
 node_modules: package.json package-lock.json
 	npm ci --ignore-scripts --no-audit --no-fund
