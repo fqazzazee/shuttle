@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
+name: changes
+description: >
+  Which parts of shuttle a pull request changes, so that jobs it cannot
+  affect are skipped. Every other event, a change to CI itself, and any
+  file it does not know count as all of them. Needs a checkout with the
+  history of both commits (fetch-depth 0).
+outputs:
+  go:
+    description: '"true" when Go code, its tests or their scripts change'
+    value: ${{ steps.areas.outputs.go }}
+  extension:
+    description: '"true" when the GNOME extension or its tooling changes'
+    value: ${{ steps.areas.outputs.extension }}
+  packaging:
+    description: '"true" when what the packages carry or how they are built changes'
+    value: ${{ steps.areas.outputs.packaging }}
+runs:
+  using: composite
+  steps:
+    - id: areas
+      shell: bash
+      env:
+        EVENT: ${{ github.event_name }}
+        BASE: ${{ github.event.pull_request.base.sha }}
+        HEAD: ${{ github.sha }}
+      run: '"$GITHUB_ACTION_PATH/areas.sh"'
