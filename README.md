@@ -46,12 +46,12 @@ like Syncthing.
 
 ## Status
 
-Early, but usable: the sync engine, SMB and NFSv3 shares, the keyring, the background service,
-the terminal interface and the GNOME Shell 50 extension work. SMB is tested against a real Samba server, NFS so far against
-an in-process test server. Still to come:
-
-1. NFS tested against the Linux kernel server: NFSv3 directly, NFSv4 through a mount
-2. Packages: RPM, DEB and a tarball on GitHub Releases
+Early, but usable: [v0.1.0](https://github.com/fqazzazee/shuttle/releases/tag/v0.1.0) is the
+first release. The sync engine, SMB and NFSv3 shares, the keyring, the background service, the
+terminal interface and the GNOME Shell 50 extension work. SMB is tested against a real Samba
+server; NFS against the Linux kernel's server (NFSv3 directly, NFSv4 through a mount) and an
+in-process one. Packages are on [GitHub Releases](https://github.com/fqazzazee/shuttle/releases):
+the RPM and the DEB are install-tested on amd64; the arm64 ones are built, not yet tested.
 
 ### Not planned as of right now but could be an addition in the future if requested
 
