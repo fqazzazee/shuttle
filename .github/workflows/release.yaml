@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: The X.Y.Z to build the APK as
-        default: '0.0.0'
+        description: The X.Y.Z to build the APK as (0.0.0 is no version code)
+        default: '0.0.1'
 
 permissions:
   contents: read

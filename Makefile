@@ -128,9 +128,13 @@ apk: aar android-notices
 	$(APKSIGNER) verify --min-sdk-version 30 --print-certs $(APK)
 
 # The SHA-256 of the certificate $(APK) is signed with: the release workflow
-# checks it against android/release-cert.sha256.
+# checks it against android/release-cert.sha256. apksigner says it per signer
+# ("Signer #1 certificate SHA-256 digest: ...") or, in newer build tools, per
+# scheme ("V2 Signer: certificate SHA-256 digest: ..."); one certificate, or
+# nothing is printed.
 apk-cert:
-	@$(APKSIGNER) verify --min-sdk-version 30 --print-certs $(APK) 2>/dev/null | sed -n 's/^Signer #1 certificate SHA-256 digest: //p'
+	@$(APKSIGNER) verify --min-sdk-version 30 --print-certs $(APK) 2>/dev/null \
+		| sed -n 's/^.*[Ss]igner.*certificate SHA-256 digest: //p' | sort -u | awk 'END { if (NR == 1) print }'
 
 # The Android app's third-party notices, an asset of the APK: the Go core's
 # modules (notices.sh android), then the Java and Kotlin libraries of the
