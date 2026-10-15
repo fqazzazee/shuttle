@@ -18,7 +18,7 @@ func TestCoreHasNoDesktopDependencies(t *testing.T) {
 		t.Skip("go not installed")
 	}
 	core := []string{"engine", "config", "fsys", "state", "ignore", "activity", "nfs3",
-		"secrets", "shares", "daemon", "notice", "present"}
+		"secrets", "shares", "daemon", "notice", "present", "pick"}
 	args := []string{"list", "-deps", "-f", "{{.ImportPath}}"}
 	for _, p := range core {
 		args = append(args, "github.com/fqazzazee/shuttle/internal/"+p)

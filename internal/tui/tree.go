@@ -14,19 +14,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/pick"
 	"github.com/fqazzazee/shuttle/internal/shares"
 )
-
-// picking is what a shuttle syncs of its folder.
-type picking int
-
-const (
-	pickAll     picking = iota // everything
-	pickInclude                // only what is marked: the shuttle's include
-	pickExclude                // all but what is marked: its exclude
-)
-
-var pickingNames = []string{"everything", "only what is marked", "all but what is marked"}
 
 // entry is one thing in a folder.
 type entry struct {
@@ -58,8 +48,7 @@ type tree struct {
 	clean func(typed string) string // a typed path as the tree's
 	root  *node                     // the shuttle's folder
 	sel   int                       // in rows()
-	pick  picking
-	marks map[string]bool // slash paths from the top
+	marks pick.Marks                // slash paths from the top
 	// folders are marks the other side's tree showed as folders: not
 	// here, they would not be known to be.
 	folders map[string]bool
@@ -130,7 +119,7 @@ func newTree(where, dir string, list func(context.Context, string) ([]entry, err
 	treeIDs++
 	dir = cleanSlash(dir)
 	return &tree{id: treeIDs, where: where, list: list, clean: cleanSlash,
-		root: &node{path: dir, dir: true, open: true}, marks: map[string]bool{}, input: newInput(dir)}
+		root: &node{path: dir, dir: true, open: true}, input: newInput(dir)}
 }
 
 // dir is the shuttle's folder: the top of the tree.
@@ -290,11 +279,11 @@ func (t *tree) key(ctx context.Context, msg tea.KeyPressMsg) (cmd tea.Cmd, chose
 			return t.load(ctx, n), false
 		}
 	case "m":
-		t.pick = (t.pick + 1) % picking(len(pickingNames))
+		t.marks.Mode = (t.marks.Mode + 1) % pick.Mode(len(pick.Names))
 	case "space":
 		switch {
 		case n == nil:
-		case t.pick == pickAll:
+		case t.marks.Mode == pick.All:
 			t.note = "everything is synced: m chooses to mark what to sync, or what to leave out"
 		default:
 			t.toggle(n)
@@ -327,109 +316,35 @@ func (t *tree) up(ctx context.Context) tea.Cmd {
 	return t.load(ctx, t.root)
 }
 
-// marked reports whether p or a folder it is in is marked, inside the
-// shuttle's folder: marks outside it are not saved, so they do not count.
-func (t *tree) marked(p string) bool {
-	for ; within(p, t.root.path) && p != t.root.path; p = parentOf(p) {
-		if t.marks[p] {
-			return true
-		}
-	}
-	return false
-}
-
-// partly reports whether something inside p is marked.
-func (t *tree) partly(p string) bool {
-	for m := range t.marks {
-		if within(m, p) && m != p {
-			return true
-		}
-	}
-	return false
-}
-
 // synced reports whether the shuttle syncs p: all of it, some of it.
-func (t *tree) synced(p string) (all, some bool) {
-	switch {
-	case t.pick == pickAll:
-		return true, true
-	case t.marked(p):
-		return t.pick == pickInclude, t.pick == pickInclude
-	case t.partly(p):
-		return false, true
-	}
-	return t.pick == pickExclude, t.pick == pickExclude
-}
+// Marks outside the shuttle's folder are not saved, so they do not count.
+func (t *tree) synced(p string) (all, some bool) { return t.marks.Synced(p, t.root.path) }
 
-// toggle marks n, or unmarks it. Unmarking something in a marked folder
-// unmarks the folder and marks what else is in it instead, down to n.
+// toggle marks n, or unmarks it (pick.Marks.Toggle).
 func (t *tree) toggle(n *node) {
-	if !t.marked(n.path) {
-		for m := range t.marks {
-			if within(m, n.path) {
-				delete(t.marks, m)
-			}
+	t.marks.Toggle(n.path, t.root.path, func(dir string) []string {
+		var kids []string
+		for _, k := range t.find(dir).kids {
+			kids = append(kids, k.path)
 		}
-		t.marks[n.path] = true
-		return
-	}
-	p := n.path
-	for !t.marks[p] {
-		parent := parentOf(p)
-		for _, k := range t.find(parent).kids {
-			if k.path != p {
-				t.marks[k.path] = true
-			}
-		}
-		p = parent
-	}
-	delete(t.marks, p)
-}
-
-// within reports whether the slash path p is top or inside it.
-func within(p, top string) bool {
-	if top == "/" {
-		return true
-	}
-	rest, ok := strings.CutPrefix(p, top)
-	return ok && (rest == "" || rest[0] == '/')
+		return kids
+	})
 }
 
 // selection is what the shuttle includes or excludes: the marks inside its
 // folder, relative to it, sorted. Marks outside it are left out.
-func (t *tree) selection() (include, exclude []string) {
-	var rel []string
-	for _, m := range t.inside() {
-		rel = append(rel, strings.TrimPrefix(strings.TrimPrefix(m, t.root.path), "/"))
-	}
-	switch t.pick {
-	case pickInclude:
-		return rel, nil
-	case pickExclude:
-		return nil, rel
-	}
-	return nil, nil
-}
+func (t *tree) selection() (include, exclude []string) { return t.marks.Selection(t.root.path) }
 
 // inside is the marks inside the shuttle's folder, sorted.
-func (t *tree) inside() []string {
-	var out []string
-	for m := range t.marks {
-		if within(m, t.root.path) && m != t.root.path {
-			out = append(out, m)
-		}
-	}
-	slices.Sort(out)
-	return out
-}
+func (t *tree) inside() []string { return t.marks.Inside(t.root.path) }
 
 // adopt takes from's marks inside its folder, as marks inside this tree's:
 // the shuttle has one list of them for both sides.
 func (t *tree) adopt(from *tree) {
-	t.pick, t.marks, t.folders = from.pick, map[string]bool{}, map[string]bool{}
+	t.marks, t.folders = pick.Marks{Mode: from.marks.Mode}, map[string]bool{}
 	for _, m := range from.inside() {
 		p := path.Join(t.root.path, strings.TrimPrefix(m, from.root.path))
-		t.marks[p] = true
+		t.marks.Add(p)
 		if from.folder(m) {
 			t.folders[p] = true
 		}
@@ -446,30 +361,20 @@ func (t *tree) folder(p string) bool {
 
 // setSelection marks what the shuttle includes or excludes, as in the config.
 func (t *tree) setSelection(include, exclude []string) {
-	t.pick = pickAll
-	marks := include
-	switch {
-	case len(include) > 0:
-		t.pick = pickInclude
-	case len(exclude) > 0:
-		t.pick, marks = pickExclude, exclude
-	}
-	for _, m := range marks {
-		t.marks[path.Join(t.root.path, m)] = true
-	}
+	t.marks.SetSelection(t.root.path, include, exclude)
 }
 
 func (t *tree) lines(room, width int) []string {
 	lines := []string{"Folder " + t.where + ": " + headStyle.Render(t.root.path)}
-	choices := make([]string, len(pickingNames))
-	for i, name := range pickingNames {
+	choices := make([]string, len(pick.Names))
+	for i, name := range pick.Names {
 		choices[i] = faint.Render(name)
-		if picking(i) == t.pick {
+		if pick.Mode(i) == t.marks.Mode {
 			choices[i] = activeTab.Render(" " + name + " ")
 		}
 	}
 	lines = append(lines, "Sync: "+strings.Join(choices, "  "))
-	if t.pick != pickAll {
+	if t.marks.Mode != pick.All {
 		lines = append(lines, t.marksLine(width))
 	}
 	lines = append(lines, "")
@@ -538,7 +443,7 @@ func (t *tree) row(n *node, depth int, sel bool) string {
 	}
 	box := ""
 	all, some := t.synced(n.path)
-	if t.pick != pickAll {
+	if t.marks.Mode != pick.All {
 		switch {
 		case all:
 			box = "[✓] "
@@ -562,13 +467,13 @@ func (t *tree) row(n *node, depth int, sel bool) string {
 func (t *tree) marksLine(width int) string {
 	inside := t.inside()
 	if len(inside) == 0 {
-		if t.pick == pickInclude {
+		if t.marks.Mode == pick.Include {
 			return heldStyle.Render("Nothing marked yet: space marks what to sync.")
 		}
 		return faint.Render("Nothing marked yet: space marks what to leave out.")
 	}
 	label := "Synced only: "
-	if t.pick == pickExclude {
+	if t.marks.Mode == pick.Exclude {
 		label = "Left out: "
 	}
 	names := make([]string, len(inside))
