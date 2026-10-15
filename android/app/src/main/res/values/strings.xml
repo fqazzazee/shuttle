@@ -61,6 +61,15 @@
     <string name="settings_own">its own</string>
     <string name="settings_save">Save</string>
     <string name="settings_reset">Use %1$s\'s (%2$s)</string>
+    <string name="conflicts_none">No conflicts waiting for you.</string>
+    <string name="keep_local">Keep the phone\'s</string>
+    <string name="keep_remote">Keep the share\'s</string>
+    <string name="keep_both">Keep both</string>
+    <string name="conflict_phone">On the phone</string>
+    <string name="conflict_share">On the share</string>
+    <string name="conflict_none_here">none</string>
+    <string name="conflict_folder">a folder</string>
+    <string name="conflict_rename">Rename one of them yourself: the phone cannot keep both names.</string>
     <string name="sync_now">Sync now</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
@@ -76,7 +85,7 @@
     <string name="state_disabled">Off</string>
     <string name="never_run">Never run</string>
     <string name="last_run">Last run %1$s</string>
-    <string name="last_run_just_now">Last run just now</string>
+    <string name="just_now">just now</string>
     <string name="progress_rate">%1$s · %2$s/s</string>
     <plurals name="conflicts">
         <item quantity="one">%d conflict</item>

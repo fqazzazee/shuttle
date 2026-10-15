@@ -600,6 +600,18 @@ func (m *Daemon) SetSetting(name, key, text string) error {
 	return m.d.SetShuttleSetting(name, key, text)
 }
 
+// Resolve settles a conflict the named shuttle holds at path, as the user
+// chose: "keep-local", "keep-remote" or "keep-both". It waits for a run in
+// progress to finish its file, so the app calls it off the main thread.
+func (m *Daemon) Resolve(name, path, choice string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
+	defer cancel()
+	return m.d.Resolve(ctx, name, path, engine.Choice(choice))
+}
+
+// resolveTimeout bounds Resolve: a run in progress finishes its file first.
+const resolveTimeout = 2 * time.Minute
+
 // SyncNow asks for a run of a shuttle.
 func (m *Daemon) SyncNow(name string) error { return m.d.SyncNow(name) }
 
