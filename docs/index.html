@@ -4,13 +4,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>shuttle — sync folders with your NAS, from the terminal and GNOME</title>
-  <meta name="description" content="shuttle pushes, pulls and syncs folders between a Linux desktop and SMB or NFS shares, with no mounts and no root. A terminal interface, a user service, and GNOME showing what it is doing.">
+  <title>shuttle — sync folders with your NAS, from the terminal, GNOME and Android</title>
+  <meta name="description" content="shuttle pushes, pulls and syncs folders between a Linux desktop or an Android phone and SMB or NFS shares, with no mounts and no root. A terminal interface, a user service, GNOME showing what it is doing, and an app for the phone.">
   <meta name="theme-color" content="#1b1e26" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
   <meta property="og:type" content="website">
   <meta property="og:title" content="shuttle">
-  <meta property="og:description" content="Push, pull and sync folders with your NAS, over SMB and NFS: no mounts, no root, a terminal UI and GNOME.">
+  <meta property="og:description" content="Push, pull and sync folders with your NAS, over SMB and NFS: no mounts, no root, a terminal UI, GNOME, and an Android app.">
   <meta property="og:url" content="https://fqazzazee.github.io/shuttle/">
   <meta property="og:image" content="https://fqazzazee.github.io/shuttle/social-preview.png">
   <meta property="og:image:width" content="1280">
@@ -114,10 +114,11 @@
 
     <p class="tagline">Push, pull and sync folders between your Linux desktop and a NAS, over SMB or
       NFS, with no mounts and no root. Set it up in the terminal; a user service runs it;
-      GNOME shows what it is doing.</p>
+      GNOME shows what it is doing. And the same on your Android phone, in an app.</p>
     <p class="modes"><b>↑</b> push &nbsp; <b>↓</b> pull &nbsp; <b>⇅</b> sync &nbsp;·&nbsp; real time, on a schedule, when the share comes online, or when you ask</p>
     <div class="actions">
-      <a class="button primary" href="#install">Install v0.1.0</a>
+      <a class="button primary" href="#install">Install v0.2.0</a>
+      <a class="button" href="https://github.com/fqazzazee/shuttle/releases/download/v0.2.0/shuttle_0.2.0_android_arm64.apk">Android APK</a>
       <a class="button" href="https://github.com/fqazzazee/shuttle">Source on GitHub</a>
       <a class="button" href="https://github.com/fqazzazee/shuttle/releases/latest">Releases</a>
     </div>
@@ -238,6 +239,8 @@
           <p>Every copy, deletion, conflict and error, newest first, kept for 30 days, per shuttle or all together.</p></div>
         <div class="feature"><span class="icon">❯_</span><h3>A command line too</h3>
           <p><code>shuttle status</code>, <code>sync</code>, <code>pause</code>, <code>resume</code> and <code>activity</code>, for scripts and quick checks.</p></div>
+        <div class="feature" style="--c: var(--mint); grid-column: 1 / -1"><span class="icon">▯</span><h3>On your phone</h3>
+          <p>An Android app, from Android 11: the same engine and every setting, set up in its own tabs, real time in the background, and backups of its setup. <span class="dim">A signed APK in each release.</span></p></div>
       </div>
     </div>
   </section>
@@ -289,11 +292,11 @@
   <section id="install">
     <div class="wrap">
       <p class="kicker">Install</p>
-      <h2>Fedora, Debian and Ubuntu, on GNOME 50</h2>
+      <h2>Fedora, Debian and Ubuntu, on GNOME 50, and Android</h2>
       <p>From the <a href="https://github.com/fqazzazee/shuttle/releases/latest">latest release</a>, as a
         package (amd64; arm64 built, not yet tested), then enable the service:</p>
       <div class="stack">
-<pre class="term"><span class="p">$ </span>v=0.1.0
+<pre class="term"><span class="p">$ </span>v=0.2.0
 <span class="p">$ </span>url=https://github.com/fqazzazee/shuttle/releases/download/v$v
 
 <span class="c"># Fedora</span>
@@ -325,9 +328,11 @@
       </div>
       <p class="caption">The <a href="https://github.com/fqazzazee/shuttle#install">README</a> has the rest:
         building from source, NFS exports, the GNOME extension, every setting.</p>
-      <p>On an Android phone (Android 11 or later, arm64): download <code>shuttle_X.Y.Z_android_arm64.apk</code> from
-        the same release on the phone and open it. The app sets up shares, profiles and shuttles in its own tabs,
-        and each release installs over the last. See the <a href="https://github.com/fqazzazee/shuttle#android">README</a>.</p>
+      <p>On an Android phone (Android 11 or later, arm64): download <a href="https://github.com/fqazzazee/shuttle/releases/download/v0.2.0/shuttle_0.2.0_android_arm64.apk">shuttle_0.2.0_android_arm64.apk</a>
+        on the phone and open it. The app sets up shares, profiles and shuttles in its own tabs, and
+        each release installs over the last, keeping them. Every release is signed with the same key: its About
+        page shows the APK's SHA-256, to compare with the release's <code>checksums.txt</code>. See the
+        <a href="https://github.com/fqazzazee/shuttle#android">README</a>.</p>
       <p style="margin-top: 26px">shuttle is not:</p>
       <div class="not"><span>a cloud sync client</span><span>a backup tool with deduplication</span><span>peer-to-peer, like Syncthing</span></div>
     </div>
@@ -383,8 +388,12 @@
           <p>Yes: it is <code>~/.config/shuttle/config.toml</code>. Save a change and it applies within a second, with no restart. A mistake keeps the previous settings running, and says what is wrong. The terminal interface edits the same file, keeping your comments and layout.</p>
         </details>
         <details>
+          <summary>Is there a phone app?</summary>
+          <p>Yes, for Android 11 and later: the same engine, settings and config file as the desktop, with a wizard to add a shuttle, conflicts, activity, and backups of its setup. It is a signed APK on the releases page, not on Google Play or F-Droid; Obtainium can follow the releases.</p>
+        </details>
+        <details>
           <summary>Does it run on macOS or Windows, or sync to the cloud?</summary>
-          <p>No: it is Linux only, and it syncs with SMB and NFS shares. For cloud storage (S3, Google Drive, OneDrive), use rclone.</p>
+          <p>No: it runs on Linux and Android, and it syncs with SMB and NFS shares. For cloud storage (S3, Google Drive, OneDrive), use rclone.</p>
         </details>
         <details>
           <summary>Is it free?</summary>

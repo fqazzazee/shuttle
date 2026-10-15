@@ -47,8 +47,8 @@ like Syncthing.
 
 ## Status
 
-Early, but usable: [v0.1.0](https://github.com/fqazzazee/shuttle/releases/tag/v0.1.0) is the
-first release. The sync engine, SMB and NFSv3 shares, the keyring, the background service, the
+Early, but usable: [v0.2.0](https://github.com/fqazzazee/shuttle/releases/tag/v0.2.0), the latest
+release, brings the Android app. The sync engine, SMB and NFSv3 shares, the keyring, the background service, the
 terminal interface and the GNOME Shell 50 extension work. SMB is tested against a real Samba
 server; NFS against the Linux kernel's server (NFSv3 directly, NFSv4 through a mount) and an
 in-process one. Packages are on [GitHub Releases](https://github.com/fqazzazee/shuttle/releases):
@@ -68,7 +68,7 @@ for amd64 (installed and tested on Fedora 44 and Debian stable) or arm64 (built,
 tested):
 
 ```bash
-v=0.1.0   # the release's version
+v=0.2.0   # the release's version
 # Fedora
 sudo dnf install https://github.com/fqazzazee/shuttle/releases/download/v$v/shuttle_${v}_linux_amd64.rpm
 # Debian, Ubuntu
@@ -105,8 +105,9 @@ passwords. Developed and tested on Fedora 44; CI also builds and runs it on Arch
 
 The same shuttles on a phone with Android 11 or later, arm64 (nearly every phone of the last
 several years). Each release has a signed `shuttle_X.Y.Z_android_arm64.apk`: open the
-[latest release](https://github.com/fqazzazee/shuttle/releases/latest) on the phone, download
-the APK and open it. Android asks once to allow installs from your browser or file manager.
+[latest release](https://github.com/fqazzazee/shuttle/releases/latest) on the phone (the first
+with the app is [v0.2.0](https://github.com/fqazzazee/shuttle/releases/download/v0.2.0/shuttle_0.2.0_android_arm64.apk)),
+download the APK and open it. Android asks once to allow installs from your browser or file manager.
 It is not on Google Play or F-Droid; [Obtainium](https://github.com/ImranR98/Obtainium) can
 follow the releases and install each new one.
 
