@@ -61,7 +61,6 @@ class MainActivity : ComponentActivity() {
     private var forceStopped by mutableStateOf(false)
     private val pauses by lazy { Core.pauses(this) }
     private var pausedAll by mutableStateOf(false)
-    private var adding by mutableStateOf(false)
     private var tab by mutableStateOf(Tab.SHUTTLES)
     private var selected by mutableStateOf<String?>(null)
     private var settingsOf by mutableStateOf<String?>(null)
@@ -119,8 +118,6 @@ class MainActivity : ComponentActivity() {
                             prefs.edit { putBoolean(FIRST_RUN_SEEN, true) }
                             firstRunSeen = true
                         }
-                    } else if (adding) {
-                        AddScreen { adding = false }
                     } else {
                         AppTabs(tab, { tab = it }) { t ->
                             when (t) {
@@ -157,7 +154,7 @@ class MainActivity : ComponentActivity() {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
                                             ::allow, pausedAll, actions, ::openWizard,
-                                        ) { adding = true }
+                                        )
                                     }
                                 }
                                 Tab.CONFLICTS -> ConflictsScreen(
@@ -671,7 +668,6 @@ private fun Main(
     pausedAll: Boolean,
     actions: ListActions,
     onWizard: () -> Unit,
-    onAdd: () -> Unit,
 ) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -687,7 +683,6 @@ private fun Main(
             ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
         OutlinedButton(onClick = onWizard, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.wizard_add)) }
-        OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.add)) }
     }
 }
 

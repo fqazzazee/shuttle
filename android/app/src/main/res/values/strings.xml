@@ -12,9 +12,6 @@
     <string name="service_title">shuttle is syncing</string>
     <string name="service_text">Watching your real-time shuttles, or finishing a run you asked for. Tap to open.</string>
 
-    <string name="add">Add a share and a shuttle</string>
-    <string name="add_title">A share and a shuttle</string>
-    <string name="add_share_heading">The share</string>
     <string name="add_share_name">Name for the share</string>
     <string name="add_host">Server (name or address, :port if not the usual)</string>
     <string name="add_share">Share on the server</string>
@@ -23,16 +20,9 @@
     <string name="add_password">Password</string>
     <string name="add_test">Test the connection</string>
     <string name="add_tested">Connected: the share is there.</string>
-    <string name="add_shuttle_heading">The shuttle</string>
-    <string name="add_name">Name for the shuttle</string>
-    <string name="add_folder">Folder on the share (empty: all of it)</string>
-    <string name="add_local">Folder on the phone</string>
     <string name="mode_push">Push to the share</string>
     <string name="mode_pull">Pull from it</string>
     <string name="mode_sync">Sync both ways</string>
-    <string name="runs_asked">When asked</string>
-    <string name="runs_realtime">In real time</string>
-    <string name="runs_hourly">Every hour</string>
     <string name="add_save">Save</string>
     <string name="add_cancel">Cancel</string>
     <string name="add_missing">Still needed: %1$s</string>

@@ -169,3 +169,10 @@ fun ShareEditor(initial: ShareForm, isNew: Boolean, usedBy: List<String>, busy: 
 private fun Field(label: Int, value: String, enabled: Boolean = true, onChange: (String) -> Unit) {
     OutlinedTextField(value, onChange, Modifier.fillMaxWidth(), enabled = enabled, label = { Text(stringResource(label)) }, singleLine = true)
 }
+
+/** A host and its port, when it ends in one: not an IPv6 address's last group. */
+fun splitPort(host: String): Pair<String, Int?> {
+    val i = host.lastIndexOf(':')
+    val port = host.substring(i + 1).toIntOrNull()
+    return if (i > 0 && port != null && host.indexOf(':') == i) host.substring(0, i) to port else host to null
+}

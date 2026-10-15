@@ -79,4 +79,12 @@ class ShareEditorTest {
         compose.onAllNodesWithText("Delete").let { it[it.fetchSemanticsNodes().size - 1].performClick() }
         assertTrue(deleted == "nas")
     }
+
+    @Test
+    fun aServerOnAnotherPort() {
+        assertEquals("10.0.2.2" to 1445, splitPort("10.0.2.2:1445"))
+        assertEquals("nas.example" to null, splitPort("nas.example"))
+        // An IPv6 address is not a host and a port.
+        assertEquals("fe80::1" to null, splitPort("fe80::1"))
+    }
 }
