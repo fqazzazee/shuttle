@@ -38,12 +38,15 @@ class DetailTest {
     @Test
     fun showsItAllAndGoesBack() {
         var back = false
-        compose.setContent { DetailScreen(Detail.parse(json)) { back = true } }
+        var settings = false
+        compose.setContent { DetailScreen(Detail.parse(json), { back = true }) { settings = true } }
         for (text in listOf("↑ photos", "push · profile phone", "/storage/emulated/0/DCIM\n12.0 GB free of 256.0 GB",
             "nas:/Photos", "all but cache", "as files change", "5m ago: 3 copied", "1 conflict waiting for you",
             "Files that could not be synced", "a.jpg", "permission denied", "what?.txt")) {
             compose.onNodeWithText(text).assertExists()
         }
+        compose.onNodeWithText("Settings").performClick()
+        assertTrue(settings)
         compose.onNodeWithText("← Back").performClick()
         assertTrue(back)
     }

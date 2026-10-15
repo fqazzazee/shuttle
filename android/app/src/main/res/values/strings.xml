@@ -55,6 +55,12 @@
     <string name="detail_attention">Details</string>
     <string name="detail_errors">Files that could not be synced</string>
     <string name="detail_refused">Names left out: the phone cannot hold them</string>
+    <string name="settings">Settings</string>
+    <string name="settings_title">%1$s: settings</string>
+    <string name="settings_from">from %1$s</string>
+    <string name="settings_own">its own</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_reset">Use %1$s\'s (%2$s)</string>
     <string name="sync_now">Sync now</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
