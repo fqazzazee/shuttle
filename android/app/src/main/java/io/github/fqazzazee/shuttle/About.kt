@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
@@ -76,6 +78,8 @@ private val links = listOf(
     R.string.about_page to "https://fqazzazee.github.io/shuttle/",
     R.string.about_releases to "https://github.com/fqazzazee/shuttle/releases",
     R.string.about_coffee to "https://buymeacoffee.com/fqazzazee",
+    // The license where it is kept, not its words in the app.
+    R.string.about_license_link to "https://github.com/fqazzazee/shuttle/blob/main/LICENSE",
 )
 
 /** The notices the build puts among the APK's assets (make android-notices). */
@@ -148,34 +152,41 @@ fun reflow(paragraph: String): String {
 private const val REFLOW_WIDTH = 50
 
 /**
- * About the app: its version, its links (the source on GitHub, the project page, the releases, Buy
- * me a coffee), this copy's checksums against the release's, its license, and the third-party
- * notices of what it includes, as the release carries them. copy is null while it is read.
+ * About the app: its logo and version, its links (the source on GitHub, the project page, the
+ * releases, Buy me a coffee, the license on GitHub), this copy's checksums against the release's,
+ * and the third-party notices of what it includes, on a page of their own. copy is null while it
+ * is read.
  */
 @Composable
-fun AboutScreen(
-    version: String,
-    copy: ThisCopy?,
-    notices: List<String>?,
-    onBack: () -> Unit,
-) {
+fun AboutScreen(version: String, copy: ThisCopy?, onNotices: () -> Unit, onBack: () -> Unit) {
     val uri = LocalUriHandler.current
+    Column(
+        Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+        ShuttleLogo(Modifier.fillMaxWidth().padding(vertical = 8.dp))
+        Text(stringResource(R.string.about_version, version), style = MaterialTheme.typography.bodyLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((label, url) in links) OutlinedButton(onClick = { uri.openUri(url) }) { Text(stringResource(label)) }
+        }
+        ThisCopyCard(copy)
+        // The libraries' licenses ask for their notices to go with the app: they are in it, a tap away.
+        OutlinedButton(onClick = onNotices) { Text(stringResource(R.string.about_notices)) }
+        Text("", Modifier.padding(bottom = 16.dp))
+    }
+}
+
+/** The third-party notices of what the app includes, as the release carries them; null in a build without them. */
+@Composable
+fun NoticesScreen(notices: List<String>?, onBack: () -> Unit) {
     // Lazily: the notices are a few thousand lines.
     LazyColumn(
         Modifier.safeDrawingPadding().padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } }
-        item { ShuttleLogo(Modifier.fillMaxWidth().padding(vertical = 8.dp)) }
-        item { Text(stringResource(R.string.about_version, version), style = MaterialTheme.typography.bodyLarge) }
-        item {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((label, url) in links) OutlinedButton(onClick = { uri.openUri(url) }) { Text(stringResource(label)) }
-            }
-        }
-        item { ThisCopyCard(copy) }
-        item { Text(stringResource(R.string.about_license), style = MaterialTheme.typography.bodyMedium) }
-        item { Text(stringResource(R.string.about_notices), style = MaterialTheme.typography.titleMedium) }
+        item { Text(stringResource(R.string.about_notices), style = MaterialTheme.typography.headlineMedium) }
         if (notices == null) {
             item { Text(stringResource(R.string.about_no_notices), style = MaterialTheme.typography.bodyMedium) }
         } else {
