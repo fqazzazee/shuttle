@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
@@ -254,6 +255,17 @@ func (m *Daemon) State() string { return string(m.d.State()) }
 // ConfigError says why the config file did not load, or "".
 func (m *Daemon) ConfigError() string { return m.d.ConfigError() }
 
+// entry is a line of an activity log as the app gets it: activity.Entry's
+// fields and names, with the shuttle it belongs to, which a log's own lines
+// leave out (it is the log's file name).
+type entry struct {
+	Time    time.Time     `json:"time"`
+	Shuttle string        `json:"shuttle"`
+	Kind    activity.Kind `json:"kind"`
+	Path    string        `json:"path,omitempty"`
+	Text    string        `json:"text"`
+}
+
 // ActivityJSON is the newest entries of a shuttle's activity log, or of
 // every shuttle's when name is "", newest first: at most limit (0: all).
 func (m *Daemon) ActivityJSON(name string, limit int) (string, error) {
@@ -261,7 +273,12 @@ func (m *Daemon) ActivityJSON(name string, limit int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return toJSON(es), nil
+	out := make([]entry, len(es))
+	for i := range es {
+		e := &es[i]
+		out[i] = entry{Time: e.Time, Shuttle: e.Shuttle, Kind: e.Kind, Path: e.Path, Text: e.Text}
+	}
+	return toJSON(out), nil
 }
 
 // RealTime reports whether an enabled shuttle is real-time: while one is,

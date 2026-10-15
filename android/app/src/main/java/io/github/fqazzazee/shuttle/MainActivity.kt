@@ -35,6 +35,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +43,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private var access by mutableStateOf(Access(files = false, localNetwork = false, notifications = false))
@@ -56,6 +60,8 @@ class MainActivity : ComponentActivity() {
     // Bumped after a setting is saved: the rows are read from the config file again.
     private var settingsRead by mutableStateOf(0)
     private var resolveError by mutableStateOf<String?>(null)
+    private var activityShuttle by mutableStateOf("")
+    private var problemsOnly by mutableStateOf(false)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -115,6 +121,21 @@ class MainActivity : ComponentActivity() {
                                     ConflictItem.held(Core.statuses), HeldDeletions.of(Core.statuses), resolveError, ::resolve,
                                     ::allowDeletions,
                                 )
+                                Tab.ACTIVITY -> {
+                                    // Read again when a run ends (a LastRun changes), not on every
+                                    // status: a run sends its progress twice a second.
+                                    val runs = Core.statuses.map { (n, j) -> n + JSONObject(j).optString("LastRun") }.sorted()
+                                    val entries by produceState<List<Entry>?>(null, activityShuttle, runs) {
+                                        value = withContext(Dispatchers.IO) {
+                                            runCatching { Core.current?.activityJSON(activityShuttle, ACTIVITY_SHOWN) }
+                                                .getOrNull()?.let(Entry::parseAll) ?: emptyList()
+                                        }
+                                    }
+                                    ActivityScreen(
+                                        Core.statuses.keys.sorted(), entries, activityShuttle, { activityShuttle = it },
+                                        problemsOnly, { problemsOnly = it },
+                                    )
+                                }
                                 else -> Later(t)
                             }
                         }
@@ -224,6 +245,9 @@ class MainActivity : ComponentActivity() {
         const val FIRST_RUN_SEEN = "first_run_seen"
         const val SCREEN = "screen"
         const val LAST_EXIT_SEEN = "last_exit_seen"
+
+        /** How many of the newest entries the Activity tab reads, as the TUI's. */
+        const val ACTIVITY_SHOWN = 500L
     }
 }
 

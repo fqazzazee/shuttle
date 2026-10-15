@@ -166,6 +166,11 @@ func TestSyncAndWait(t *testing.T) {
 	if err := json.Unmarshal([]byte(act), &es); err != nil || len(es) == 0 || es[0].Kind != activity.KindRun {
 		t.Errorf("ActivityJSON = %s, %v", act, err)
 	}
+	// Every shuttle's together: each line says whose it is.
+	every, err := m.ActivityJSON("", 0)
+	if err != nil || !strings.Contains(every, `"shuttle":"s"`) {
+		t.Errorf("ActivityJSON of every shuttle = %s, %v", every, err)
+	}
 }
 
 func TestSyncAndWaitGivesUp(t *testing.T) {
