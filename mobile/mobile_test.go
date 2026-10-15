@@ -912,3 +912,30 @@ func TestShareEditor(t *testing.T) {
 		t.Errorf("config still has the share:\n%s", doc)
 	}
 }
+
+// The Profiles tab's rows, as the TUI lists them.
+func TestProfilesJSON(t *testing.T) {
+	f := newFixture(t)
+	doc := strings.Replace(mustRead(t, f.opts.ConfigPath), `remote = "mnt:"`, "remote = \"mnt:\"\nprofile = \"phone\"", 1) +
+		"\n[profiles.phone]\nmode = \"push\"\ntriggers = [\"realtime\"]\n\n[profiles.quiet]\nconflicts = \"ask\"\n"
+	if err := os.WriteFile(f.opts.ConfigPath, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	out, err := m.ProfilesJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []struct {
+		Name, Mode, Triggers string
+		UsedBy               []string
+	}
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 || rows[0].Name != "phone" || rows[0].Mode != "push" || rows[0].Triggers != "realtime" ||
+		!slices.Equal(rows[0].UsedBy, []string{"s"}) || rows[1].Name != "quiet" || rows[1].Mode != "" ||
+		rows[1].Triggers != "manual only" || len(rows[1].UsedBy) != 0 {
+		t.Errorf("profiles = %s", out)
+	}
+}

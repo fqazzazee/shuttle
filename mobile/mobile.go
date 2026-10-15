@@ -748,6 +748,42 @@ func (m *Daemon) SharesJSON() string {
 	return toJSON(out)
 }
 
+// profileRow is one profile as the Profiles tab lists it, as the TUI's does.
+type profileRow struct {
+	Name, Mode, Triggers string // as the profile sets them; Triggers "manual only" when it sets none
+	UsedBy               []string
+}
+
+// ProfilesJSON is every profile in the config file, by name, as a JSON array.
+func (m *Daemon) ProfilesJSON() (string, error) {
+	data, err := os.ReadFile(m.configPath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+	cfg, err := m.fileConfig()
+	if err != nil {
+		return "", err
+	}
+	out := []profileRow{}
+	for _, name := range cfg.Profiles {
+		raw, err := config.RawTable(data, "profiles", name)
+		if err != nil {
+			return "", err
+		}
+		r := profileRow{Name: name, Mode: config.RawText(raw["mode"]), Triggers: config.RawText(raw["triggers"]), UsedBy: []string{}}
+		if r.Triggers == "" {
+			r.Triggers = "manual only"
+		}
+		for i := range cfg.Shuttles {
+			if cfg.Shuttles[i].Profile == name {
+				r.UsedBy = append(r.UsedBy, cfg.Shuttles[i].Name)
+			}
+		}
+		out = append(out, r)
+	}
+	return toJSON(out), nil
+}
+
 // SyncNow asks for a run of a shuttle.
 func (m *Daemon) SyncNow(name string) error { return m.d.SyncNow(name) }
 

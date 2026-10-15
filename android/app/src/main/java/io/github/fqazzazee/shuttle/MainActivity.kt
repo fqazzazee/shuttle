@@ -159,7 +159,12 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 }
-                                else -> Later(t)
+                                Tab.PROFILES -> {
+                                    // A reload brings statuses: the config file may have changed.
+                                    Core.statuses
+                                    val json = runCatching { Core.current?.profilesJSON() }.getOrNull()
+                                    ProfilesScreen(json?.let(ProfileRow::parseAll) ?: emptyList())
+                                }
                             }
                         }
                     }
@@ -348,15 +353,6 @@ private fun Main(
             ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
         OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.add)) }
-    }
-}
-
-/** A tab whose screen comes in a later step of the app's phase. */
-@Composable
-private fun Later(tab: Tab) {
-    Column(Modifier.safeDrawingPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(tab.label), style = MaterialTheme.typography.headlineMedium)
-        Text(stringResource(R.string.tab_later))
     }
 }
 
