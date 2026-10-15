@@ -3,6 +3,14 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # A dry run of the APK: built, signed and checked against the pinned
+  # certificate as a release's would be, kept as this run's artifact. Nothing
+  # is released: the release job runs for a tag only.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The X.Y.Z to build the APK as
+        default: '0.0.0'
 
 permissions:
   contents: read
@@ -38,8 +46,9 @@ jobs:
           umask 077
           echo "$SIGNING_KEY" | base64 -d > "$RUNNER_TEMP/release.p12"
       - name: build and sign
-        run: make apk ANDROID_HOME="$ANDROID_HOME" APK_VERSION="${GITHUB_REF_NAME#v}"
+        run: make apk ANDROID_HOME="$ANDROID_HOME" APK_VERSION="${VERSION#v}"
         env:
+          VERSION: ${{ inputs.version || github.ref_name }}
           SHUTTLE_SIGNING_KEYSTORE: ${{ runner.temp }}/release.p12
           SHUTTLE_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
           SHUTTLE_SIGNING_ALIAS: ${{ secrets.ANDROID_SIGNING_ALIAS }}
@@ -51,18 +60,23 @@ jobs:
       - name: signed with the release key
         run: |
           want=$(tr -d ' \n' < android/release-cert.sha256)
-          got=$(make -s apk-cert APK_VERSION="${GITHUB_REF_NAME#v}" ANDROID_HOME="$ANDROID_HOME")
+          got=$(make -s apk-cert APK_VERSION="${VERSION#v}" ANDROID_HOME="$ANDROID_HOME")
           echo "certificate SHA-256: $got"
           test -n "$want" && test "$got" = "$want"
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
       - uses: actions/upload-artifact@v7
         with:
           name: apk
           path: build/apk/*.apk
           if-no-files-found: error
+          # A dry run's is for a look, not to keep: it is signed with the release key.
+          retention-days: ${{ github.event_name == 'push' && 7 || 1 }}
 
   release:
     name: release
     needs: apk
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write   # create the release and upload assets
