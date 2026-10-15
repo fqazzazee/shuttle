@@ -117,8 +117,8 @@ func (e *MountError) Error() string {
 	case 20: // MNT3ERR_NOTDIR
 		return fmt.Sprintf("nfs: export %q is not a folder", e.Export)
 	case 1, 13: // MNT3ERR_PERM, MNT3ERR_ACCES
-		return fmt.Sprintf("nfs: the server will not share %q with this computer: check that the export "+
-			"allows this computer's address, and that it accepts connections from ports above 1023 "+
+		return fmt.Sprintf("nfs: the server will not share %q with this device: check that the export "+
+			"allows this device's address, and that it accepts connections from ports above 1023 "+
 			"(\"insecure\" on Linux, \"allow connections from non-privileged ports\" on Synology)", e.Export)
 	}
 	return fmt.Sprintf("nfs: mounting %q failed: mount status %d", e.Export, uint32(e.Status))

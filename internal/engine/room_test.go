@@ -50,7 +50,14 @@ func TestNoRoomStopsTheRun(t *testing.T) {
 		t.Error("the other side was copied to")
 	}
 
-	remote.space.Free = 1 << 20
+	// This side, by the name the daemon gives it.
+	local.space.Free, remote.space.Free = 10, 1<<20
+	write(t, h.remoteDir, "d.txt", "from the share too", t0)
+	h.opts.Here = "this phone"
+	if _, err := Run(context.Background(), &h.opts); err == nil || !strings.HasPrefix(err.Error(), "not enough room on this phone:") {
+		t.Fatalf("Run = %v", err)
+	}
+	local.space.Free = 1 << 20
 	h.run()
 	if got := listing(t, h.localDir); !strings.Contains(got, "c.txt=from the share") || !strings.Contains(listing(t, h.remoteDir), "a.bin=") {
 		t.Errorf("local = %q after making room", got)

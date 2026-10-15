@@ -57,6 +57,9 @@ type Options struct {
 	// the device's name and the share's name. Empty means "local" and
 	// "remote".
 	LocalName, RemoteName string
+	// Here names this side in what a run says, e.g. "this phone". Empty
+	// means "this computer".
+	Here string
 	// Cap limits transfers across every shuttle (the global bandwidth cap),
 	// on top of the shuttle's own limits. nil means no cap.
 	Cap *Cap

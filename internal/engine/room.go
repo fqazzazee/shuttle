@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 
@@ -13,7 +14,7 @@ import (
 // run stops before copying anything, rather than fail part way with a
 // side full.
 type NoRoomError struct {
-	Side       string // "this computer", "the share nas"
+	Side       string // "this computer" (Options.Here), "the share nas"
 	Need, Free int64
 }
 
@@ -65,7 +66,7 @@ func checkRoom(ctx context.Context, o *Options, actions []Action) error {
 		f    fsys.FS
 		name string
 		need int64
-	}{{o.Local, "this computer", toLocal}, {o.Remote, remoteName, toRemote}} {
+	}{{o.Local, cmp.Or(o.Here, "this computer"), toLocal}, {o.Remote, remoteName, toRemote}} {
 		if side.need == 0 {
 			continue // nothing to ask: most runs copy nothing
 		}

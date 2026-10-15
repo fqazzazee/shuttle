@@ -209,6 +209,7 @@ func daemonOptions(o *Options, acc *access, log *slog.Logger) (*daemon.Options, 
 		Store:      store{o.Passwords},
 		Log:        log,
 		DeviceName: o.DeviceName,
+		Here:       "this phone",
 		LocalNames: localNames,
 		Waiting:    acc.waiting,
 	}

@@ -342,7 +342,7 @@ func (e *AuthError) Error() string {
 	case 5: // AUTH_TOOWEAK
 		why = "it wants stronger authentication (Kerberos?) than shuttle offers"
 	case 1, 2: // AUTH_BADCRED, AUTH_REJECTEDCRED
-		why = "it refused this computer's user and group IDs"
+		why = "it refused this device's user and group IDs"
 	}
 	return fmt.Sprintf("nfs: the server's %s refused the call: %s", e.Program, why)
 }

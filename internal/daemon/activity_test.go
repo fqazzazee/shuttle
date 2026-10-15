@@ -233,3 +233,22 @@ func TestActivityOfAStoppedRun(t *testing.T) {
 		t.Errorf("activity:\n%s", texts(es))
 	}
 }
+
+// A conflict kept on this side says which side that is, by the name the
+// daemon is given.
+func TestResolvedText(t *testing.T) {
+	for _, c := range []struct {
+		choice engine.Choice
+		here   string
+		want   string
+	}{
+		{engine.KeepLocal, "", "kept this computer's copy"},
+		{engine.KeepLocal, "this phone", "kept this phone's copy"},
+		{engine.KeepRemote, "this phone", "kept the share's copy"},
+		{engine.KeepBoth, "this phone", "kept both"},
+	} {
+		if got := resolvedText(c.choice, c.here); got != c.want {
+			t.Errorf("resolvedText(%s, %q) = %q; want %q", c.choice, c.here, got, c.want)
+		}
+	}
+}
