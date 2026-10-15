@@ -18,7 +18,7 @@ func ProfileRows(data []byte, name string) ([]RowState, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tableRows(own, nil, ""), nil
+	return tableRows(ownText(own), nil, ""), nil
 }
 
 // SetProfileRow sets the profile name's setting key to text in the config

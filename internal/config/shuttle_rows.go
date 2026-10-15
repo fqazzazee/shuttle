@@ -27,13 +27,17 @@ func ShuttleRows(data []byte, name string) ([]RowState, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tableRows(own, base, "profile "+profile), nil
+	return tableRows(ownText(own), base, "profile "+profile), nil
 }
 
-// tableRows are a table's settings as rows: own as written, over base, which
-// from names; past base, the defaults apply.
-func tableRows(own, base map[string]any, from string) []RowState {
-	value := func(key string) string { return RawText(Lookup(own, key)) }
+// ownText is a table's own text for each key, as written.
+func ownText(own map[string]any) func(string) string {
+	return func(key string) string { return RawText(Lookup(own, key)) }
+}
+
+// tableRows are a table's settings as rows: its own text from value, over
+// base, which from names; past base, the defaults apply.
+func tableRows(value func(string) string, base map[string]any, from string) []RowState {
 	effective := effectiveText(value, base)
 	rows := make([]RowState, 0, len(Rows))
 	for _, r := range Rows {
