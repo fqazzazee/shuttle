@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -46,22 +47,28 @@ data class ShareRow(
     }
 }
 
-/** The Shares tab: each share, where it is, which shuttles use it, whether they reach it, and its room. */
+/**
+ * The Shares tab: each share, where it is, which shuttles use it, whether they reach it, and its
+ * room; a share opens its editor, and a new one can be added. note is what the last save or delete
+ * came to.
+ */
 @Composable
-fun SharesScreen(shares: List<ShareRow>) {
+fun SharesScreen(shares: List<ShareRow>, note: String?, onOpen: (String) -> Unit, onAdd: () -> Unit) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.tab_shares), style = MaterialTheme.typography.headlineMedium)
+        note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary) }
         if (shares.isEmpty()) Text(stringResource(R.string.shares_none))
-        for (s in shares) ShareCard(s)
+        for (s in shares) ShareCard(s) { onOpen(s.name) }
+        OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.share_add)) }
     }
 }
 
 @Composable
-private fun ShareCard(s: ShareRow) {
-    Card(Modifier.fillMaxWidth()) {
+private fun ShareCard(s: ShareRow, onOpen: () -> Unit) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(s.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))

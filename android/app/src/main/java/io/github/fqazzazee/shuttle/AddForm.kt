@@ -69,15 +69,15 @@ data class AddForm(
     }
 
     private companion object {
-        /** A host and its port, when it ends in one: not an IPv6 address's last group. */
-        fun splitPort(host: String): Pair<String, Int?> {
-            val i = host.lastIndexOf(':')
-            val port = host.substring(i + 1).toIntOrNull()
-            return if (i > 0 && port != null && host.indexOf(':') == i) host.substring(0, i) to port else host to null
-        }
-
         /** A folder in the phone's storage, not all of it: never a whole card or the whole phone. */
         @Suppress("SdCardPath") // paths refused as a whole folder to sync, never written to
         val STORAGE_ROOTS = setOf("", "/storage", "/storage/emulated", "/storage/emulated/0", "/sdcard", "/mnt/sdcard")
     }
+}
+
+/** A host and its port, when it ends in one: not an IPv6 address's last group. */
+fun splitPort(host: String): Pair<String, Int?> {
+    val i = host.lastIndexOf(':')
+    val port = host.substring(i + 1).toIntOrNull()
+    return if (i > 0 && port != null && host.indexOf(':') == i) host.substring(0, i) to port else host to null
 }

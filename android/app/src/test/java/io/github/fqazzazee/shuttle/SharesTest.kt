@@ -30,7 +30,7 @@ class SharesTest {
 
     @Test
     fun eachShareAsTheTuiListsIt() {
-        compose.setContent { SharesScreen(ShareRow.parseAll(json)) }
+        compose.setContent { SharesScreen(ShareRow.parseAll(json), null, {}, {}) }
         for (text in listOf("card", "Online", "path · /storage/1A2B-3C4D", "Used by photos, music", "12.0 GB free of 128.0 GB",
             "nas", "Not looked at yet", "smb · smb://user@nas.example/home", "No shuttle uses it")) {
             compose.onNodeWithText(text).assertExists()
@@ -39,7 +39,7 @@ class SharesTest {
 
     @Test
     fun none() {
-        compose.setContent { SharesScreen(emptyList()) }
+        compose.setContent { SharesScreen(emptyList(), null, {}, {}) }
         compose.onNodeWithText("No shares yet.").assertExists()
     }
 }
