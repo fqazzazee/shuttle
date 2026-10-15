@@ -18,7 +18,7 @@ GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v
 # Keep in step with the release workflow. Not newer: from v2.18 it needs Go 1.27.
 GORELEASER    ?= go run github.com/goreleaser/goreleaser/v2@v2.17.1
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar apk apk-cert test-android test-android-device test-android-flow samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar apk apk-cert android-notices test-android test-android-device test-android-flow samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -120,7 +120,7 @@ APK_VERSION ?= $(patsubst v%,%,$(VERSION))
 APK         := build/apk/shuttle_$(APK_VERSION)_android_arm64.apk
 APKSIGNER    = $(lastword $(sort $(wildcard $(ANDROID_HOME)/build-tools/*/apksigner)))
 
-apk: aar
+apk: aar android-notices
 	@test -n "$$SHUTTLE_SIGNING_KEYSTORE" || { echo "apk: SHUTTLE_SIGNING_KEYSTORE, _PASSWORD and _ALIAS must give the release key"; exit 1; }
 	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew --no-daemon assembleRelease -PshuttleVersion=$(APK_VERSION)
 	mkdir -p $(dir $(APK))
@@ -132,10 +132,20 @@ apk: aar
 apk-cert:
 	@$(APKSIGNER) verify --min-sdk-version 30 --print-certs $(APK) 2>/dev/null | sed -n 's/^Signer #1 certificate SHA-256 digest: //p'
 
+# The Android app's third-party notices, an asset of the APK: the Go core's
+# modules (notices.sh android), then the Java and Kotlin libraries of the
+# release build, their licenses from their POMs (android-notices.py).
+ANDROID_NOTICES := android/app/build/notices/THIRD_PARTY_NOTICES
+android-notices:
+	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew -q --no-daemon :app:noticesPoms
+	mkdir -p $(dir $(ANDROID_NOTICES))
+	{ packaging/notices.sh android; packaging/android-notices.py android/app/build/notices-poms; } > android/app/build/THIRD_PARTY_NOTICES.tmp
+	mv android/app/build/THIRD_PARTY_NOTICES.tmp $(ANDROID_NOTICES)
+
 # The app in android/, on that .aar: a debug APK, its unit tests and Android
 # lint, and its tests on a phone built (they run in test-android-device).
 # Gradle comes from the wrapper, at the version and checksum it pins.
-test-android: aar
+test-android: aar android-notices
 	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug \
 		assembleDebugAndroidTest
 

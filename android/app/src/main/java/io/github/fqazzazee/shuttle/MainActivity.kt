@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
     private var shareMessage by mutableStateOf<String?>(null)
     private var sharesNote by mutableStateOf<String?>(null)
     private var wizard by mutableStateOf<WizardState?>(null)
+    private var about by mutableStateOf(false)
     // What the wizard marks; replaced with each new wizard, or another share.
     private var picker: Picker = Mobile.newPicker("/")
     private var marksRev by mutableStateOf(0)
@@ -131,7 +132,12 @@ class MainActivity : ComponentActivity() {
                                         settingsRead.let { runCatching { Core.current?.settingsJSON(name) }.getOrNull() }
                                     }
                                     val w = wizard
-                                    if (w != null) {
+                                    if (about) {
+                                        BackHandler { about = false }
+                                        val version = remember { packageManager.getPackageInfo(packageName, 0).versionName.orEmpty() }
+                                        val notices = remember { readNotices(this@MainActivity) }
+                                        AboutScreen(version, notices) { about = false }
+                                    } else if (w != null) {
                                         BackHandler { wizardBack() }
                                         Wizard(w)
                                     } else if (rows != null) {
@@ -154,7 +160,7 @@ class MainActivity : ComponentActivity() {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
                                             ::allow, pausedAll, actions, ::openWizard,
-                                        )
+                                        ) { about = true }
                                     }
                                 }
                                 Tab.CONFLICTS -> ConflictsScreen(
@@ -668,6 +674,7 @@ private fun Main(
     pausedAll: Boolean,
     actions: ListActions,
     onWizard: () -> Unit,
+    onAbout: () -> Unit,
 ) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -683,6 +690,7 @@ private fun Main(
             ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
         OutlinedButton(onClick = onWizard, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.wizard_add)) }
+        TextButton(onClick = onAbout) { Text(stringResource(R.string.about)) }
     }
 }
 
