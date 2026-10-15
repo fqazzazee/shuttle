@@ -3,6 +3,7 @@
 package io.github.fqazzazee.shuttle
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.storage.StorageManager
@@ -16,8 +17,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +44,9 @@ import androidx.core.net.toUri
 import io.github.fqazzazee.shuttle.mobile.Draft
 import io.github.fqazzazee.shuttle.mobile.Mobile
 import io.github.fqazzazee.shuttle.mobile.Picker
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -69,6 +73,18 @@ class MainActivity : ComponentActivity() {
     private var wizard by mutableStateOf<WizardState?>(null)
     private var about by mutableStateOf(false)
     private var help by mutableStateOf(false)
+    private var backup by mutableStateOf(false)
+    private var backupBusy by mutableStateOf(false)
+    private var backupMessage by mutableStateOf<String?>(null)
+    // A backup read and checked, with what it holds, waiting for the user's yes.
+    private var backupPending by mutableStateOf<Pair<String, BackupSummary>?>(null)
+    // The system's file picker: the user chooses where a backup goes, and which to restore.
+    private val saveBackup = registerForActivityResult(ActivityResultContracts.CreateDocument(BACKUP_TYPE)) { uri ->
+        uri?.let { backupTask { writeBackup(it) } }
+    }
+    private val openBackup = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { backupTask { readBackup(it) } }
+    }
     // The wallpaper's colours (Material You) in place of shuttle's palette, as the About screen sets.
     private var wallpaperColors by mutableStateOf(false)
     // What the wizard marks; replaced with each new wizard, or another share.
@@ -129,7 +145,18 @@ class MainActivity : ComponentActivity() {
                                         settingsRead.let { runCatching { Core.current?.settingsJSON(name) }.getOrNull() }
                                     }
                                     val w = wizard
-                                    if (help) {
+                                    if (backup) {
+                                        BackHandler { backup = false }
+                                        BackupScreen(
+                                            backupMessage, backupBusy, backupPending?.second,
+                                            BackupActions(
+                                                save = { saveBackup.launch("shuttle-backup-${LocalDate.now()}.toml") },
+                                                restore = { openBackup.launch(arrayOf("*/*")) },
+                                                confirm = ::restoreBackup,
+                                                cancel = { backupPending = null },
+                                            ),
+                                        ) { backup = false; backupMessage = null }
+                                    } else if (help) {
                                         BackHandler { help = false }
                                         HelpScreen { help = false }
                                     } else if (about) {
@@ -166,7 +193,7 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
-                                            ::allow, pausedAll, actions, ::openWizard, { help = true },
+                                            ::allow, pausedAll, actions, ::openWizard, { help = true }, { backup = true },
                                         ) { about = true }
                                     }
                                 }
@@ -560,6 +587,70 @@ class MainActivity : ComponentActivity() {
         if (wizardProblem == null) closeWizard()
     }
 
+    /** Runs a backup's file work off the main thread; it returns what to say, or null. */
+    private fun backupTask(f: () -> String?) {
+        backupBusy = true
+        Thread {
+            val said = try {
+                f()
+            } catch (e: Exception) {
+                e.message
+            }
+            runOnUiThread {
+                backupMessage = said
+                backupBusy = false
+            }
+        }.start()
+    }
+
+    /** Writes the config file where the user chose: what to say. */
+    private fun writeBackup(uri: Uri): String {
+        val text = Core.current?.configText() ?: return getString(R.string.add_no_daemon)
+        if (text.isEmpty()) return getString(R.string.backup_nothing)
+        val out = contentResolver.openOutputStream(uri, "wt") ?: return getString(R.string.backup_unreadable, uri)
+        out.use { it.write(text.toByteArray()) }
+        return getString(R.string.backup_saved)
+    }
+
+    /** Reads the backup the user chose and checks it; restoring it waits for their yes. What to say, or null. */
+    private fun readBackup(uri: Uri): String? {
+        val bytes = try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                // At most a byte past the limit: enough to tell a file is too big.
+                val out = ByteArrayOutputStream()
+                val buffer = ByteArray(1 shl 13)
+                while (out.size() <= MAX_BACKUP) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    out.write(buffer, 0, n)
+                }
+                out.toByteArray()
+            } ?: return getString(R.string.backup_unreadable, uri)
+        } catch (e: IOException) {
+            return getString(R.string.backup_unreadable, e.message)
+        }
+        if (bytes.size > MAX_BACKUP) return getString(R.string.backup_too_big)
+        val text = bytes.toString(Charsets.UTF_8)
+        val d = Core.current ?: return getString(R.string.add_no_daemon)
+        val summary = try {
+            BackupSummary.parse(d.checkBackup(text))
+        } catch (e: Exception) {
+            return getString(R.string.backup_not_config, e.message)
+        }
+        runOnUiThread { backupPending = text to summary }
+        return null
+    }
+
+    /** Restores the backup the user said yes to; the daemon follows the file. */
+    private fun restoreBackup() {
+        val (text, _) = backupPending ?: return
+        backupPending = null
+        backupTask {
+            Core.current?.restoreBackup(text) ?: return@backupTask getString(R.string.add_no_daemon)
+            getString(R.string.backup_restored)
+        }
+    }
+
     /** Opens the wizard on a saved shuttle, at its first step, with its folders, marks and profile. */
     private fun editWizard(name: String) {
         val d = try {
@@ -662,6 +753,10 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val FIRST_RUN_SEEN = "first_run_seen"
         const val WALLPAPER_COLORS = "wallpaper_colors"
+        // Not text/plain: the file picker would add .txt to the name.
+        const val BACKUP_TYPE = "application/toml"
+        // A config file is a few kilobytes; a backup is never near this.
+        const val MAX_BACKUP = 1 shl 20
         const val SCREEN = "screen"
         const val LAST_EXIT_SEEN = "last_exit_seen"
 
@@ -683,6 +778,7 @@ private fun Main(
     actions: ListActions,
     onWizard: () -> Unit,
     onHelp: () -> Unit,
+    onBackup: () -> Unit,
     onAbout: () -> Unit,
 ) {
     Column(
@@ -701,6 +797,7 @@ private fun Main(
         OutlinedButton(onClick = onWizard, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.wizard_add)) }
         Row {
             TextButton(onClick = onHelp) { Text(stringResource(R.string.help)) }
+            TextButton(onClick = onBackup) { Text(stringResource(R.string.backup)) }
             TextButton(onClick = onAbout) { Text(stringResource(R.string.about)) }
         }
     }
