@@ -111,6 +111,7 @@ object Core {
     fun pauses(context: Context) = Pauses(context.getSharedPreferences("app", Context.MODE_PRIVATE))
 
     private fun start(app: Context): Daemon {
+        Notices.channels(app)
         val files = AppFiles(app.filesDir, app.noBackupFilesDir)
         val access = Access.of(app)
         val o = Options().apply {
@@ -125,9 +126,8 @@ object Core {
                     synchronized(this@Core) { statuses = statuses + (name to statusJSON) }
                 }
 
-                // The notification channels come with step 15; until then the events are logged.
-                override fun onEvent(eventJSON: String) {
-                    Log.i(TAG, "event $eventJSON")
+                override fun onNotice(noteJSON: String) {
+                    Notices.show(app, Notice.parse(noteJSON))
                 }
 
                 // The config changed: drop the shuttles it removed, and see again whether the

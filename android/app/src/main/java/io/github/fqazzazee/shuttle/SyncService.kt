@@ -3,8 +3,6 @@
 package io.github.fqazzazee.shuttle
 
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
@@ -65,14 +63,11 @@ class SyncService : Service() {
     }
 
     private fun notification(): Notification {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, getString(R.string.service_channel), NotificationManager.IMPORTANCE_LOW),
-        )
+        Notices.channels(this)
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
         )
-        return Notification.Builder(this, CHANNEL)
+        return Notification.Builder(this, Channel.SERVICE.id)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(getString(R.string.service_title))
             .setContentText(getString(R.string.service_text))
@@ -89,7 +84,6 @@ class SyncService : Service() {
 
         private const val EXTRA_SYNC = "sync"
         private const val HOLDER = "service"
-        private const val CHANNEL = "service"
         private const val NOTIFICATION = 1
     }
 }

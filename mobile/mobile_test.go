@@ -58,7 +58,7 @@ type listener struct {
 }
 
 func (l *listener) OnStatus(s string) { l.mu.Lock(); l.statuses = append(l.statuses, s); l.mu.Unlock() }
-func (l *listener) OnEvent(e string)  { l.mu.Lock(); l.events = append(l.events, e); l.mu.Unlock() }
+func (l *listener) OnNotice(n string) { l.mu.Lock(); l.events = append(l.events, n); l.mu.Unlock() }
 func (l *listener) OnReload(r string) { l.mu.Lock(); l.reloads = append(l.reloads, r); l.mu.Unlock() }
 
 func (l *listener) heard() (statuses, events []string) {
@@ -139,8 +139,12 @@ func TestSyncAndWait(t *testing.T) {
 	if len(statuses) == 0 || !strings.Contains(statuses[len(statuses)-1], `"Name":"s"`) {
 		t.Errorf("statuses heard: %q", statuses)
 	}
-	if !slices.ContainsFunc(events, func(e string) bool { return strings.Contains(e, `"Kind":"completed"`) }) {
-		t.Errorf("events heard: %q, want the run's completion", events)
+	// Worded as the desktop words it.
+	if !slices.ContainsFunc(events, func(e string) bool {
+		return strings.Contains(e, `"Kind":"completed"`) && strings.Contains(e, `"Summary":"s: synced"`) &&
+			strings.Contains(e, `"Body":"Copied 1 file."`) && strings.Contains(e, `"Key":"completed/s"`)
+	}) {
+		t.Errorf("notices heard: %q, want the run's completion", events)
 	}
 	var all []daemon.Status
 	if err := json.Unmarshal([]byte(m.StatusesJSON()), &all); err != nil || len(all) != 1 || all[0].Copied != 1 {
