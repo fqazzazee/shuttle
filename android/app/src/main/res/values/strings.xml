@@ -52,6 +52,7 @@
     <string name="state_disabled">Off</string>
     <string name="never_run">Never run</string>
     <string name="last_run">Last run %1$s</string>
+    <string name="last_run_just_now">Last run just now</string>
     <string name="progress_rate">%1$s · %2$s/s</string>
     <plurals name="conflicts">
         <item quantity="one">%d conflict</item>

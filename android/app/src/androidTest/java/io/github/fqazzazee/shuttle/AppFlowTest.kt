@@ -22,10 +22,10 @@ import org.junit.runner.RunWith
 
 /**
  * The phase's exit test: a shuttle set up through the app, as a user would, against a test SMB
- * server, and a run that copies a file to it. CI runs it on an emulator against the Samba
- * container (smbHost etc. as instrumentation arguments; the job checks the share afterwards).
- * It works on the app's own config and a folder in shared storage, so without those arguments,
- * as on someone's phone, it does not run.
+ * server, and a run that copies a file to it. make test-android-flow runs it on a phone against
+ * the Samba container (smbHost etc. as instrumentation arguments) and checks the share
+ * afterwards. It works on the app's own config and a folder in shared storage, so without those
+ * arguments, as in make test-android-device, it does not run.
  */
 @RunWith(AndroidJUnit4::class)
 class AppFlowTest {
@@ -44,7 +44,7 @@ class AppFlowTest {
     private fun waitFor(what: String, millis: Long = 60_000, ok: () -> Boolean) {
         try {
             compose.waitUntil(millis, ok)
-        } catch (e: Exception) {
+        } catch (e: Throwable) { // ComposeTimeoutException is a Throwable, not an Exception
             throw AssertionError("waiting for $what; statuses: ${Core.statuses}", e)
         }
     }
@@ -52,7 +52,7 @@ class AppFlowTest {
     @Test
     fun setUpAShuttleInTheAppAndSync() {
         val host = args.getString("smbHost")
-        assumeTrue("needs smbHost, smbShare, smbUser, smbPassword: see CI's android (emulator) job", host != null)
+        assumeTrue("needs smbHost, smbShare, smbUser, smbPassword: see make test-android-flow", host != null)
         val local = File("/storage/emulated/0/ShuttleCI").apply { mkdirs() }
         ActivityScenario.launch(MainActivity::class.java).use { flow(host!!, local) }
     }
@@ -75,7 +75,7 @@ class AppFlowTest {
         click("Save")
 
         waitFor("the new shuttle in the list") { compose.onAllNodesWithText("↑ ci").fetchSemanticsNodes().isNotEmpty() }
-        File(local, "from-the-app.txt").writeText("set up in the app, synced from the emulator\n")
+        File(local, "from-the-app.txt").writeText("set up in the app, and synced\n")
         compose.onAllNodesWithText("Sync now")[0].performScrollTo().performClick()
         waitFor("the run to copy the file") {
             Core.statuses["ci"]?.let { JSONObject(it).getInt("Copied") == 1 } == true

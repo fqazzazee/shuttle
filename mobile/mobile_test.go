@@ -610,7 +610,8 @@ func TestAddShareAndShuttle(t *testing.T) {
 		t.Errorf("passwords = %v, want the share's stored", pw.m)
 	}
 
-	shuttle := fmt.Sprintf(`{"Name": "photos", "Share": "card", "Folder": "", "Local": %q, "Mode": "push",
+	// A folder on the share that is not there yet is made.
+	shuttle := fmt.Sprintf(`{"Name": "photos", "Share": "card", "Folder": "new/photos", "Local": %q, "Mode": "push",
 		"Triggers": ["schedule"], "Interval": "1h"}`, f.local)
 	if err := m.AddShuttle(shuttle); err != nil {
 		t.Fatal(err)
@@ -626,10 +627,21 @@ func TestAddShareAndShuttle(t *testing.T) {
 	if after, _ := os.ReadFile(f.opts.ConfigPath); !bytes.Equal(before, after) {
 		t.Errorf("config changed by a refused shuttle:\n%s", after)
 	}
-	for _, want := range []string{"[shares.card]", "[shares.nas]", "[shuttles.photos]", `remote = "card:"`, `triggers = ["schedule"]`, `interval = "1h"`} {
+	for _, want := range []string{"[shares.card]", "[shares.nas]", "[shuttles.photos]", `remote = "card:new/photos"`, `triggers = ["schedule"]`, `interval = "1h"`} {
 		if !strings.Contains(string(before), want) {
 			t.Errorf("config lacks %s:\n%s", want, before)
 		}
+	}
+
+	if info, err := os.Stat(filepath.Join(f.share, "new", "photos")); err != nil || !info.IsDir() {
+		t.Errorf("the folder on the share: %v, %v", info, err)
+	}
+	// A share that cannot be reached saves nothing.
+	if err := m.AddShuttle(`{"Name": "far", "Share": "nas", "Folder": "x", "Local": "/tmp/far", "Mode": "push"}`); err == nil {
+		t.Error("a shuttle on an unreachable share's new folder taken")
+	}
+	if after, _ := os.ReadFile(f.opts.ConfigPath); strings.Contains(string(after), "far") {
+		t.Errorf("config has the refused shuttle:\n%s", after)
 	}
 
 	// The daemon runs it: never ran, so its schedule is due.

@@ -18,7 +18,7 @@ GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v
 # Keep in step with the release workflow. Not newer: from v2.18 it needs Go 1.27.
 GORELEASER    ?= go run github.com/goreleaser/goreleaser/v2@v2.17.1
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar test-android test-android-device samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar test-android test-android-device test-android-flow samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -132,6 +132,35 @@ test-android-device: aar
 	adb shell am instrument -w --user 0 io.github.fqazzazee.shuttle.test/androidx.test.runner.AndroidJUnitRunner \
 		| tee /dev/stderr | grep -q '^OK ('
 
+
+# The app's flow test (AppFlowTest) on a phone: a shuttle set up through
+# the app's own screens against the Samba container (make samba-up first),
+# reached through adb reverse, so the container stays on 127.0.0.1. It
+# clears the debug app's config, state and passwords before and after, and
+# makes a ShuttleCI folder in shared storage: a test install only. The
+# phone must be unlocked: the test taps through the app on its screen.
+ANDROID_APP := io.github.fqazzazee.shuttle
+
+test-android-flow: aar
+	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+	adb install -r --user 0 $(ANDROID_APK)
+	adb install -r -t --user 0 $(ANDROID_TEST_APK)
+	adb shell appops set --user 0 $(ANDROID_APP) MANAGE_EXTERNAL_STORAGE allow
+	adb shell pm grant --user 0 $(ANDROID_APP) android.permission.POST_NOTIFICATIONS
+	adb shell pm grant --user 0 $(ANDROID_APP) android.permission.ACCESS_LOCAL_NETWORK
+	adb shell am force-stop --user 0 $(ANDROID_APP)
+	adb shell run-as $(ANDROID_APP) --user 0 rm -rf files/config.toml files/state no_backup/passwords
+	rm -rf $(SAMBA_DIR)/android-ci
+	adb reverse tcp:$(SAMBA_PORT) tcp:$(SAMBA_PORT)
+	adb shell am instrument -w --user 0 -e class $(ANDROID_APP).AppFlowTest \
+		-e smbHost 127.0.0.1:$(SAMBA_PORT) -e smbShare test -e smbUser shuttle -e smbPassword samba-throwaway-pw \
+		$(ANDROID_APP).test/androidx.test.runner.AndroidJUnitRunner | tee /dev/stderr | grep -q '^OK ('
+	grep -qx 'set up in the app, and synced' $(SAMBA_DIR)/android-ci/from-the-app.txt
+	adb reverse --remove tcp:$(SAMBA_PORT)
+	adb shell am force-stop --user 0 $(ANDROID_APP)
+	adb shell run-as $(ANDROID_APP) --user 0 rm -rf files/config.toml files/state no_backup/passwords
+	adb shell rm -rf /storage/emulated/0/ShuttleCI
+	adb uninstall --user 0 $(ANDROID_APP).test
 
 # SMB integration tests run against a throwaway Samba container.
 CONTAINER    ?= podman
