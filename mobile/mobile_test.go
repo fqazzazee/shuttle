@@ -738,3 +738,48 @@ func TestSettings(t *testing.T) {
 		t.Errorf("an unknown shuttle: %v", err)
 	}
 }
+
+// A conflict held for the user, settled from the app.
+func TestResolve(t *testing.T) {
+	f := newFixture(t)
+	doc := strings.Replace(mustRead(t, f.opts.ConfigPath), `mode = "push"`, `mode = "sync"`+"\nconflicts = \"ask\"", 1)
+	if err := os.WriteFile(f.opts.ConfigPath, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("the phone's"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(f.share, "a.txt"), []byte("the share's, longer"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	out, err := m.SyncAndWait("s", 10_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"Outcome":"held"`) {
+		t.Fatalf("status = %s, want the conflict held", out)
+	}
+	if err := m.Resolve("s", "a.txt", "keep-local"); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for mustRead(t, filepath.Join(f.share, "a.txt")) != "the phone's" {
+		if time.Now().After(deadline) {
+			t.Fatalf("share's a.txt = %q", mustRead(t, filepath.Join(f.share, "a.txt")))
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if err := m.Resolve("s", "a.txt", "keep-whichever"); err == nil {
+		t.Error("a choice that is none taken")
+	}
+}
+
+func mustRead(t *testing.T, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}

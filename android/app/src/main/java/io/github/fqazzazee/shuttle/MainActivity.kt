@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
     private var settingsOf by mutableStateOf<String?>(null)
     // Bumped after a setting is saved: the rows are read from the config file again.
     private var settingsRead by mutableStateOf(0)
+    private var resolveError by mutableStateOf<String?>(null)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -110,6 +111,7 @@ class MainActivity : ComponentActivity() {
                                         ) { adding = true }
                                     }
                                 }
+                                Tab.CONFLICTS -> ConflictsScreen(ConflictItem.held(Core.statuses), resolveError, ::resolve)
                                 else -> Later(t)
                             }
                         }
@@ -163,6 +165,18 @@ class MainActivity : ComponentActivity() {
             Core.async { Core.current?.setPaused("", paused) }
         },
     )
+
+    /** Settles a conflict, off the main thread: the daemon waits for a run in progress to finish its file. */
+    private fun resolve(c: ConflictItem, keep: Keep) {
+        resolveError = null
+        Thread {
+            try {
+                Core.current?.resolve(c.shuttle, c.path, keep.choice)
+            } catch (e: Exception) {
+                resolveError = e.message
+            }
+        }.start()
+    }
 
     /** Sets one of the open shuttle's settings: null, or why it was refused. */
     private fun setSetting(key: String, text: String): String? {

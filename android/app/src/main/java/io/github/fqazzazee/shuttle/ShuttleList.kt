@@ -2,7 +2,6 @@
 
 package io.github.fqazzazee.shuttle
 
-import android.text.format.DateUtils
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -110,14 +109,7 @@ private fun detail(s: ShuttleStatus): String {
     if (s.waiting.isNotEmpty() && !s.paused) return s.waiting
     if (s.error.isNotEmpty()) return s.error
     val last = s.lastRun ?: return stringResource(R.string.never_run)
-    // Android's own wording says "0 minutes ago" for the last minute.
-    if (System.currentTimeMillis() - last.toEpochMilli() < DateUtils.MINUTE_IN_MILLIS) {
-        return stringResource(R.string.last_run_just_now)
-    }
-    return stringResource(
-        R.string.last_run,
-        DateUtils.getRelativeTimeSpanString(last.toEpochMilli(), System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
-    )
+    return stringResource(R.string.last_run, ago(last, stringResource(R.string.just_now)))
 }
 
 /** Conflicts, paths that failed, names left out: what the selected shuttle's panel will show in full. */
