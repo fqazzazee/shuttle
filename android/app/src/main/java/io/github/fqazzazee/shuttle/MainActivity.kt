@@ -66,6 +66,11 @@ class MainActivity : ComponentActivity() {
     private var shareBusy by mutableStateOf(false)
     private var shareMessage by mutableStateOf<String?>(null)
     private var sharesNote by mutableStateOf<String?>(null)
+    private var profileOf by mutableStateOf<String?>(null)
+    // Bumped after a profile is changed: its rows, and the list, are read from the config file again.
+    private var profileRead by mutableStateOf(0)
+    private var profilesNote by mutableStateOf<String?>(null)
+    private var newProfile by mutableStateOf(false)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -109,7 +114,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                     if (rows != null) {
                                         BackHandler { settingsOf = null }
-                                        SettingsScreen(settingsOf!!, Setting.parseAll(rows), ::setSetting) { settingsOf = null }
+                                        SettingsScreen(
+                                            stringResource(R.string.settings_title, settingsOf!!), Setting.parseAll(rows), ::setSetting,
+                                        ) { settingsOf = null }
                                     } else if (json != null) {
                                         // Back to the list, by the button or Android's back gesture.
                                         BackHandler { selected = null }
@@ -162,8 +169,22 @@ class MainActivity : ComponentActivity() {
                                 Tab.PROFILES -> {
                                     // A reload brings statuses: the config file may have changed.
                                     Core.statuses
-                                    val json = runCatching { Core.current?.profilesJSON() }.getOrNull()
-                                    ProfilesScreen(json?.let(ProfileRow::parseAll) ?: emptyList())
+                                    val profiles = profileRead.let { runCatching { Core.current?.profilesJSON() }.getOrNull() }
+                                        ?.let(ProfileRow::parseAll) ?: emptyList()
+                                    val rows = profileOf?.let { name ->
+                                        profileRead.let { runCatching { Core.current?.profileSettingsJSON(name) }.getOrNull() }
+                                    }
+                                    if (rows != null) {
+                                        BackHandler { profileOf = null }
+                                        val name = profileOf!!
+                                        ProfileEditor(
+                                            name, Setting.parseAll(rows), profiles.firstOrNull { it.name == name }?.usedBy ?: emptyList(),
+                                            ::setProfileSetting, profileActions,
+                                        ) { profileOf = null }
+                                    } else {
+                                        ProfilesScreen(profiles, profilesNote, { profilesNote = null; profileOf = it }) { newProfile = true }
+                                        if (newProfile) NewProfileDialog(profileActions.create) { newProfile = false }
+                                    }
                                 }
                             }
                         }
@@ -299,6 +320,49 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             e.message
         }
+    }
+
+    /** Sets one of the open profile's settings: null, or why it was refused. */
+    private fun setProfileSetting(key: String, text: String): String? {
+        val name = profileOf ?: return null
+        return refusal {
+            Core.current?.setProfileSetting(name, key, text)
+            profileRead++
+        }
+    }
+
+    // Each opens what it made, or goes back to the list after a delete.
+    private val profileActions = ProfileActions(
+        create = { name, mode ->
+            refusal {
+                Core.current?.newProfile(name, mode)
+                profileOf = name
+                profileRead++
+            }
+        },
+        duplicate = { from, to ->
+            refusal {
+                Core.current?.duplicateProfile(from, to)
+                profileOf = to
+                profileRead++
+            }
+        },
+        delete = { name ->
+            refusal {
+                Core.current?.deleteProfile(name)
+                profilesNote = getString(R.string.profile_deleted, name)
+                profileOf = null
+                profileRead++
+            }
+        },
+    )
+
+    /** Runs f: null, or why it failed. */
+    private fun refusal(f: () -> Unit): String? = try {
+        f()
+        null
+    } catch (e: Exception) {
+        e.message
     }
 
     private fun allow(p: Permission) {

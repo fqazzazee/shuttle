@@ -664,13 +664,17 @@ func (m *Daemon) SettingsJSON(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return settingsJSON(rows), nil
+}
+
+func settingsJSON(rows []config.RowState) string {
 	out := make([]setting, len(rows))
 	for i := range rows {
 		r := &rows[i]
 		out[i] = setting{Key: r.Key, Label: r.Label, Hint: r.Hint, Choices: r.Choices, List: r.List, Number: r.Number,
 			Value: r.Value, Inherited: r.Inherited, From: r.From, Off: r.Off}
 	}
-	return toJSON(out), nil
+	return toJSON(out)
 }
 
 // SetSetting sets one of the named shuttle's settings, the text as its row
@@ -782,6 +786,95 @@ func (m *Daemon) ProfilesJSON() (string, error) {
 		out = append(out, r)
 	}
 	return toJSON(out), nil
+}
+
+// ProfileSettingsJSON is every setting of the named profile, as SettingsJSON
+// has a shuttle's: where the profile sets nothing, the default applies.
+func (m *Daemon) ProfileSettingsJSON(name string) (string, error) {
+	rows, err := m.d.ProfileSettings(name)
+	if err != nil {
+		return "", err
+	}
+	return settingsJSON(rows), nil
+}
+
+// SetProfileSetting sets one of the named profile's settings, as SetSetting
+// does a shuttle's; its shuttles follow it, except where one sets the key
+// itself.
+func (m *Daemon) SetProfileSetting(name, key, text string) error {
+	return m.d.SetProfileSetting(name, key, text)
+}
+
+// NewProfile adds a profile with its mode: a profile that set nothing would
+// not be written, as the TUI says. Its other settings are set after, one by
+// one.
+func (m *Daemon) NewProfile(name, mode string) error {
+	if err := m.freeProfileName(name); err != nil {
+		return err
+	}
+	return m.edit(func(d *config.Doc) error { return d.Set([]string{"profiles", name}, "mode", mode) })
+}
+
+// DuplicateProfile copies the profile from, every setting as written, as a
+// new profile named to: the TUI's copy. No shuttle uses the copy yet.
+func (m *Daemon) DuplicateProfile(from, to string) error {
+	if err := m.freeProfileName(to); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(m.configPath)
+	if err != nil {
+		return err
+	}
+	raw, err := config.RawTable(data, "profiles", from)
+	switch {
+	case err != nil:
+		return err
+	case raw == nil:
+		return fmt.Errorf("there is no profile named %s", from)
+	case len(raw) == 0:
+		return fmt.Errorf("%s sets nothing: there is nothing to copy", from)
+	}
+	value := func(key string) string { return config.RawText(config.Lookup(raw, key)) }
+	return m.edit(func(d *config.Doc) error {
+		return config.WriteRows(d, []string{"profiles", to}, value, func(string) string { return "" })
+	})
+}
+
+// DeleteProfile removes the named profile from the config. One a shuttle
+// uses is refused, with which: change them first, as the TUI says.
+func (m *Daemon) DeleteProfile(name string) error {
+	cfg, err := m.fileConfig()
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(cfg.Profiles, name) {
+		return fmt.Errorf("there is no profile named %s", name)
+	}
+	var users []string
+	for i := range cfg.Shuttles {
+		if cfg.Shuttles[i].Profile == name {
+			users = append(users, cfg.Shuttles[i].Name)
+		}
+	}
+	if len(users) > 0 {
+		return fmt.Errorf("%s is used by %s: change them first", name, strings.Join(users, ", "))
+	}
+	return m.edit(func(d *config.Doc) error { return d.DeleteTable([]string{"profiles", name}) })
+}
+
+// freeProfileName refuses a new profile's name when it is empty or taken.
+func (m *Daemon) freeProfileName(name string) error {
+	if name == "" {
+		return errors.New("the profile needs a name")
+	}
+	cfg, err := m.fileConfig()
+	if err != nil {
+		return err
+	}
+	if slices.Contains(cfg.Profiles, name) {
+		return fmt.Errorf("there is a profile named %s already", name)
+	}
+	return nil
 }
 
 // SyncNow asks for a run of a shuttle.
