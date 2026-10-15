@@ -610,6 +610,9 @@ func TestAddShareAndShuttle(t *testing.T) {
 		t.Errorf("passwords = %v, want the share's stored", pw.m)
 	}
 
+	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	// A folder on the share that is not there yet is made.
 	shuttle := fmt.Sprintf(`{"Name": "photos", "Share": "card", "Folder": "new/photos", "Local": %q, "Mode": "push",
 		"Triggers": ["schedule"], "Interval": "1h"}`, f.local)
@@ -644,10 +647,8 @@ func TestAddShareAndShuttle(t *testing.T) {
 		t.Errorf("config has the refused shuttle:\n%s", after)
 	}
 
-	// The daemon runs it: never ran, so its schedule is due.
-	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("a"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	// The daemon runs it: never ran, so its schedule is due. The file was
+	// there first, whenever that run starts.
 	deadline := time.Now().Add(10 * time.Second)
 	for !strings.Contains(m.StatusesJSON(), `"Name":"photos"`) || !strings.Contains(m.StatusesJSON(), `"Copied":1`) {
 		if time.Now().After(deadline) {
