@@ -20,6 +20,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/present"
 )
 
 // The Shares tab reads and writes the config file itself, so shares can be
@@ -308,7 +309,7 @@ func (m *model) gotTest(msg testedMsg) {
 	case msg.err != nil:
 		m.say(msg.share+": "+firstLine(msg.err.Error()), true)
 	case msg.space.Total > 0:
-		m.say(msg.share+" works: "+spaceText(msg.space), false)
+		m.say(msg.share+" works: "+present.Room(msg.space), false)
 	default:
 		m.say(msg.share+" works", false)
 	}

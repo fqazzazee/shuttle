@@ -13,6 +13,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
 // Bus is shuttle's icon in text, for the terminal: the front of a shuttle
@@ -178,4 +179,98 @@ func Ago(t, now time.Time) string {
 	default:
 		return fmt.Sprintf("%dd ago", int(d/(24*time.Hour)))
 	}
+}
+
+// Selection says what of its folder a shuttle syncs.
+func Selection(s *config.Settings) string {
+	switch {
+	case len(s.Include) > 0:
+		return "only " + strings.Join(s.Include, ", ")
+	case len(s.Exclude) > 0:
+		return "all but " + strings.Join(s.Exclude, ", ")
+	}
+	return "everything"
+}
+
+// Runs says what starts a shuttle's runs: "as files change, every 1h".
+// With no triggers, "only when you ask".
+func Runs(s *config.Settings) string {
+	if len(s.Triggers) == 0 {
+		return "only when you ask"
+	}
+	var parts []string
+	for _, t := range s.Triggers {
+		switch t {
+		case config.TriggerRealtime:
+			parts = append(parts, "as files change")
+		case config.TriggerShareAvailable:
+			parts = append(parts, "when the share comes online")
+		case config.TriggerSchedule:
+			if s.Interval > 0 {
+				parts = append(parts, "every "+Interval(s.Interval))
+			}
+			if len(s.At) > 0 {
+				at := make([]string, len(s.At))
+				for i, t := range s.At {
+					at[i] = t.String()
+				}
+				parts = append(parts, "at "+strings.Join(at, ", "))
+			}
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+// Next is when the schedule runs a shuttle next ("next in 3h"), or "" while
+// it runs or without a schedule.
+func Next(st *daemon.Status, now time.Time) string {
+	if st.State == daemon.StateRunning {
+		return ""
+	}
+	if next := Until(st.NextRun, now); next != "" {
+		return "next " + next
+	}
+	return ""
+}
+
+// LastRun is what the last run did: "it failed", "nothing to do", or
+// "3 copied, 1 deleted".
+func LastRun(st *daemon.Status) string {
+	if st.Error != "" {
+		return "it failed"
+	}
+	if st.Copied == 0 && st.Deleted == 0 {
+		return "nothing to do"
+	}
+	var parts []string
+	if st.Copied > 0 {
+		parts = append(parts, fmt.Sprintf("%d copied", st.Copied))
+	}
+	if st.Deleted > 0 {
+		parts = append(parts, fmt.Sprintf("%d deleted", st.Deleted))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// Interval is an interval as the config writes it: "90m", "1h", "2d".
+func Interval(d time.Duration) string {
+	switch {
+	case d%(24*time.Hour) == 0:
+		return fmt.Sprintf("%dd", d/(24*time.Hour))
+	case d%time.Hour == 0:
+		return fmt.Sprintf("%dh", d/time.Hour)
+	case d%time.Minute == 0:
+		return fmt.Sprintf("%dm", d/time.Minute)
+	}
+	return d.String()
+}
+
+// Room is room in words: "1.2 TB free of 4.0 TB".
+func Room(sp fsys.Space) string {
+	return Size(sp.Free) + " free of " + Size(sp.Total)
+}
+
+// Low reports whether less than a tenth of the room is left.
+func Low(sp fsys.Space) bool {
+	return sp.Total > 0 && sp.Free < sp.Total/10
 }

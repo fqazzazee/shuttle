@@ -115,25 +115,15 @@ func (m *model) hereLine() string {
 	}
 	parts := make([]string, len(disks))
 	for i, d := range disks {
-		parts[i] = spaceText(d.space)
+		parts[i] = present.Room(d.space)
 		if len(disks) > 1 {
 			parts[i] += " (" + strings.Join(d.names, ", ") + ")"
 		}
-		if low(d.space) {
+		if present.Low(d.space) {
 			parts[i] = heldStyle.Render(parts[i])
 		}
 	}
 	return "This computer: " + strings.Join(parts, faint.Render(" · "))
-}
-
-// low reports whether less than a tenth of the room is left.
-func low(sp fsys.Space) bool {
-	return sp.Total > 0 && sp.Free < sp.Total/10
-}
-
-// spaceText is room in words: "1.2 TB free of 4.0 TB".
-func spaceText(sp fsys.Space) string {
-	return present.Size(sp.Free) + " free of " + present.Size(sp.Total)
 }
 
 // freeText is room for the Shares tab's FREE column: "1.2 TB of 4.0 TB",
@@ -143,7 +133,7 @@ func freeText(sp fsys.Space) string {
 		return "—"
 	}
 	s := present.Size(sp.Free) + " of " + present.Size(sp.Total)
-	if low(sp) {
+	if present.Low(sp) {
 		return heldStyle.Render(s)
 	}
 	return s

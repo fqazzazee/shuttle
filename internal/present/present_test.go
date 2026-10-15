@@ -3,12 +3,14 @@
 package present
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
 func TestAgo(t *testing.T) {
@@ -111,5 +113,77 @@ func TestAttentionMetered(t *testing.T) {
 		if got := Attention(&tc.st); got != tc.want {
 			t.Errorf("Attention(%+v) = %q, want %q", tc.st, got, tc.want)
 		}
+	}
+}
+
+func TestSelection(t *testing.T) {
+	for _, tt := range []struct {
+		s    config.Settings
+		want string
+	}{
+		{config.Settings{}, "everything"},
+		{config.Settings{Include: []string{"Photos", "Docs/2026"}}, "only Photos, Docs/2026"},
+		{config.Settings{Exclude: []string{"Cache"}}, "all but Cache"},
+	} {
+		if got := Selection(&tt.s); got != tt.want {
+			t.Errorf("Selection(%+v) = %q, want %q", tt.s, got, tt.want)
+		}
+	}
+}
+
+func TestRuns(t *testing.T) {
+	at := []config.TimeOfDay{{Hour: 2}, {Hour: 14, Minute: 30}}
+	for _, tt := range []struct {
+		s    config.Settings
+		want string
+	}{
+		{config.Settings{}, "only when you ask"},
+		{config.Settings{Triggers: []config.Trigger{config.TriggerRealtime}}, "as files change"},
+		{config.Settings{Triggers: []config.Trigger{config.TriggerShareAvailable}}, "when the share comes online"},
+		{config.Settings{Triggers: []config.Trigger{config.TriggerSchedule}, Interval: 90 * time.Minute, At: at},
+			"every 90m, at 02:00, 14:30"},
+		{config.Settings{Triggers: []config.Trigger{config.TriggerRealtime, config.TriggerSchedule}, Interval: 24 * time.Hour},
+			"as files change, every 1d"},
+	} {
+		if got := Runs(&tt.s); got != tt.want {
+			t.Errorf("Runs(%+v) = %q, want %q", tt.s, got, tt.want)
+		}
+	}
+}
+
+func TestNextAndLastRun(t *testing.T) {
+	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+	if got := Next(&daemon.Status{NextRun: now.Add(3 * time.Hour)}, now); got != "next in 3h" {
+		t.Errorf("Next = %q", got)
+	}
+	if got := Next(&daemon.Status{State: daemon.StateRunning, NextRun: now.Add(time.Hour)}, now); got != "" {
+		t.Errorf("Next while running = %q", got)
+	}
+	if got := Next(&daemon.Status{}, now); got != "" {
+		t.Errorf("Next without a schedule = %q", got)
+	}
+	for st, want := range map[*daemon.Status]string{
+		{Error: "share offline"}: "it failed",
+		{}:                       "nothing to do",
+		{Copied: 3}:              "3 copied",
+		{Copied: 3, Deleted: 1}:  "3 copied, 1 deleted",
+		{Deleted: 2}:             "2 deleted",
+	} {
+		if got := LastRun(st); got != want {
+			t.Errorf("LastRun(%+v) = %q, want %q", st, got, want)
+		}
+	}
+}
+
+func TestRoom(t *testing.T) {
+	sp := fsys.Space{Free: 50, Total: 1000}
+	if !Low(sp) || Low(fsys.Space{Free: 500, Total: 1000}) || Low(fsys.Space{}) {
+		t.Error("Low: a tenth left is low; half is not; unknown is not")
+	}
+	if got := Room(fsys.Space{Free: 1 << 30, Total: 4 << 30}); !strings.Contains(got, " free of ") {
+		t.Errorf("Room = %q", got)
+	}
+	if got := Interval(36 * time.Hour); got != "36h" {
+		t.Errorf("Interval = %q", got)
 	}
 }
