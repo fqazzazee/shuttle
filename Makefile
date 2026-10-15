@@ -18,7 +18,7 @@ GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v
 # Keep in step with the release workflow. Not newer: from v2.18 it needs Go 1.27.
 GORELEASER    ?= go run github.com/goreleaser/goreleaser/v2@v2.17.1
 
-.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar test-android test-android-device test-android-flow samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
+.PHONY: build test lint fmt-check install uninstall smoke unit-check clean aar apk apk-cert test-android test-android-device test-android-flow samba-up samba-down test-integration test-nfs test-keyring test-systemd test-tui screenshots test-extension lint-extension install-extension uninstall-extension package-files packages test-packages
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="$(LDFLAGS)" -o bin/$(BINARY) ./cmd/shuttle
@@ -110,6 +110,27 @@ aar:
 	ANDROID_NDK_HOME=$(ANDROID_HOME)/ndk/$(NDK_VERSION) \
 		go tool gomobile bind -target=$(ANDROID_TARGETS) -androidapi 30 -trimpath \
 		-javapkg io.github.fqazzazee.shuttle -o $(AAR) ./mobile
+
+# The release APK: arm64, signed with the release key the environment gives
+# (SHUTTLE_SIGNING_KEYSTORE, a PKCS12 file, _PASSWORD and _ALIAS: see
+# android/app/build.gradle.kts), as build/apk/shuttle_X.Y.Z_android_arm64.apk.
+# APK_VERSION is the release's X.Y.Z, from the tag the checkout is on; its
+# versionCode follows from it. apksigner checks the signature it ends with.
+APK_VERSION ?= $(patsubst v%,%,$(VERSION))
+APK         := build/apk/shuttle_$(APK_VERSION)_android_arm64.apk
+APKSIGNER    = $(lastword $(sort $(wildcard $(ANDROID_HOME)/build-tools/*/apksigner)))
+
+apk: aar
+	@test -n "$$SHUTTLE_SIGNING_KEYSTORE" || { echo "apk: SHUTTLE_SIGNING_KEYSTORE, _PASSWORD and _ALIAS must give the release key"; exit 1; }
+	cd android && ANDROID_HOME=$(ANDROID_HOME) ./gradlew --no-daemon assembleRelease -PshuttleVersion=$(APK_VERSION)
+	mkdir -p $(dir $(APK))
+	cp android/app/build/outputs/apk/release/app-release.apk $(APK)
+	$(APKSIGNER) verify --min-sdk-version 30 --print-certs $(APK)
+
+# The SHA-256 of the certificate $(APK) is signed with: the release workflow
+# checks it against android/release-cert.sha256.
+apk-cert:
+	@$(APKSIGNER) verify --min-sdk-version 30 --print-certs $(APK) 2>/dev/null | sed -n 's/^Signer #1 certificate SHA-256 digest: //p'
 
 # The app in android/, on that .aar: a debug APK, its unit tests and Android
 # lint, and its tests on a phone built (they run in test-android-device).

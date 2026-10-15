@@ -20,6 +20,8 @@ Thumbs.db
 *.pem
 *.key
 *.p12
+*.jks
+*.keystore
 credentials.json
 secrets.yaml
 
