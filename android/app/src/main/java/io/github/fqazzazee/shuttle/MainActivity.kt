@@ -145,33 +145,7 @@ class MainActivity : ComponentActivity() {
                                         settingsRead.let { runCatching { Core.current?.settingsJSON(name) }.getOrNull() }
                                     }
                                     val w = wizard
-                                    if (backup) {
-                                        BackHandler { backup = false }
-                                        BackupScreen(
-                                            backupMessage, backupBusy, backupPending?.second,
-                                            BackupActions(
-                                                save = { saveBackup.launch("shuttle-backup-${LocalDate.now()}.toml") },
-                                                restore = { openBackup.launch(arrayOf("*/*")) },
-                                                confirm = ::restoreBackup,
-                                                cancel = { backupPending = null },
-                                            ),
-                                        ) { backup = false; backupMessage = null }
-                                    } else if (help) {
-                                        BackHandler { help = false }
-                                        HelpScreen { help = false }
-                                    } else if (about) {
-                                        BackHandler { about = false }
-                                        val version = remember { packageManager.getPackageInfo(packageName, 0).versionName.orEmpty() }
-                                        val notices = remember { readNotices(this@MainActivity) }
-                                        // The APK is read whole for its checksum: off the main thread.
-                                        val copy by produceState<ThisCopy?>(null) {
-                                            value = withContext(Dispatchers.IO) { ThisCopy.of(this@MainActivity) }
-                                        }
-                                        AboutScreen(
-                                            version, copy, notices, wallpaperColors.takeIf { hasWallpaperColors },
-                                            { on -> wallpaperColors = on; prefs.edit { putBoolean(WALLPAPER_COLORS, on) } },
-                                        ) { about = false }
-                                    } else if (w != null) {
+                                    if (w != null) {
                                         BackHandler { wizardBack() }
                                         Wizard(w)
                                     } else if (rows != null) {
@@ -193,8 +167,8 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
-                                            ::allow, pausedAll, actions, ::openWizard, { help = true }, { backup = true },
-                                        ) { about = true }
+                                            ::allow, pausedAll, actions, ::openWizard,
+                                        )
                                     }
                                 }
                                 Tab.CONFLICTS -> ConflictsScreen(
@@ -235,6 +209,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 }
+                                Tab.APP -> AppTab()
                                 Tab.PROFILES -> {
                                     // A reload brings statuses: the config file may have changed.
                                     Core.statuses
@@ -587,6 +562,41 @@ class MainActivity : ComponentActivity() {
         if (wizardProblem == null) closeWizard()
     }
 
+    /** The App tab: its page, or the one of its pages open. */
+    @Composable
+    private fun AppTab() {
+        if (backup) {
+            BackHandler { backup = false; backupMessage = null }
+            BackupScreen(
+                backupMessage, backupBusy, backupPending?.second,
+                BackupActions(
+                    save = { saveBackup.launch("shuttle-backup-${LocalDate.now()}.toml") },
+                    restore = { openBackup.launch(arrayOf("*/*")) },
+                    confirm = ::restoreBackup,
+                    cancel = { backupPending = null },
+                ),
+            ) { backup = false; backupMessage = null }
+        } else if (help) {
+            BackHandler { help = false }
+            HelpScreen { help = false }
+        } else if (about) {
+            BackHandler { about = false }
+            val version = remember { packageManager.getPackageInfo(packageName, 0).versionName.orEmpty() }
+            val notices = remember { readNotices(this@MainActivity) }
+            // The APK is read whole for its checksum: off the main thread.
+            val copy by produceState<ThisCopy?>(null) {
+                value = withContext(Dispatchers.IO) { ThisCopy.of(this@MainActivity) }
+            }
+            AboutScreen(version, copy, notices) { about = false }
+        } else {
+            AppScreen(
+                wallpaperColors.takeIf { hasWallpaperColors },
+                { on -> wallpaperColors = on; prefs.edit { putBoolean(WALLPAPER_COLORS, on) } },
+                AppActions(help = { help = true }, backup = { backup = true }, about = { about = true }),
+            )
+        }
+    }
+
     /** Runs a backup's file work off the main thread; it returns what to say, or null. */
     private fun backupTask(f: () -> String?) {
         backupBusy = true
@@ -777,9 +787,6 @@ private fun Main(
     pausedAll: Boolean,
     actions: ListActions,
     onWizard: () -> Unit,
-    onHelp: () -> Unit,
-    onBackup: () -> Unit,
-    onAbout: () -> Unit,
 ) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -795,11 +802,6 @@ private fun Main(
             ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
         OutlinedButton(onClick = onWizard, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.wizard_add)) }
-        Row {
-            TextButton(onClick = onHelp) { Text(stringResource(R.string.help)) }
-            TextButton(onClick = onBackup) { Text(stringResource(R.string.backup)) }
-            TextButton(onClick = onAbout) { Text(stringResource(R.string.about)) }
-        }
     }
 }
 

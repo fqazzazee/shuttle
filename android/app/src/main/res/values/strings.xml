@@ -32,6 +32,11 @@
     <string name="tab_activity">Activity</string>
     <string name="tab_profiles">Profiles</string>
     <string name="tab_shares">Shares</string>
+    <string name="tab_app">App</string>
+    <string name="app_title">The app</string>
+    <string name="app_help">How to use the app, as questions</string>
+    <string name="app_backup">Save the app\'s shares, profiles and shuttles, or restore them</string>
+    <string name="app_about">Its version, links, this copy\'s checksums and the licenses</string>
     <string name="back">← Back</string>
     <string name="detail_profile">profile %1$s</string>
     <string name="detail_phone">This phone</string>
@@ -47,7 +52,6 @@
     <string name="settings">Settings</string>
     <string name="edit">Edit</string>
     <string name="about">About shuttle</string>
-    <string name="backup">Backup</string>
     <string name="backup_title">Backup and restore</string>
     <string name="backup_what">A backup is the app\'s config file: its shares, profiles and shuttles, as the desktop\'s shuttle also reads it. Passwords are not in it: after a restore, set each share\'s again on the Shares tab.</string>
     <string name="backup_save">Save a backup…</string>

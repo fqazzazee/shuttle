@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
@@ -21,13 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 
-/** The app's tabs: the TUI's, in its order. A notice opens one by its name (the Go core's notice.Note.Open). */
+/** The app's tabs: the TUI's, in its order, then the app's own. A notice opens one by its name (the Go core's notice.Note.Open). */
 enum class Tab(val label: Int, val icon: ImageVector) {
     SHUTTLES(R.string.tab_shuttles, Icons.AutoMirrored.Filled.List),
     CONFLICTS(R.string.tab_conflicts, Icons.Filled.Warning),
     ACTIVITY(R.string.tab_activity, Icons.Filled.DateRange),
     PROFILES(R.string.tab_profiles, Icons.Filled.Settings),
     SHARES(R.string.tab_shares, Icons.Filled.Share),
+    APP(R.string.tab_app, Icons.Filled.Menu),
     ;
 
     companion object {

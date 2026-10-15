@@ -28,7 +28,7 @@ class TabsTest {
         compose.setContent { AppTabs(tab, { tab = it }) { t -> Text("screen of ${t.name}") } }
         compose.onNodeWithText("screen of SHUTTLES").assertExists()
         for ((label, t) in listOf("Conflicts" to Tab.CONFLICTS, "Activity" to Tab.ACTIVITY, "Profiles" to Tab.PROFILES,
-            "Shares" to Tab.SHARES, "Shuttles" to Tab.SHUTTLES)) {
+            "Shares" to Tab.SHARES, "App" to Tab.APP, "Shuttles" to Tab.SHUTTLES)) {
             compose.onNodeWithText(label).performClick()
             compose.onNodeWithText("screen of ${t.name}").assertExists()
             assertEquals(t, tab)

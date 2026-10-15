@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -17,11 +16,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -154,16 +151,12 @@ private const val REFLOW_WIDTH = 50
  * About the app: its version, its links (the source on GitHub, the project page, the releases, Buy
  * me a coffee), this copy's checksums against the release's, its license, and the third-party
  * notices of what it includes, as the release carries them. copy is null while it is read.
- * wallpaper is whether the app takes the wallpaper's colours in place of shuttle's palette; null
- * where Android has none to offer.
  */
 @Composable
 fun AboutScreen(
     version: String,
     copy: ThisCopy?,
     notices: List<String>?,
-    wallpaper: Boolean?,
-    onWallpaper: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     val uri = LocalUriHandler.current
@@ -182,17 +175,6 @@ fun AboutScreen(
         }
         item { ThisCopyCard(copy) }
         item { Text(stringResource(R.string.about_license), style = MaterialTheme.typography.bodyMedium) }
-        wallpaper?.let { on ->
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.about_wallpaper), style = MaterialTheme.typography.titleSmall)
-                        Text(stringResource(R.string.about_wallpaper_hint), style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(on, onWallpaper)
-                }
-            }
-        }
         item { Text(stringResource(R.string.about_notices), style = MaterialTheme.typography.titleMedium) }
         if (notices == null) {
             item { Text(stringResource(R.string.about_no_notices), style = MaterialTheme.typography.bodyMedium) }
