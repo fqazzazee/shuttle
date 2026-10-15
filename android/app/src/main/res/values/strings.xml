@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">shuttle</string>
     <string name="not_set_up">No shuttles yet.</string>
     <string name="start_failed">Syncing could not start: %1$s</string>
@@ -89,6 +89,16 @@
     <string name="share_unused">No shuttle uses it</string>
     <string name="share_used_by">Used by %1$s</string>
     <string name="share_add">Add a share</string>
+    <string name="example_name">Your name for it, e.g. nas or office</string>
+    <string name="example_smb_url">A share\'s address, smb://192.168.1.20/home, is its server, 192.168.1.20, and the share on it, home.</string>
+    <string name="example_nfs_url" tools:ignore="Typos">An export\'s address, nfs://192.168.1.20/volume1/photos, is its server, 192.168.1.20, and the export on it, /volume1/photos.</string> <!-- volume1 is how Synology names its volumes, not a typo -->
+    <string name="example_smb_host">e.g. 192.168.1.20 or nas.local; a port only if not 445: 192.168.1.20:1445</string>
+    <string name="example_nfs_host">e.g. 192.168.1.20 or nas.local</string>
+    <string name="example_smb_share">e.g. home, Photos or public: the name the server shares it by, not a folder path</string>
+    <string name="example_nfs_export" tools:ignore="Typos">e.g. /volume1/photos (Synology), /mnt/tank/media (TrueNAS) or /srv/nfs/data</string> <!-- volume1 is how Synology names its volumes, not a typo -->
+    <string name="example_user">The account on the server, e.g. alex</string>
+    <string name="example_domain">Usually empty; else, e.g. WORKGROUP or your company\'s domain</string>
+    <string name="example_path">A folder already on the phone, e.g. /storage/emulated/0/Shared</string>
     <string name="share_new">New share</string>
     <string name="share_editing">The share %1$s</string>
     <string name="share_folder">Folder</string>

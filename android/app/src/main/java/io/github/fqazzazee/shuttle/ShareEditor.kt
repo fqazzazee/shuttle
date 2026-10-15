@@ -124,16 +124,20 @@ fun ShareEditor(initial: ShareForm, isNew: Boolean, usedBy: List<String>, busy: 
                 FilterChip(form.type == t, { form = form.copy(type = t) }, { Text(label) })
             }
         }
-        Field(R.string.add_share_name, form.name, enabled = isNew) { form = form.copy(name = it) }
+        Field(R.string.add_share_name, form.name, R.string.example_name, enabled = isNew) { form = form.copy(name = it) }
         if (form.type == "path") {
-            Field(R.string.share_path, form.path) { form = form.copy(path = it) }
+            Field(R.string.share_path, form.path, R.string.example_path) { form = form.copy(path = it) }
         } else {
-            Field(R.string.add_host, form.host) { form = form.copy(host = it) }
-            Field(if (form.type == "smb") R.string.add_share else R.string.add_export, form.share) { form = form.copy(share = it) }
+            val smb = form.type == "smb"
+            Text(stringResource(if (smb) R.string.example_smb_url else R.string.example_nfs_url), style = MaterialTheme.typography.bodySmall)
+            Field(R.string.add_host, form.host, if (smb) R.string.example_smb_host else R.string.example_nfs_host) { form = form.copy(host = it) }
+            Field(if (smb) R.string.add_share else R.string.add_export, form.share, if (smb) R.string.example_smb_share else R.string.example_nfs_export) {
+                form = form.copy(share = it)
+            }
         }
         if (form.type == "smb") {
-            Field(R.string.add_user, form.user) { form = form.copy(user = it) }
-            Field(R.string.share_domain, form.domain) { form = form.copy(domain = it) }
+            Field(R.string.add_user, form.user, R.string.example_user) { form = form.copy(user = it) }
+            Field(R.string.share_domain, form.domain, R.string.example_domain) { form = form.copy(domain = it) }
             OutlinedTextField(
                 form.password, { form = form.copy(password = it) }, Modifier.fillMaxWidth(),
                 label = { Text(stringResource(if (isNew) R.string.add_password else R.string.share_password_keep)) },
@@ -166,8 +170,12 @@ fun ShareEditor(initial: ShareForm, isNew: Boolean, usedBy: List<String>, busy: 
 }
 
 @Composable
-private fun Field(label: Int, value: String, enabled: Boolean = true, onChange: (String) -> Unit) {
-    OutlinedTextField(value, onChange, Modifier.fillMaxWidth(), enabled = enabled, label = { Text(stringResource(label)) }, singleLine = true)
+private fun Field(label: Int, value: String, example: Int? = null, enabled: Boolean = true, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value, onChange, Modifier.fillMaxWidth(), enabled = enabled, label = { Text(stringResource(label)) }, singleLine = true,
+        // What goes there, by example: the forms a server, share or export take.
+        supportingText = example?.let { { Text(stringResource(it)) } },
+    )
 }
 
 /** A host and its port, when it ends in one: not an IPv6 address's last group. */
