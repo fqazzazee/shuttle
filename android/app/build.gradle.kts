@@ -58,6 +58,8 @@ android {
     buildFeatures {
         compose = true
     }
+    // THIRD_PARTY_NOTICES, which make android-notices writes there, read by the app's About screen.
+    sourceSets.getByName("main").assets.directories.add("build/notices")
     testOptions {
         // Robolectric reads the app's resources: the screens' strings.
         unitTests.isIncludeAndroidResources = true
@@ -99,4 +101,32 @@ dependencies {
 // which JDKs from 22 on keep closed (CI runs 21).
 tasks.withType<Test>().configureEach {
     jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED")
+}
+
+// The POMs of the release build's libraries, and of their parents, with the list of the libraries,
+// in build/notices-poms: packaging/android-notices.py reads their licenses (make android-notices).
+// Gradle keeps no POM where a library publishes its module metadata, so each is asked for.
+tasks.register("noticesPoms") {
+    notCompatibleWithConfigurationCache("resolves the POMs as it runs")
+    val out = layout.buildDirectory.dir("notices-poms")
+    doLast {
+        val dir = out.get().asFile.apply { deleteRecursively(); mkdirs() }
+        val libraries = configurations.getByName("releaseRuntimeClasspath").incoming.resolutionResult.allComponents
+            .mapNotNull { it.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+            // A BOM only pins versions: nothing of it is in the app.
+            .filterNot { it.module.endsWith("-bom") }
+            .map { "${it.group}:${it.module}:${it.version}" }
+            .sorted()
+        File(dir, "libraries.txt").writeText(libraries.joinToString("\n", postfix = "\n"))
+        val parent = Regex("""<parent>.*?<groupId>(.*?)</groupId>.*?<artifactId>(.*?)</artifactId>.*?<version>(.*?)</version>""", RegexOption.DOT_MATCHES_ALL)
+        val pending = ArrayDeque(libraries)
+        val seen = mutableSetOf<String>()
+        while (pending.isNotEmpty()) {
+            val coords = pending.removeFirst()
+            if (!seen.add(coords)) continue
+            val pom = configurations.detachedConfiguration(dependencies.create("$coords@pom")).apply { isTransitive = false }.singleFile
+            pom.copyTo(File(dir, "$coords.pom"), overwrite = true)
+            parent.find(pom.readText())?.let { m -> pending.add(m.groupValues.drop(1).joinToString(":") { it.trim() }) }
+        }
+    }
 }
