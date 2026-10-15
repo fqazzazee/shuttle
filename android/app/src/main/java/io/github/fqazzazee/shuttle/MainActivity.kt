@@ -136,6 +136,12 @@ class MainActivity : ComponentActivity() {
                                         problemsOnly, { problemsOnly = it },
                                     )
                                 }
+                                Tab.SHARES -> {
+                                    // Read again with every status: a share's state and room come from its shuttles.
+                                    Core.statuses
+                                    val json = runCatching { Core.current?.sharesJSON() }.getOrNull()
+                                    SharesScreen(json?.let(ShareRow::parseAll) ?: emptyList())
+                                }
                                 else -> Later(t)
                             }
                         }
