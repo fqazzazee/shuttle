@@ -168,3 +168,31 @@ func openNFS(ctx context.Context, share *config.Share, folder string) (fsys.FS, 
 	}
 	return f, nil
 }
+
+// StorePassword keeps share's password in store. With none typed, an edit
+// that moved the share to another server, share or user (old is what it was;
+// nil for a new share) takes the stored one along. none reports that the
+// share is left with no password stored: its first run will ask for one.
+func StorePassword(ctx context.Context, store secrets.Store, old, share *config.Share, password string) (none bool, err error) {
+	k, needs := Key(share)
+	switch {
+	case !needs:
+		return false, nil
+	case password != "":
+		return false, store.Set(ctx, k, password)
+	case old == nil:
+		return true, nil
+	}
+	was, had := Key(old)
+	if !had || was == k {
+		return false, nil
+	}
+	pw, err := store.Get(ctx, was)
+	if errors.Is(err, secrets.ErrNotFound) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return false, store.Set(ctx, k, pw)
+}

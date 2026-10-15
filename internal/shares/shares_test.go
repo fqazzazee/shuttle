@@ -359,3 +359,35 @@ func TestTestAnSMBShare(t *testing.T) {
 		t.Errorf("no password stored: %v", err)
 	}
 }
+
+func TestStorePassword(t *testing.T) {
+	ctx := context.Background()
+	nas := config.Share{Name: "nas", Type: config.ShareSMB, Host: "nas.example", Share: "home", User: "user"}
+	moved := nas
+	moved.Host = "nas2.example"
+
+	// Typed: stored under the share's own key.
+	m := memStore{t, map[string]string{}}
+	if none, err := StorePassword(ctx, m, nil, &nas, "fake-pw"); none || err != nil || m.pw["smb://user@nas.example/home"] != "fake-pw" {
+		t.Errorf("typed: none %v, %v, store %v", none, err, m.pw)
+	}
+	// A new share with none typed has none.
+	if none, err := StorePassword(ctx, memStore{t, map[string]string{}}, nil, &nas, ""); !none || err != nil {
+		t.Errorf("new, none typed: none %v, %v", none, err)
+	}
+	// Moved to another server: the stored one goes along.
+	if none, err := StorePassword(ctx, m, &nas, &moved, ""); none || err != nil || m.pw["smb://user@nas2.example/home"] != "fake-pw" {
+		t.Errorf("moved: none %v, %v, store %v", none, err, m.pw)
+	}
+	// Moved, but nothing was stored for the old one.
+	if none, err := StorePassword(ctx, memStore{t, map[string]string{}}, &nas, &moved, ""); !none || err != nil {
+		t.Errorf("moved, nothing stored: none %v, %v", none, err)
+	}
+	// Not moved, none typed: left alone. A path share needs none.
+	if none, err := StorePassword(ctx, memStore{t, nil}, &nas, &nas, ""); none || err != nil {
+		t.Errorf("unchanged: none %v, %v", none, err)
+	}
+	if none, err := StorePassword(ctx, memStore{t, nil}, nil, &config.Share{Name: "usb", Type: config.SharePath, Path: "/mnt/usb"}, ""); none || err != nil {
+		t.Errorf("path share: none %v, %v", none, err)
+	}
+}
