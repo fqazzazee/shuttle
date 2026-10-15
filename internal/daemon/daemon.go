@@ -64,6 +64,9 @@ type Options struct {
 	// about a conflict. "" means the host name, which Android gives as
 	// "localhost": the app passes the device's name.
 	DeviceName string
+	// Here names this side in what the daemon says, e.g. "this phone". ""
+	// means "this computer".
+	Here string
 	// Waiting, if set, says why a shuttle cannot run now although nothing is
 	// wrong with it, or "" when it can: on Android, a permission the user has
 	// not given ("needs All files access"). A waiting shuttle starts no run,
@@ -396,7 +399,7 @@ func (d *Daemon) Resolve(ctx context.Context, name, path string, choice engine.C
 		return err
 	}
 	d.o.Log.Info("conflict resolved", "shuttle", name, "path", path, "choice", choice)
-	r.addActivity(activity.KindConflict, path, "resolved: "+resolvedText[choice])
+	r.addActivity(activity.KindConflict, path, "resolved: "+resolvedText(choice, d.o.Here))
 	r.trigger()
 	return nil
 }

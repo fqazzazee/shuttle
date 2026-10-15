@@ -38,11 +38,16 @@ var (
 	}
 )
 
-// What the activity log says of a conflict the user resolved.
-var resolvedText = map[engine.Choice]string{
-	engine.KeepLocal:  "kept this computer's copy",
-	engine.KeepRemote: "kept the share's copy",
-	engine.KeepBoth:   "kept both",
+// resolvedText is what the activity log says of a conflict the user
+// resolved; here names this side (Options.Here).
+func resolvedText(choice engine.Choice, here string) string {
+	switch choice {
+	case engine.KeepLocal:
+		return "kept " + cmp.Or(here, "this computer") + "'s copy"
+	case engine.KeepRemote:
+		return "kept the share's copy"
+	}
+	return "kept both"
 }
 
 func (d *Daemon) activityPath(name string) string {

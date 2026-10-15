@@ -172,7 +172,7 @@ func openSMB(ctx context.Context, share *config.Share, folder string, store secr
 	if k, ok := Key(share); ok {
 		password, err := store.Get(ctx, k)
 		if errors.Is(err, secrets.ErrNotFound) {
-			return nil, fmt.Errorf("share %s: no password stored in the keyring for %s; set it in shuttle's Shares screen: %w",
+			return nil, fmt.Errorf("share %s: no password stored for %s; set it on shuttle's Shares tab: %w",
 				share.Name, k.Account(), err)
 		}
 		if err != nil {

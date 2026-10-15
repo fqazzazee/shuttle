@@ -74,7 +74,7 @@ func DefaultText(key string) string { return defaults[key] }
 
 var Rows = []Row{
 	{Key: "mode", Label: "Mode", Choices: []string{"push", "pull", "sync"}, Default: "none: each shuttle must say",
-		Hint: "↑ push: this computer to the share; ↓ pull: the share to this computer; ⇅ sync: both ways"},
+		Hint: "↑ push: the folder here to the share; ↓ pull: the share to the folder here; ⇅ sync: both ways"},
 	{Key: "triggers", Label: "Triggers", List: true, Default: "manual only",
 		Hint: "any of realtime, schedule, share-available"},
 	{Key: "interval", Label: "Every", Default: "-", Hint: "with the schedule trigger: run this often, e.g. 6h",
@@ -111,12 +111,12 @@ var Rows = []Row{
 		Hint: "on a metered connection, such as a phone's hotspot: wait for another, or run anyway"},
 	{Key: "bandwidth.up", Label: "Upload", Default: "unlimited", Hint: "e.g. 20MB/s"},
 	{Key: "bandwidth.down", Label: "Download", Default: "unlimited", Hint: "e.g. 50MB/s"},
-	{Key: "notify.errors", Label: "Tell errors", Choices: []string{"on", "off"}, Default: "on", Hint: "desktop notifications"},
-	{Key: "notify.conflicts", Label: "Tell conflicts", Choices: []string{"on", "off"}, Default: "on", Hint: "desktop notifications"},
+	{Key: "notify.errors", Label: "Tell errors", Choices: []string{"on", "off"}, Default: "on", Hint: "notifications"},
+	{Key: "notify.conflicts", Label: "Tell conflicts", Choices: []string{"on", "off"}, Default: "on", Hint: "notifications"},
 	{Key: "notify.completed", Label: "Tell done", Choices: []string{"on", "off"}, Default: "on, off for real-time",
-		Hint: "desktop notifications: a run that changed something"},
+		Hint: "notifications: a run that changed something"},
 	{Key: "notify.share", Label: "Tell share", Choices: []string{"on", "off"}, Default: "on",
-		Hint: "desktop notifications: a share lost or back"},
+		Hint: "notifications: a share lost or back"},
 }
 
 // RowOf is the row for key; nil for none.
