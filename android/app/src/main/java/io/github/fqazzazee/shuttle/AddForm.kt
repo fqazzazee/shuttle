@@ -68,7 +68,7 @@ data class AddForm(
         if (!l.startsWith("/") || l in STORAGE_ROOTS) add(R.string.add_local)
     }
 
-    private companion object {
+    companion object {
         /** A folder in the phone's storage, not all of it: never a whole card or the whole phone. */
         @Suppress("SdCardPath") // paths refused as a whole folder to sync, never written to
         val STORAGE_ROOTS = setOf("", "/storage", "/storage/emulated", "/storage/emulated/0", "/sdcard", "/mnt/sdcard")

@@ -18,6 +18,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -166,5 +168,80 @@ class WizardTest {
         compose.onNodeWithText("↑ Up a folder").performClick()
         assertEquals(listOf("/Media"), opened)
         compose.onNodeWithText("Next").performScrollTo().assertIsEnabled()
+    }
+
+    private val phone = Volume("Internal storage", "/storage/emulated/0")
+    private val card = Volume("SD card", "/storage/1234-ABCD")
+
+    @Test
+    fun theTopOfStorageIsNotAShuttlesFolder() {
+        assertEquals(true, storageTop("/storage/emulated/0/", listOf(phone)))
+        assertEquals(true, storageTop("/sdcard", listOf(phone)))
+        assertEquals(true, storageTop("/storage/1234-ABCD", listOf(phone, card)))
+        assertEquals(false, storageTop("/storage/emulated/0/DCIM", listOf(phone)))
+    }
+
+    // As the share's folder: folders open, files only show, Up goes to the folder above.
+    @Test
+    fun thePhonesFolderIsBrowsed() {
+        val opened = mutableListOf<String>()
+        var next = 0
+        val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0/Media")
+        compose.setContent { WizardLocalStep(state, listOf(phone), Listing(FolderEntry.parseAll(json), null), { opened += it }, { null }, {}, {}) { next++ } }
+        compose.onNodeWithText("/storage/emulated/0/Media").assertExists()
+        compose.onNodeWithText("Photos/").performClick()
+        compose.onNodeWithText("↑ Up a folder").performClick()
+        compose.onNode(hasText("a.txt") and hasClickAction()).assertIsNotEnabled()
+        compose.onNodeWithText("Use this folder").performScrollTo().assertIsEnabled().performClick()
+        assertEquals(listOf("/storage/emulated/0/Media/Photos", "/storage/emulated/0"), opened)
+        assertEquals(1, next)
+    }
+
+    // At the top of the phone's storage: no Up, the SD card instead, and nothing to choose.
+    @Test
+    fun theTopOfStorageGoesToTheCard() {
+        val opened = mutableListOf<String>()
+        val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0")
+        compose.setContent { WizardLocalStep(state, listOf(phone, card), Listing(FolderEntry.parseAll(json), null), { opened += it }, { null }, {}, {}) {} }
+        compose.onNodeWithText("↑ Up a folder").assertDoesNotExist()
+        compose.onNodeWithText("Internal storage (/storage/emulated/0)").assertDoesNotExist()
+        compose.onNodeWithText("SD card (/storage/1234-ABCD)").performClick()
+        assertEquals(listOf("/storage/1234-ABCD"), opened)
+        compose.onNodeWithText("Choose a folder in it, or make one: a shuttle does not sync all of the phone's storage.").assertExists()
+        compose.onNodeWithText("Use this folder").performScrollTo().assertIsNotEnabled()
+    }
+
+    // A refused name keeps the dialog open, saying why; a folder made closes it.
+    @Test
+    fun aFolderIsMade() {
+        val asked = mutableListOf<String>()
+        val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0/Media")
+        compose.setContent {
+            WizardLocalStep(state, listOf(phone), Listing(emptyList(), null), {}, { asked += it; if (it == "a:b") "the phone cannot hold that name" else null }, {}, {}) {}
+        }
+        compose.onNodeWithText("Nothing in this folder.").assertExists()
+        compose.onNodeWithText("New folder").performScrollTo().performClick()
+        compose.onNodeWithText("In /storage/emulated/0/Media").assertExists()
+        compose.onNodeWithText("Name").performTextInput("a:b")
+        compose.onNodeWithText("Make").performClick()
+        compose.onNodeWithText("the phone cannot hold that name").assertExists()
+        compose.onNodeWithText("Name").performTextClearance()
+        compose.onNodeWithText("Name").performTextInput("Backups")
+        compose.onNodeWithText("Make").performClick()
+        compose.onNodeWithText("Make").assertDoesNotExist()
+        assertEquals(listOf("a:b", "Backups"), asked)
+    }
+
+    // A folder that could not be read, as without All files access: tried again, not chosen, nothing made in it.
+    @Test
+    fun aPhoneFolderThatCouldNotBeRead() {
+        var retried = 0
+        val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0/Media")
+        compose.setContent { WizardLocalStep(state, listOf(phone), Listing(null, "permission denied"), {}, { null }, { retried++ }, {}) {} }
+        compose.onNodeWithText("permission denied").assertExists()
+        compose.onNodeWithText("Try again").performClick()
+        assertEquals(1, retried)
+        compose.onNodeWithText("New folder").assertDoesNotExist()
+        compose.onNodeWithText("Use this folder").performScrollTo().assertIsNotEnabled()
     }
 }
