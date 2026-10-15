@@ -296,12 +296,86 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  # The app on an Android 17 emulator, against the Samba container: its tests
+  # on a device, and the phase's exit test, a shuttle set up through the
+  # app's own screens that copies a file to the share (AppFlowTest), checked
+  # here on the share's side. The emulator reaches the host's 127.0.0.1 at
+  # 10.0.2.2. The SDK's own emulator and avdmanager, no third-party action.
+  android-emulator:
+    name: android (emulator)
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      IMAGE: system-images;android-37.0;google_apis;x86_64
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      - name: let the emulator use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: install the NDK, the emulator and the Android 17 image
+        run: |
+          ndk=$(sed -n 's/^NDK_VERSION *?= *//p' Makefile)
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$ndk" emulator \
+            "platforms;android-37.0" "$IMAGE" >/dev/null
+      - name: start the test Samba server
+        run: make samba-up CONTAINER=docker
+      - run: echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+      - name: start the emulator
+        run: |
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n ci -k "$IMAGE"
+          nohup "$ANDROID_HOME/emulator/emulator" -avd ci -no-window -no-audio -no-boot-anim -no-snapshot \
+            -gpu swiftshader_indirect -memory 4096 -accel on > emulator.log 2>&1 &
+          adb wait-for-device
+          for i in $(seq 120); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
+            sleep 5
+          done
+          [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]
+          adb shell wm dismiss-keyguard
+          for s in window_animation_scale transition_animation_scale animator_duration_scale; do
+            adb shell settings put global "$s" 0
+          done
+      - name: build the app for the emulator
+        run: |
+          make aar ANDROID_HOME="$ANDROID_HOME" ANDROID_TARGETS=android/amd64
+          cd android && ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: the app's tests on the emulator, and the flow against Samba
+        run: |
+          app=io.github.fqazzazee.shuttle
+          adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+          adb install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          # The three permissions, as a user gives them on first run.
+          adb shell appops set "$app" MANAGE_EXTERNAL_STORAGE allow
+          adb shell pm grant "$app" android.permission.POST_NOTIFICATIONS
+          adb shell pm grant "$app" android.permission.ACCESS_LOCAL_NETWORK
+          adb shell am instrument -w -e smbHost 10.0.2.2:1445 -e smbShare test -e smbUser shuttle \
+            -e smbPassword samba-throwaway-pw "$app.test/androidx.test.runner.AndroidJUnitRunner" | tee instrument.log
+          grep -q '^OK (' instrument.log
+      - name: the file the app copied is on the share
+        run: grep -qx 'set up in the app, synced from the emulator' .cache/samba-share/android-ci/from-the-app.txt
+      - name: logs
+        if: failure()
+        run: |
+          tail -50 emulator.log || true
+          adb logcat -d | grep -iE 'shuttle|AndroidRuntime|TestRunner' | tail -200 || true
+          docker logs shuttle-samba || true
+
   # The one check branch protection requires of CI: every job passed, or was
   # skipped as nothing it tests changed. A job added above goes in needs.
   ci:
     name: ci
     if: always()
-    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln, android]
+    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln, android,
+      android-emulator]
     runs-on: ubuntu-latest
     steps:
       - name: every job passed or was not needed

@@ -16,7 +16,7 @@
     <string name="add_title">A share and a shuttle</string>
     <string name="add_share_heading">The share</string>
     <string name="add_share_name">Name for the share</string>
-    <string name="add_host">Server (name or address)</string>
+    <string name="add_host">Server (name or address, :port if not the usual)</string>
     <string name="add_share">Share on the server</string>
     <string name="add_export">Export on the server</string>
     <string name="add_user">User</string>
