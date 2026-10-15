@@ -365,6 +365,37 @@ func (d *Daemon) SetShuttleSetting(name, key, text string) error {
 	return nil
 }
 
+// ProfileSettings are the named profile's settings as rows, as its editor
+// in the TUI shows them, from the config file as it is on disk.
+func (d *Daemon) ProfileSettings(name string) ([]config.RowState, error) {
+	data, err := os.ReadFile(d.o.Paths.Config)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrConfig, err)
+	}
+	return config.ProfileRows(data, name)
+}
+
+// SetProfileSetting sets one of the named profile's settings in the config
+// file, as SetShuttleSetting does a shuttle's (config.SetProfileRow); every
+// shuttle on the profile runs with it once the daemon has reloaded, at once.
+func (d *Daemon) SetProfileSetting(name, key, text string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	d.editMu.Lock()
+	changed, err := config.SetProfileRow(d.o.Paths.Config, home, name, key, text)
+	d.editMu.Unlock()
+	if err != nil {
+		return err
+	}
+	if changed {
+		d.o.Log.Info("setting changed", "profile", name, "key", key)
+		d.askReload()
+	}
+	return nil
+}
+
 func (d *Daemon) askReload() {
 	select {
 	case d.reload <- struct{}{}:
