@@ -55,6 +55,7 @@
     <string name="detail_errors">Files that could not be synced</string>
     <string name="detail_refused">Names left out: the phone cannot hold them</string>
     <string name="settings">Settings</string>
+    <string name="edit">Edit</string>
     <string name="settings_title">%1$s: settings</string>
     <string name="settings_from">from %1$s</string>
     <string name="settings_own">its own</string>
@@ -100,6 +101,9 @@
     <string name="share_deleted">Deleted the share %1$s.</string>
     <string name="profiles_none">No profiles yet. A profile is a set of settings that shuttles share.</string>
     <string name="wizard_add">Add a shuttle</string>
+    <string name="wizard_edit">Edit %1$s</string>
+    <string name="wizard_moved">%1$s now syncs other folders: it starts afresh, as on its first sync. Nothing is deleted; files that differ on the two sides are kept as conflicts.</string>
+    <string name="wizard_moved_save">Save</string>
     <string name="wizard_share_title">Name and share</string>
     <string name="wizard_name">The shuttle\'s name</string>
     <string name="wizard_share_none">There is no share yet: add one on the Shares tab.</string>

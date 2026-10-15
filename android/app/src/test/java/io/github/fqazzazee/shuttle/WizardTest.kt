@@ -21,6 +21,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -291,5 +292,29 @@ class WizardTest {
         compose.onNodeWithText("Save the shuttle").performClick()
         assertEquals(1, saved)
         compose.onNodeWithText("Mode").assertExists()
+    }
+
+    // A saved shuttle keeps its name, and says whose wizard it is.
+    @Test
+    fun anEditKeepsItsName() {
+        val shares = listOf(ShareRow("nas", "smb", "nas.example/home", emptyList(), "", "", false))
+        compose.setContent {
+            CompositionLocalProvider(LocalWizardEditing provides "photos") { WizardShareStep(shares, "nas", "photos", null, {}, {}, {}) {} }
+        }
+        compose.onNodeWithText("Edit photos").assertExists()
+        compose.onNodeWithText("The shuttle's name").assertIsNotEnabled()
+        compose.onNodeWithText("Next").assertIsEnabled()
+    }
+
+    @Test
+    fun aMoveIsAskedAbout() {
+        var saved = 0
+        var cancelled = 0
+        compose.setContent { MovedDialog("photos", { saved++ }) { cancelled++ } }
+        compose.onNodeWithText("photos now syncs other folders", substring = true).assertExists()
+        compose.onNodeWithText("Save").performClick()
+        compose.onNodeWithText("Cancel").performClick()
+        assertEquals(1, saved)
+        assertEquals(1, cancelled)
     }
 }

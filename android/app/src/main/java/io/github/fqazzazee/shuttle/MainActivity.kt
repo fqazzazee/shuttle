@@ -35,6 +35,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -82,6 +83,8 @@ class MainActivity : ComponentActivity() {
     private var wizardProblem by mutableStateOf<String?>(null)
     // Bumped after the draft changes: its rows are read again.
     private var draftRev by mutableStateOf(0)
+    // An edit that moves the shuttle, asked about before it is saved.
+    private var askMoved by mutableStateOf(false)
     // Bumped by Try again: the folder is read again.
     private var browseTry by mutableStateOf(0)
     private var profileOf by mutableStateOf<String?>(null)
@@ -142,7 +145,7 @@ class MainActivity : ComponentActivity() {
                                     } else if (json != null) {
                                         // Back to the list, by the button or Android's back gesture.
                                         BackHandler { selected = null }
-                                        DetailScreen(Detail.parse(json), { selected = null }) { settingsOf = selected }
+                                        DetailScreen(Detail.parse(json), { selected = null }, { selected?.let(::editWizard) }) { settingsOf = selected }
                                     } else {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
@@ -346,6 +349,11 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Wizard(w: WizardState) {
+        CompositionLocalProvider(LocalWizardEditing provides if (w.editing) w.name else "") { WizardScreen(w) }
+    }
+
+    @Composable
+    private fun WizardScreen(w: WizardState) {
         when (w.step) {
             WizardStep.SHARE -> {
                 val shares = runCatching { Core.current?.sharesJSON() }.getOrNull()?.let(ShareRow::parseAll) ?: emptyList()
@@ -407,9 +415,10 @@ class MainActivity : ComponentActivity() {
                             e.message
                         }
                     },
-                    head = { WizardSaveHead(w.profile, wizardProblem, ::saveDraft) },
+                    head = { WizardSaveHead(w.profile, wizardProblem) { saveDraft(false) } },
                     onBack = ::wizardBack,
                 )
+                if (askMoved) MovedDialog(w.name, { askMoved = false; saveDraft(true) }) { askMoved = false }
             }
         }
     }
@@ -490,15 +499,43 @@ class MainActivity : ComponentActivity() {
         if (wizardProblem == null) wizard = next
     }
 
-    /** Saves the wizard's shuttle and closes it; the daemon follows the file. Else says why. */
-    private fun saveDraft() {
+    /**
+     * Saves the wizard's shuttle and closes it; the daemon follows the file. Else says why. An edit
+     * that moves the shuttle is asked about first, unless that was answered.
+     */
+    private fun saveDraft(moveAsked: Boolean) {
         wizardProblem = try {
-            draft?.save() ?: throw IllegalStateException(getString(R.string.add_no_daemon))
+            val d = draft ?: throw IllegalStateException(getString(R.string.add_no_daemon))
+            if (!moveAsked && d.moved()) {
+                askMoved = true
+                return
+            }
+            d.save()
             null
         } catch (e: Exception) {
             e.message
         }
         if (wizardProblem == null) closeWizard()
+    }
+
+    /** Opens the wizard on a saved shuttle, at its first step, with its folders, marks and profile. */
+    private fun editWizard(name: String) {
+        val d = try {
+            Core.current?.editDraft(name)
+        } catch (e: Exception) {
+            Log.w("shuttle", "edit $name: ${e.message}")
+            null
+        } ?: return
+        val o = JSONObject(d.json())
+        val folder = o.getString("Folder")
+        picker = Mobile.newPicker(folder).also { it.setSelection(o.getJSONObject("Selection").toString()) }
+        marksRev++
+        draft = d
+        wizardProblem = null
+        wizard = WizardState(
+            share = o.getString("Share"), dir = folder, inner = folder, local = o.getString("Local"),
+            name = name, profile = o.optString("Profile"), editing = true,
+        )
     }
 
     private fun wizardBack() {

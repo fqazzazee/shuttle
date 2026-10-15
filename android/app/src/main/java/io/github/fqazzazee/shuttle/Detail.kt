@@ -65,9 +65,12 @@ data class Detail(
     }
 }
 
-/** The selected shuttle in full, as the TUI's panel: label and value, then what failed and what was left out. */
+/**
+ * The selected shuttle in full, as the TUI's panel: label and value, then what failed and what was
+ * left out. Edit opens it in the wizard; Settings, its settings alone.
+ */
 @Composable
-fun DetailScreen(d: Detail, onBack: () -> Unit, onSettings: () -> Unit) {
+fun DetailScreen(d: Detail, onBack: () -> Unit, onEdit: () -> Unit, onSettings: () -> Unit) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -75,6 +78,7 @@ fun DetailScreen(d: Detail, onBack: () -> Unit, onSettings: () -> Unit) {
         Row(Modifier.fillMaxWidth()) {
             TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = onEdit) { Text(stringResource(R.string.edit)) }
             TextButton(onClick = onSettings) { Text(stringResource(R.string.settings)) }
         }
         Text("${d.arrow} ${d.name}", style = MaterialTheme.typography.headlineMedium)

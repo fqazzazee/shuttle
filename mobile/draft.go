@@ -5,6 +5,9 @@ package mobile
 import (
 	"encoding/json"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/fqazzazee/shuttle/internal/config"
@@ -22,6 +25,64 @@ type Draft struct {
 // NewDraft is a new shuttle, for the wizard.
 func (m *Daemon) NewDraft() *Draft {
 	return &Draft{path: m.configPath, d: config.Draft{New: true, Settings: map[string]string{}}}
+}
+
+// EditDraft is the named shuttle as the config file has it, for the wizard
+// to edit. It keeps its name.
+func (m *Daemon) EditDraft(name string) (*Draft, error) {
+	d := &Draft{path: m.configPath}
+	data, _, err := d.read()
+	if err != nil {
+		return nil, err
+	}
+	dd, err := config.DraftOf(data, name)
+	if err != nil {
+		return nil, err
+	}
+	d.d = *dd
+	return d, nil
+}
+
+// draftJSON is where a shuttle syncs, for the wizard to start from.
+type draftJSON struct {
+	Name, Share string
+	Folder      string // a slash path from the share's top
+	Local       string // a full path
+	Profile     string
+	Selection   struct{ Include, Exclude []string }
+}
+
+// JSON is where the shuttle syncs and its profile, for the wizard to start
+// its steps from: {"Name": "photos", "Share": "nas", "Folder": "/Photos",
+// "Local": "/storage/emulated/0/DCIM", "Profile": "", "Selection":
+// {"Include": ["2024"], "Exclude": null}}, the selection as a Picker's
+// SetSelection takes it.
+func (d *Draft) JSON() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := draftJSON{Name: d.d.Name, Profile: d.d.Profile, Local: d.d.Local}
+	share, folder, _ := strings.Cut(d.d.Remote, ":")
+	out.Share, out.Folder = share, path.Clean("/"+folder)
+	if rest, ok := strings.CutPrefix(out.Local, "~/"); ok {
+		if home, err := os.UserHomeDir(); err == nil {
+			out.Local = filepath.Join(home, rest)
+		}
+	}
+	out.Selection.Include, out.Selection.Exclude = d.d.Include, d.d.Exclude
+	return toJSON(out)
+}
+
+// Moved reports whether the edit syncs other folders than the shuttle
+// does: it then starts afresh, as on its first run, which the wizard asks
+// about before it saves.
+func (d *Draft) Moved() (bool, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	data, home, err := d.read()
+	if err != nil {
+		return false, err
+	}
+	return d.d.Moved(data, home)
 }
 
 // SetName names the new shuttle, and says why the name will not do: empty,

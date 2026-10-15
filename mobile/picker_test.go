@@ -49,3 +49,23 @@ func TestPicker(t *testing.T) {
 		t.Error("a listing that is not JSON taken")
 	}
 }
+
+// A shuttle the wizard edits starts from what it selects.
+func TestPickerSetSelection(t *testing.T) {
+	p := NewPicker("/top")
+	if err := p.Listed("/top", `[{"Name":"a","Dir":true},{"Name":"z.txt","Dir":false}]`); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.SetSelection(`{"Include":["a"],"Exclude":null}`); err != nil {
+		t.Fatal(err)
+	}
+	if p.Mode() != PickInclude || p.Synced("/top/a") != SyncedAll || p.Synced("/top/z.txt") != SyncedNone {
+		t.Errorf("include a: mode %d, a %d, z.txt %d", p.Mode(), p.Synced("/top/a"), p.Synced("/top/z.txt"))
+	}
+	if got := p.SelectionJSON(); got != `{"Include":["a"],"Exclude":null}` {
+		t.Errorf("read back: %s", got)
+	}
+	if err := p.SetSelection("{"); err == nil {
+		t.Error("bad JSON taken")
+	}
+}
