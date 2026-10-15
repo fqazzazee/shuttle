@@ -837,3 +837,34 @@ func TestAllowDeletions(t *testing.T) {
 		t.Error("a file still on the phone was deleted from the share")
 	}
 }
+
+// The Shares tab's rows: where each share is, who uses it, and its state.
+func TestSharesJSON(t *testing.T) {
+	f := newFixture(t)
+	doc := mustRead(t, f.opts.ConfigPath) + "\n[shares.nas]\ntype = \"smb\"\nhost = \"nas.invalid\"\nport = 1445\nshare = \"home\"\nuser = \"user\"\n"
+	if err := os.WriteFile(f.opts.ConfigPath, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	if _, err := m.SyncAndWait("s", 10_000); err != nil {
+		t.Fatal(err)
+	}
+	var rows []struct {
+		Name, Type, Where, State, Room string
+		UsedBy                         []string
+	}
+	if err := json.Unmarshal([]byte(m.SharesJSON()), &rows); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows = %s", m.SharesJSON())
+	}
+	mnt, nas := rows[0], rows[1]
+	if mnt.Name != "mnt" || mnt.Type != "path" || mnt.Where != f.share || !slices.Equal(mnt.UsedBy, []string{"s"}) ||
+		mnt.State != "online" || !strings.Contains(mnt.Room, "free of") {
+		t.Errorf("mnt = %+v", mnt)
+	}
+	if nas.Name != "nas" || nas.Where != "smb://user@nas.invalid:1445/home" || len(nas.UsedBy) != 0 || nas.State != "" || nas.Room != "" {
+		t.Errorf("nas = %+v", nas)
+	}
+}

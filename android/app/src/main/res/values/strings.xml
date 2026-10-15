@@ -81,6 +81,12 @@
     <string name="activity_no_problems">No problems in the activity shown.</string>
     <string name="activity_reading">Reading the activity…</string>
     <string name="activity_none">Nothing yet: entries appear as shuttles copy, delete or run into problems.</string>
+    <string name="shares_none">No shares yet.</string>
+    <string name="share_online">Online</string>
+    <string name="share_offline">Offline</string>
+    <string name="share_unknown">Not looked at yet</string>
+    <string name="share_unused">No shuttle uses it</string>
+    <string name="share_used_by">Used by %1$s</string>
     <string name="sync_now">Sync now</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>

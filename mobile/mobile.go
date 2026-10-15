@@ -18,9 +18,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -632,6 +634,57 @@ func (m *Daemon) AllowDeletions(name string) error { return m.d.AllowDeletions(n
 
 // resolveTimeout bounds Resolve: a run in progress finishes its file first.
 const resolveTimeout = 2 * time.Minute
+
+// shareRow is one share as the Shares tab lists it, as the TUI's does.
+type shareRow struct {
+	Name, Type, Where string
+	UsedBy            []string // the shuttles on it
+	State             string   // "online" while any of its shuttles reaches it, "offline", or "" before a look
+	Room              string   // "1.2 TB free of 4.0 TB" from its shuttles' latest run; "" until known
+	Low               bool     // under a tenth left
+}
+
+// SharesJSON is every share in the config, by name, as a JSON array.
+func (m *Daemon) SharesJSON() string {
+	cfg := m.d.Config()
+	statuses := map[string]*daemon.Status{}
+	all := m.d.Statuses()
+	for i := range all {
+		statuses[all[i].Name] = &all[i]
+	}
+	out := []shareRow{}
+	for _, name := range slices.Sorted(maps.Keys(cfg.Shares)) {
+		sh := cfg.Shares[name]
+		r := shareRow{Name: name, Type: string(sh.Type), Where: present.Where(&sh), UsedBy: []string{}}
+		var room fsys.Space
+		var at time.Time
+		for i := range cfg.Shuttles {
+			s := &cfg.Shuttles[i]
+			if s.Share != name {
+				continue
+			}
+			r.UsedBy = append(r.UsedBy, s.Name)
+			st := statuses[s.Name]
+			if st == nil {
+				continue
+			}
+			switch {
+			case st.Share == daemon.ShareOnline:
+				r.State = daemon.ShareOnline
+			case st.Share == daemon.ShareOffline && r.State == "":
+				r.State = daemon.ShareOffline
+			}
+			if st.RemoteSpace.Total > 0 && st.LastRun.After(at) {
+				room, at = st.RemoteSpace, st.LastRun
+			}
+		}
+		if room.Total > 0 {
+			r.Room, r.Low = present.Room(room), present.Low(room)
+		}
+		out = append(out, r)
+	}
+	return toJSON(out)
+}
 
 // SyncNow asks for a run of a shuttle.
 func (m *Daemon) SyncNow(name string) error { return m.d.SyncNow(name) }
