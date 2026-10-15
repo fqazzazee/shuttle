@@ -10,6 +10,7 @@ class NoticesTest {
     fun parsesTheCoresNote() {
         val json = """{"Key":"error/docs","Kind":"errors","Summary":"docs: sync failed","Body":"2 paths could not be synced\nx: busy","Open":""}"""
         assertEquals(Notice("error/docs", "errors", "docs: sync failed", "2 paths could not be synced\nx: busy"), Notice.parse(json))
+        assertEquals("conflicts", Notice.parse("""{"Kind":"conflicts","Summary":"s","Open":"conflicts"}""").open)
     }
 
     @Test
