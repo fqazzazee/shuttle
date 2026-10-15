@@ -675,6 +675,7 @@ type detail struct {
 	Syncs, Runs, LastRun, Now  string
 	Waiting, Attention         string // why it waits for a permission; what needs the user
 	Errors, Refused            []engine.Issue
+	Enabled                    bool
 }
 
 // DetailJSON is the named shuttle in full, as JSON, for the screen it opens
@@ -692,7 +693,7 @@ func (m *Daemon) DetailJSON(name string) (string, error) {
 	}
 	d := detail{Name: name, Mode: string(st.Mode), Arrow: present.ModeArrow(st.Mode),
 		Now: present.Progress(&st.Progress), Waiting: st.Waiting, Attention: present.Attention(st),
-		Errors: st.Errors, Refused: st.Refused}
+		Errors: st.Errors, Refused: st.Refused, Enabled: st.State != daemon.StateDisabled}
 	if st.LocalSpace.Total > 0 {
 		d.LocalRoom, d.LocalLow = present.Room(st.LocalSpace), present.Low(st.LocalSpace)
 	}
@@ -962,6 +963,19 @@ func (m *Daemon) SetPaused(name string, paused bool) error { return m.d.SetPause
 
 // SetEnabled turns a shuttle on or off in the config.
 func (m *Daemon) SetEnabled(name string, on bool) error { return m.d.SetEnabled(name, on) }
+
+// DeleteShuttle removes the named shuttle from the config, as the TUI's
+// does: its files stay where they are, on both sides. The daemon follows
+// the file, and the app forgets its pause with it.
+func (m *Daemon) DeleteShuttle(name string) error {
+	return m.edit(func(d *config.Doc) error {
+		table := []string{"shuttles", name}
+		if !d.HasTable(table) {
+			return fmt.Errorf("there is no shuttle named %s", name)
+		}
+		return d.DeleteTable(table)
+	})
+}
 
 // SetPermissions says which permissions the user has given now, as the app
 // finds them each time it comes to the foreground: shuttles waiting for one

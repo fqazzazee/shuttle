@@ -56,6 +56,12 @@
     <string name="detail_refused">Names left out: the phone cannot hold them</string>
     <string name="settings">Settings</string>
     <string name="edit">Edit</string>
+    <string name="enable">Enable</string>
+    <string name="disable">Disable</string>
+    <string name="delete">Delete</string>
+    <string name="delete_shuttle">Delete…</string>
+    <string name="delete_shuttle_ask">Delete the shuttle %1$s from the config? Its files stay where they are, on both sides.</string>
+    <string name="detail_disabled">Disabled: it does not run, by itself or when asked, until it is enabled.</string>
     <string name="settings_title">%1$s: settings</string>
     <string name="settings_from">from %1$s</string>
     <string name="settings_own">its own</string>

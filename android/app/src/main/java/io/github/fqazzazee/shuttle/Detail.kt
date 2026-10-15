@@ -12,11 +12,17 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -47,6 +53,7 @@ data class Detail(
     val attention: String,
     val errors: List<PathIssue>,
     val refused: List<PathIssue>,
+    val enabled: Boolean = true,
 ) {
     companion object {
         fun parse(json: String): Detail {
@@ -59,27 +66,38 @@ data class Detail(
                 o.optString("Local"), o.optString("Remote"), o.optString("LocalRoom"), o.optString("RemoteRoom"),
                 o.optBoolean("LocalLow"), o.optBoolean("RemoteLow"), o.optString("Syncs"), o.optString("Runs"),
                 o.optString("LastRun"), o.optString("Now"), o.optString("Waiting"), o.optString("Attention"),
-                issues("Errors"), issues("Refused"),
+                issues("Errors"), issues("Refused"), o.optBoolean("Enabled", true),
             )
         }
     }
 }
 
+/** What the shuttle's screen does; delete returns why it was refused, or null. */
+class DetailActions(
+    val back: () -> Unit,
+    val edit: () -> Unit,
+    val settings: () -> Unit,
+    val setEnabled: (Boolean) -> Unit,
+    val delete: () -> String?,
+)
+
 /**
  * The selected shuttle in full, as the TUI's panel: label and value, then what failed and what was
- * left out. Edit opens it in the wizard; Settings, its settings alone.
+ * left out. Edit opens it in the wizard; Settings, its settings alone. Below, it is turned off or on,
+ * or deleted, once asked: its files stay where they are.
  */
 @Composable
-fun DetailScreen(d: Detail, onBack: () -> Unit, onEdit: () -> Unit, onSettings: () -> Unit) {
+fun DetailScreen(d: Detail, actions: DetailActions) {
+    var deleting by remember { mutableStateOf(false) }
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(Modifier.fillMaxWidth()) {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+            TextButton(onClick = actions.back) { Text(stringResource(R.string.back)) }
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onEdit) { Text(stringResource(R.string.edit)) }
-            TextButton(onClick = onSettings) { Text(stringResource(R.string.settings)) }
+            TextButton(onClick = actions.edit) { Text(stringResource(R.string.edit)) }
+            TextButton(onClick = actions.settings) { Text(stringResource(R.string.settings)) }
         }
         Text("${d.arrow} ${d.name}", style = MaterialTheme.typography.headlineMedium)
         Text(
@@ -99,7 +117,35 @@ fun DetailScreen(d: Detail, onBack: () -> Unit, onEdit: () -> Unit, onSettings: 
         Line(R.string.detail_attention, d.attention, bad)
         Issues(R.string.detail_errors, d.errors)
         Issues(R.string.detail_refused, d.refused)
+        HorizontalDivider()
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { actions.setEnabled(!d.enabled) }) { Text(stringResource(if (d.enabled) R.string.disable else R.string.enable)) }
+            OutlinedButton(onClick = { deleting = true }) { Text(stringResource(R.string.delete_shuttle)) }
+        }
+        if (!d.enabled) Text(stringResource(R.string.detail_disabled), style = MaterialTheme.typography.bodySmall)
     }
+    if (deleting) DeleteShuttleDialog(d.name, actions.delete) { deleting = false }
+}
+
+@Composable
+private fun DeleteShuttleDialog(name: String, delete: () -> String?, close: () -> Unit) {
+    var refused by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = close,
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.delete_shuttle_ask, name))
+                refused?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                refused = delete()
+                if (refused == null) close()
+            }) { Text(stringResource(R.string.delete)) }
+        },
+        dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.add_cancel)) } },
+    )
 }
 
 private fun withRoom(folder: String, room: String) = if (room.isEmpty()) folder else "$folder\n$room"
