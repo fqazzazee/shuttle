@@ -5,6 +5,7 @@ package daemon
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -280,6 +281,47 @@ func (d *Daemon) SetEnabled(name string, on bool) error {
 	// caught up with it yet.
 	d.askReload()
 	return nil
+}
+
+// EditConfig changes the config file through its editor (config.Doc), which
+// keeps the rest of the file as written, and applies the result as a reload.
+// The change must leave a config that loads: if not, the file is left alone.
+// A file another editor saved meanwhile is read again and the change made
+// to it. A missing file is an empty one, as on a phone before its first
+// shuttle.
+func (d *Daemon) EditConfig(change func(*config.Doc) error) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	d.editMu.Lock()
+	defer d.editMu.Unlock()
+	for range 3 {
+		before, err := os.ReadFile(d.o.Paths.Config)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			before = nil
+		case err != nil:
+			return err
+		}
+		doc, err := config.ParseDoc(before)
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrConfig, err)
+		}
+		if err := change(doc); err != nil {
+			return err
+		}
+		err = config.Save(d.o.Paths.Config, before, doc.Bytes(), home)
+		if errors.Is(err, config.ErrChanged) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		d.askReload()
+		return nil
+	}
+	return config.ErrChanged
 }
 
 // ShuttleSettings are the named shuttle's settings as rows, as its editor in

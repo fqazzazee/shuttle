@@ -3,6 +3,7 @@
 package mobile
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -579,5 +580,67 @@ func TestWorkJSONLeavesOutHeldShuttles(t *testing.T) {
 	m.SetPermissions(false, true) // the fixture's folders are not in shared storage: no wait
 	if got := m.WorkJSON(); !strings.Contains(got, `"Name":"s"`) {
 		t.Errorf("resumed: work = %s, want s's", got)
+	}
+}
+
+// A phone's first share and shuttle, into a config that does not exist yet,
+// and the daemon runs the shuttle once it has reloaded.
+func TestAddShareAndShuttle(t *testing.T) {
+	f := newFixture(t)
+	if err := os.Remove(f.opts.ConfigPath); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	pw := f.opts.Passwords.(*passwords)
+
+	share := fmt.Sprintf(`{"Name": "card", "Type": "path", "Path": %q}`, f.share)
+	if space, err := m.TestShare(share, ""); err != nil || !strings.Contains(space, `"Free"`) {
+		t.Fatalf("TestShare = %s, %v", space, err)
+	}
+	if err := m.AddShare(share, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.AddShare(share, ""); err == nil || !strings.Contains(err.Error(), "already") {
+		t.Errorf("the same share twice: %v", err)
+	}
+	if err := m.AddShare(`{"Name": "nas", "Type": "smb", "Host": "nas.invalid", "Share": "home", "User": "user"}`, "fake-pw"); err != nil {
+		t.Fatal(err)
+	}
+	if pw.m["smb://user@nas.invalid/home"] != "fake-pw" {
+		t.Errorf("passwords = %v, want the share's stored", pw.m)
+	}
+
+	shuttle := fmt.Sprintf(`{"Name": "photos", "Share": "card", "Folder": "", "Local": %q, "Mode": "push",
+		"Triggers": ["schedule"], "Interval": "1h"}`, f.local)
+	if err := m.AddShuttle(shuttle); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.AddShuttle(shuttle); err == nil || !strings.Contains(err.Error(), "already") {
+		t.Errorf("the same shuttle twice: %v", err)
+	}
+	// One that would not load is refused, and the file left alone.
+	before, _ := os.ReadFile(f.opts.ConfigPath)
+	if err := m.AddShuttle(`{"Name": "bad", "Share": "nowhere", "Local": "/tmp/x", "Mode": "push"}`); err == nil {
+		t.Error("a shuttle on no share taken")
+	}
+	if after, _ := os.ReadFile(f.opts.ConfigPath); !bytes.Equal(before, after) {
+		t.Errorf("config changed by a refused shuttle:\n%s", after)
+	}
+	for _, want := range []string{"[shares.card]", "[shares.nas]", "[shuttles.photos]", `remote = "card:"`, `triggers = ["schedule"]`, `interval = "1h"`} {
+		if !strings.Contains(string(before), want) {
+			t.Errorf("config lacks %s:\n%s", want, before)
+		}
+	}
+
+	// The daemon runs it: never ran, so its schedule is due.
+	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(m.StatusesJSON(), `"Name":"photos"`) || !strings.Contains(m.StatusesJSON(), `"Copied":1`) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the new shuttle did not run: %s", m.StatusesJSON())
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
