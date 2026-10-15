@@ -682,7 +682,7 @@ func TestDetailJSON(t *testing.T) {
 	}
 	var d struct {
 		Name, Arrow, Local, Remote, Syncs, Runs, LastRun, LocalRoom string
-		Errors                                                       []engine.Issue
+		Errors                                                      []engine.Issue
 	}
 	if err := json.Unmarshal([]byte(out), &d); err != nil {
 		t.Fatal(err)
