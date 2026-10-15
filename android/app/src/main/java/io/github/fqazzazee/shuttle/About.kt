@@ -173,7 +173,7 @@ fun AboutScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } }
-        item { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium) }
+        item { ShuttleLogo(Modifier.fillMaxWidth().padding(vertical = 8.dp)) }
         item { Text(stringResource(R.string.about_version, version), style = MaterialTheme.typography.bodyLarge) }
         item {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

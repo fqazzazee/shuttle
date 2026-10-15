@@ -785,7 +785,7 @@ private fun Main(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+        ShuttleLogo(Modifier.fillMaxWidth(0.85f).padding(vertical = 4.dp))
         if (forceStopped && statuses.isNotEmpty()) ForceStopped(onSeen)
         MissingPermissions(access, onAllow)
         startError?.let { Text(stringResource(R.string.start_failed, it), color = MaterialTheme.colorScheme.error) }
