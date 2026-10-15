@@ -334,12 +334,20 @@ jobs:
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n ci -k "$IMAGE"
           nohup "$ANDROID_HOME/emulator/emulator" -avd ci -no-window -no-audio -no-boot-anim -no-snapshot \
             -gpu swiftshader_indirect -memory 4096 -accel on > emulator.log 2>&1 &
-          adb wait-for-device
+          # Ten minutes to boot, or the emulator's log says why not.
+          booted=no
           for i in $(seq 120); do
-            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
+            if [ "$(timeout 10 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; then
+              booted=yes
+              break
+            fi
             sleep 5
           done
-          [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]
+          if [ "$booted" != yes ]; then
+            echo "the emulator did not boot:"
+            tail -100 emulator.log
+            exit 1
+          fi
           adb shell wm dismiss-keyguard
           for s in window_animation_scale transition_animation_scale animator_duration_scale; do
             adb shell settings put global "$s" 0
