@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.time.Instant
@@ -64,17 +65,54 @@ data class ConflictItem(val shuttle: String, val path: String, val reason: Strin
     }
 }
 
-/** The Conflicts tab: what waits for the user, and how to settle each. resolve runs off the main thread. */
+/** A shuttle's deletions the deletion guard held back: too large a share of its files at once. */
+data class HeldDeletions(val shuttle: String, val count: Int) {
+    companion object {
+        /** The shuttles holding deletions, from their statuses as JSON. */
+        fun of(statuses: Map<String, String>): List<HeldDeletions> = statuses.toSortedMap().values.mapNotNull { json ->
+            val st = JSONObject(json)
+            st.optInt("HeldDeletions").takeIf { it > 0 }?.let { HeldDeletions(st.getString("Name"), it) }
+        }
+    }
+}
+
+/**
+ * The Conflicts tab: what waits for the user, and how to settle each, then deletions the guard held
+ * back, to allow. resolve and allow run off the main thread.
+ */
 @Composable
-fun ConflictsScreen(items: List<ConflictItem>, error: String?, resolve: (ConflictItem, Keep) -> Unit) {
+fun ConflictsScreen(
+    items: List<ConflictItem>,
+    held: List<HeldDeletions>,
+    error: String?,
+    resolve: (ConflictItem, Keep) -> Unit,
+    allow: (String) -> Unit,
+) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.tab_conflicts), style = MaterialTheme.typography.headlineMedium)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        if (items.isEmpty()) Text(stringResource(R.string.conflicts_none))
+        if (items.isEmpty() && held.isEmpty()) Text(stringResource(R.string.conflicts_none))
         for (c in items) ConflictCard(c, resolve)
+        for (h in held) HeldCard(h, allow)
+    }
+}
+
+@Composable
+private fun HeldCard(h: HeldDeletions, allow: (String) -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                pluralStringResource(R.plurals.held_deletions, h.count, h.shuttle, h.count),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(stringResource(R.string.held_deletions_why), style = MaterialTheme.typography.bodyMedium)
+            androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { allow(h.shuttle) }) { Text(stringResource(R.string.held_deletions_allow)) }
+            }
+        }
     }
 }
 

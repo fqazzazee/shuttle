@@ -28,7 +28,7 @@ class ConflictsTest {
             {"Path":"x","Op":9,"Reason":"a file here, a folder on the share","Outcome":"held","Local":${file(3)},"Remote":$dir}]}""",
         "docs" to """{"Name":"docs","Conflicts":[
             {"Path":"Readme.md","Op":9,"Reason":"differs only in case from README.md","Outcome":"held","Local":null,"Remote":${file(9)}}]}""",
-        "music" to """{"Name":"music","Conflicts":null}""",
+        "music" to """{"Name":"music","Conflicts":null,"HeldDeletions":15}""",
     )
 
     @Test
@@ -49,7 +49,7 @@ class ConflictsTest {
     @Test
     fun settlesFromItsCard() {
         val done = mutableListOf<Pair<String, Keep>>()
-        compose.setContent { ConflictsScreen(ConflictItem.held(statuses), null) { c, k -> done += c.path to k } }
+        compose.setContent { ConflictsScreen(ConflictItem.held(statuses), emptyList(), null, { c, k -> done += c.path to k }) {} }
         compose.onNodeWithText("Rename one of them yourself: the phone cannot keep both names.").assertExists()
         compose.onNodeWithText("Keep the share's").performScrollTo().performClick()
         assertEquals(listOf("a.jpg" to Keep.REMOTE), done)
@@ -57,7 +57,18 @@ class ConflictsTest {
 
     @Test
     fun noneWaiting() {
-        compose.setContent { ConflictsScreen(emptyList(), null) { _, _ -> } }
+        compose.setContent { ConflictsScreen(emptyList(), emptyList(), null, { _, _ -> }) {} }
         compose.onNodeWithText("No conflicts waiting for you.").assertExists()
+    }
+
+    @Test
+    fun heldDeletionsAndTheirAllow() {
+        assertEquals(listOf(HeldDeletions("music", 15)), HeldDeletions.of(statuses))
+        val allowed = mutableListOf<String>()
+        compose.setContent { ConflictsScreen(emptyList(), HeldDeletions.of(statuses), null, { _, _ -> }) { allowed += it } }
+        compose.onNodeWithText("music: 15 deletions held back").assertExists()
+        compose.onNodeWithText("No conflicts waiting for you.").assertDoesNotExist()
+        compose.onNodeWithText("Allow them").performScrollTo().performClick()
+        assertEquals(listOf("music"), allowed)
     }
 }
