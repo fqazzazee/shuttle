@@ -87,4 +87,16 @@ class ShareEditorTest {
         // An IPv6 address is not a host and a port.
         assertEquals("fe80::1" to null, splitPort("fe80::1"))
     }
+
+    // Each field says what goes in it by example; the examples follow the share's type.
+    @Test
+    fun examplesForEachType() {
+        compose.setContent { ShareEditor(ShareForm(), true, emptyList(), false, null, ShareActions({}, {}, {}, {})) }
+        compose.onNodeWithText("e.g. home, Photos or public: the name the server shares it by, not a folder path").assertExists()
+        compose.onNodeWithText("smb://192.168.1.20/home", substring = true).assertExists()
+        compose.onNodeWithText("NFS").performClick()
+        compose.onNodeWithText("e.g. /volume1/photos (Synology), /mnt/tank/media (TrueNAS) or /srv/nfs/data").assertExists()
+        compose.onNodeWithText("nfs://192.168.1.20/volume1/photos", substring = true).assertExists()
+        compose.onNodeWithText("The account on the server, e.g. alex").assertDoesNotExist()
+    }
 }
