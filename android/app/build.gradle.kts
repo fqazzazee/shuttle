@@ -56,7 +56,7 @@ dependencies {
 }
 
 // Robolectric reaches into the JDK for file descriptors (jdk.internal.access.SharedSecrets),
-// which newer JDKs than CI's 17 keep closed.
+// which JDKs from 22 on keep closed (CI runs 21).
 tasks.withType<Test>().configureEach {
     jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED")
 }
