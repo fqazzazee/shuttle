@@ -85,7 +85,7 @@ def main():
         names = licenses(poms, coords)
         used.update(names)
         group, artifact, version = coords.split(":")
-        print(f"{group}:{artifact} {version}: {', '.join(names)}")
+        print(f"- {group}:{artifact} {version}: {', '.join(names)}")
     for name in sorted(used):
         print(f"\n{rule}\n== {name}\n")
         print((ROOT / "packaging/licenses" / TEXTS[name]).read_text(encoding="utf-8"), end="")
