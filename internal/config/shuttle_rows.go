@@ -9,13 +9,13 @@ import (
 	"slices"
 )
 
-// RowState is a setting's row as it stands for one shuttle: what the
-// shuttle sets itself, what applies where it does not, and whether the row
-// applies at all.
+// RowState is a setting's row as it stands for one shuttle, or one
+// profile: what it sets itself, what applies where it does not, and
+// whether the row applies at all.
 type RowState struct {
 	Row
-	Value     string // the shuttle's own, as typed; "" when it sets none
-	Inherited string // what applies when it sets none: its profile's, else the default
+	Value     string // the shuttle's (or profile's) own, as typed; "" when it sets none
+	Inherited string // what applies when it sets none: a shuttle's profile's, else the default
 	From      string // where Inherited comes from: "profile <name>", or "default"
 	Off       string // why the row does not apply as things stand; "" when it does
 }
@@ -27,20 +27,26 @@ func ShuttleRows(data []byte, name string) ([]RowState, error) {
 	if err != nil {
 		return nil, err
 	}
+	return tableRows(own, base, "profile "+profile), nil
+}
+
+// tableRows are a table's settings as rows: own as written, over base, which
+// from names; past base, the defaults apply.
+func tableRows(own, base map[string]any, from string) []RowState {
 	value := func(key string) string { return RawText(Lookup(own, key)) }
 	effective := effectiveText(value, base)
 	rows := make([]RowState, 0, len(Rows))
 	for _, r := range Rows {
 		st := RowState{Row: r, Value: value(r.Key), Inherited: r.Default, From: "default"}
 		if v := RawText(Lookup(base, r.Key)); v != "" {
-			st.Inherited, st.From = v, "profile "+profile
+			st.Inherited, st.From = v, from
 		}
 		if r.Needs != nil {
 			st.Off = r.Needs(effective)
 		}
 		rows = append(rows, st)
 	}
-	return rows, nil
+	return rows
 }
 
 // SetShuttleRow sets the shuttle name's setting key to text in the config
@@ -62,6 +68,17 @@ func SetShuttleRow(path, home, name, key, text string) (changed bool, err error)
 }
 
 func setShuttleRow(path, home, name, key, text string) (bool, error) {
+	return setTableRow(path, home, []string{"shuttles", name}, key, text, func(data []byte) (own, base map[string]any, err error) {
+		own, base, _, err = shuttleTables(data, name)
+		return own, base, err
+	})
+}
+
+// setTableRow sets key to text in the config file's table, as its row
+// would, given its own settings and those under them (tables).
+func setTableRow(path, home string, table []string, key, text string,
+	tables func(data []byte) (own, base map[string]any, err error),
+) (bool, error) {
 	r := RowOf(key)
 	if r == nil {
 		return false, fmt.Errorf("%w: %s", ErrNoSetting, key)
@@ -73,7 +90,7 @@ func setShuttleRow(path, home, name, key, text string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	own, base, _, err := shuttleTables(before, name)
+	own, base, err := tables(before)
 	if err != nil {
 		return false, err
 	}
@@ -99,7 +116,7 @@ func setShuttleRow(path, home, name, key, text string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if err := WriteRow(doc, []string{"shuttles", name}, key, value, off); err != nil {
+	if err := WriteRow(doc, table, key, value, off); err != nil {
 		return false, err
 	}
 	return true, Save(path, before, doc.Bytes(), home)
