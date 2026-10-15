@@ -274,6 +274,12 @@ jobs:
           go-version: '1.26'
           check-latest: true
           cache: true
+      # Robolectric's Android 17 needs Java 21; the runner has it beside its
+      # default 17.
+      - name: use Java 21
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
       - name: install the NDK
         run: |
           ndk=$(sed -n 's/^NDK_VERSION *?= *//p' Makefile)

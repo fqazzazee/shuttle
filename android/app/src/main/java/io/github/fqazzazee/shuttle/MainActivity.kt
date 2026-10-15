@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
     private val pauses by lazy { Core.pauses(this) }
     private var pausedAll by mutableStateOf(false)
     private var adding by mutableStateOf(false)
+    private var tab by mutableStateOf(Tab.SHUTTLES)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -58,6 +59,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        openTab(intent)
         firstRunSeen = prefs.getBoolean(FIRST_RUN_SEEN, false)
         pausedAll = pauses.all
         // Opening the app after a force stop starts syncing again (the screen holds the daemon,
@@ -78,12 +80,29 @@ class MainActivity : ComponentActivity() {
                     } else if (adding) {
                         AddScreen { adding = false }
                     } else {
-                        Main(access, Core.statuses, Core.startError, forceStopped, { forceStopped = false }, ::allow, pausedAll, actions)
-                        { adding = true }
+                        AppTabs(tab, { tab = it }) { t ->
+                            when (t) {
+                                Tab.SHUTTLES -> Main(
+                                    access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
+                                    ::allow, pausedAll, actions,
+                                ) { adding = true }
+                                else -> Later(t)
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    // A notice's tap opens the app on its tab, whether the app was open or not.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openTab(intent)
+    }
+
+    private fun openTab(intent: Intent?) {
+        Tab.of(intent?.getStringExtra(Notices.EXTRA_TAB))?.let { tab = it }
     }
 
     // The screen holds the daemon while it is shown, and starts the foreground service if a
@@ -169,6 +188,15 @@ private fun Main(
             ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
         OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.add)) }
+    }
+}
+
+/** A tab whose screen comes in a later step of the app's phase. */
+@Composable
+private fun Later(tab: Tab) {
+    Column(Modifier.safeDrawingPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(tab.label), style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.tab_later))
     }
 }
 

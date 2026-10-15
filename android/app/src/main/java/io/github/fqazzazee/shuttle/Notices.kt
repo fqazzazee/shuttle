@@ -11,12 +11,12 @@ import android.content.Intent
 import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONObject
 
-/** What one notification says, as the desktop words it (the Go core's notice.Note). */
-data class Notice(val key: String, val kind: String, val summary: String, val body: String) {
+/** What one notification says, as the desktop words it (the Go core's notice.Note), and the tab it opens. */
+data class Notice(val key: String, val kind: String, val summary: String, val body: String, val open: String = "") {
     companion object {
         fun parse(json: String): Notice {
             val o = JSONObject(json)
-            return Notice(o.optString("Key"), o.getString("Kind"), o.getString("Summary"), o.optString("Body"))
+            return Notice(o.optString("Key"), o.getString("Kind"), o.getString("Summary"), o.optString("Body"), o.optString("Open"))
         }
     }
 }
@@ -50,6 +50,9 @@ fun tagOf(n: Notice, seq: Int) = n.key.ifEmpty { "${n.kind}#$seq" }
 object Notices {
     private val seq = AtomicInteger()
 
+    /** The tab the app opens on, from a notice's tap. */
+    const val EXTRA_TAB = "tab"
+
     /** Makes the channels; Android keeps them, and leaves the user's settings for each alone. */
     fun channels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -60,8 +63,12 @@ object Notices {
 
     /** Shows a notice in its channel. Without the notifications permission, Android drops it. */
     fun show(context: Context, n: Notice) {
+        // One pending intent per tab: Android would otherwise reuse the first, extras and all.
+        val tab = Tab.of(n.open)
         val open = PendingIntent.getActivity(
-            context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
+            context, tab?.ordinal ?: -1,
+            Intent(context, MainActivity::class.java).putExtra(EXTRA_TAB, tab?.name),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val note = Notification.Builder(context, Channel.of(n.kind).id)
             .setSmallIcon(R.drawable.ic_launcher_foreground)

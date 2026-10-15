@@ -37,6 +37,12 @@
     <string name="add_cancel">Cancel</string>
     <string name="add_missing">Still needed: %1$s</string>
     <string name="add_no_daemon">Syncing is not running; open the app again.</string>
+    <string name="tab_shuttles">Shuttles</string>
+    <string name="tab_conflicts">Conflicts</string>
+    <string name="tab_activity">Activity</string>
+    <string name="tab_profiles">Profiles</string>
+    <string name="tab_shares">Shares</string>
+    <string name="tab_later">Not on the phone yet: coming in this version\'s next steps.</string>
     <string name="sync_now">Sync now</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>

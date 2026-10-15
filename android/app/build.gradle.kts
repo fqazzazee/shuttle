@@ -20,6 +20,10 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        // Robolectric reads the app's resources: the screens' strings.
+        unitTests.isIncludeAndroidResources = true
+    }
     lint {
         warningsAsErrors = true
         // A newer AndroidX or SDK is a pull request of its own, not a lint failure.
@@ -33,14 +37,26 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
+    implementation(libs.compose.icons)
     implementation(libs.activity.compose)
     implementation(libs.work.runtime)
     testImplementation(libs.junit)
     testImplementation(libs.json)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test)
+    testImplementation(libs.espresso.core)
+    testImplementation(libs.androidx.test.junit)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test)
     androidTestImplementation(libs.espresso.core)
     debugImplementation(libs.compose.ui.test.manifest)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
+}
+
+// Robolectric reaches into the JDK for file descriptors (jdk.internal.access.SharedSecrets),
+// which JDKs from 22 on keep closed (CI runs 21).
+tasks.withType<Test>().configureEach {
+    jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED")
 }
