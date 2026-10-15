@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -25,9 +26,7 @@ class AboutTest {
     fun theVersionTheLicenseAndTheNotices() {
         var back = false
         val notices = listOf("Third-party notices for shuttle's Android app") + (1..200).map { "paragraph $it" }
-        compose.setContent { AboutScreen("0.3.0", null, notices) { back = true } }
-        compose.onNodeWithText("Version 0.3.0").assertExists()
-        compose.onNodeWithText("PolyForm Noncommercial License 1.0.0", substring = true).assertExists()
+        compose.setContent { NoticesScreen(notices) { back = true } }
         compose.onNodeWithText("Third-party notices for shuttle's Android app").assertExists()
         // The last of many, scrolled to.
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("paragraph 200"))
@@ -39,7 +38,7 @@ class AboutTest {
 
     @Test
     fun aBuildWithoutNotices() {
-        compose.setContent { AboutScreen("0.0.0-dev", null, null) {} }
+        compose.setContent { NoticesScreen(null) {} }
         compose.onNodeWithText("This build was made without them: a release carries them.").assertExists()
     }
 
@@ -71,24 +70,30 @@ class AboutTest {
     // A release: its checksums, said to be the release key's; the links.
     @Test
     fun aReleasedCopy() {
-        compose.setContent { AboutScreen("0.2.0", ThisCopy("ab12", released), null) {} }
+        var notices = 0
+        compose.setContent { AboutScreen("0.2.0", ThisCopy("ab12", released), { notices++ }) {} }
         compose.onNodeWithText("Signed with shuttle's release key", substring = true).assertExists()
         compose.onNodeWithText("ab12").assertExists()
         compose.onNodeWithText(released).assertExists()
-        for (link in listOf("Source on GitHub", "Project page", "Releases", "Buy me a coffee")) compose.onNodeWithText(link).assertExists()
+        compose.onNodeWithText("Version 0.2.0").assertExists()
+        for (link in listOf("Source on GitHub", "Project page", "Releases", "Buy me a coffee", "License")) compose.onNodeWithText(link).assertExists()
+        // The license is a link: its words are not on the page.
+        compose.onNodeWithText("PolyForm", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Third-party notices").performScrollTo().performClick()
+        assertEquals(1, notices)
     }
 
     // A build of one's own, or one whose checksums cannot be read.
     @Test
     fun anotherCopy() {
-        compose.setContent { AboutScreen("0.0.0-dev", ThisCopy(null, "ffff"), null) {} }
+        compose.setContent { AboutScreen("0.0.0-dev", ThisCopy(null, "ffff"), {}) {} }
         compose.onNodeWithText("Not signed with shuttle's release key", substring = true).assertExists()
         compose.onNodeWithText("cannot be read here").assertExists()
     }
 
     @Test
     fun whileTheChecksumsAreRead() {
-        compose.setContent { AboutScreen("0.2.0", null, null) {} }
+        compose.setContent { AboutScreen("0.2.0", null, {}) {} }
         compose.onNodeWithText("Reading its checksums…").assertExists()
     }
 }

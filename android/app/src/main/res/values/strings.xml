@@ -99,12 +99,12 @@
     <string name="help_desktop_q">Is there a desktop version?</string>
     <string name="help_desktop_a">Yes: shuttle began on the Linux desktop, as a terminal interface, a background service and a GNOME extension, with the same engine and the same config file. See the project page, from About.</string>
     <string name="about_version">Version %1$s</string>
-    <string name="about_license">shuttle is source-available: you may use it under the PolyForm Noncommercial License 1.0.0 or the PolyForm Internal Use License 1.0.0, as its LICENSE file says. Its source is at github.com/fqazzazee/shuttle.</string>
     <string name="about_notices">Third-party notices</string>
     <string name="about_github">Source on GitHub</string>
     <string name="about_page">Project page</string>
     <string name="about_releases">Releases</string>
     <string name="about_coffee">Buy me a coffee</string>
+    <string name="about_license_link">License</string>
     <string name="about_this_copy">This copy</string>
     <string name="about_reading">Reading its checksums…</string>
     <string name="about_release_key">Signed with shuttle\'s release key: each release installs over it, keeping its setup.</string>

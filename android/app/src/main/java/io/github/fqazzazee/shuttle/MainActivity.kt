@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
     private var about by mutableStateOf(false)
     private var help by mutableStateOf(false)
     private var backup by mutableStateOf(false)
+    private var notices by mutableStateOf(false)
     private var backupBusy by mutableStateOf(false)
     private var backupMessage by mutableStateOf<String?>(null)
     // A backup read and checked, with what it holds, waiting for the user's yes.
@@ -579,15 +580,17 @@ class MainActivity : ComponentActivity() {
         } else if (help) {
             BackHandler { help = false }
             HelpScreen { help = false }
+        } else if (about && notices) {
+            BackHandler { notices = false }
+            NoticesScreen(remember { readNotices(this@MainActivity) }) { notices = false }
         } else if (about) {
             BackHandler { about = false }
             val version = remember { packageManager.getPackageInfo(packageName, 0).versionName.orEmpty() }
-            val notices = remember { readNotices(this@MainActivity) }
             // The APK is read whole for its checksum: off the main thread.
             val copy by produceState<ThisCopy?>(null) {
                 value = withContext(Dispatchers.IO) { ThisCopy.of(this@MainActivity) }
             }
-            AboutScreen(version, copy, notices) { about = false }
+            AboutScreen(version, copy, { notices = true }) { about = false }
         } else {
             AppScreen(
                 wallpaperColors.takeIf { hasWallpaperColors },
