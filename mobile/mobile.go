@@ -28,8 +28,10 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/notice"
+	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 	"github.com/fqazzazee/shuttle/internal/shares"
 )
@@ -504,6 +506,64 @@ func (m *Daemon) makeFolder(share, folder string) error {
 // app hears when it has (Listener.OnReload), with the new shuttle's status
 // after it.
 func (m *Daemon) edit(change func(*config.Doc) error) error { return m.d.EditConfig(change) }
+
+// detail is the selected shuttle in full, as the TUI's panel shows it and in
+// its words (package present).
+type detail struct {
+	Name, Mode, Arrow, Profile string
+	Local, Remote              string // the folder on the phone; the share's, as "nas:/Photos"
+	LocalRoom, RemoteRoom      string // "1.2 TB free of 4.0 TB"; "" until known
+	LocalLow, RemoteLow        bool   // under a tenth left
+	Syncs, Runs, LastRun, Now  string
+	Waiting, Attention         string // why it waits for a permission; what needs the user
+	Errors, Refused            []engine.Issue
+}
+
+// DetailJSON is the named shuttle in full, as JSON, for the screen it opens
+// to in the app.
+func (m *Daemon) DetailJSON(name string) (string, error) {
+	var st *daemon.Status
+	all := m.d.Statuses()
+	for i := range all {
+		if all[i].Name == name {
+			st = &all[i]
+		}
+	}
+	if st == nil {
+		return "", fmt.Errorf("%q: %w", name, daemon.ErrUnknownShuttle)
+	}
+	d := detail{Name: name, Mode: string(st.Mode), Arrow: present.ModeArrow(st.Mode),
+		Now: present.Progress(&st.Progress), Waiting: st.Waiting, Attention: present.Attention(st),
+		Errors: st.Errors, Refused: st.Refused}
+	if st.LocalSpace.Total > 0 {
+		d.LocalRoom, d.LocalLow = present.Room(st.LocalSpace), present.Low(st.LocalSpace)
+	}
+	if st.RemoteSpace.Total > 0 {
+		d.RemoteRoom, d.RemoteLow = present.Room(st.RemoteSpace), present.Low(st.RemoteSpace)
+	}
+	now := time.Now()
+	if !st.LastRun.IsZero() {
+		d.LastRun = present.Ago(st.LastRun, now) + ": " + present.LastRun(st)
+	}
+	cfg := m.d.Config()
+	for i := range cfg.Shuttles {
+		s := &cfg.Shuttles[i]
+		if s.Name != name {
+			continue
+		}
+		d.Profile, d.Local = s.Profile, s.Local
+		d.Remote = s.Share + ":/" + strings.TrimPrefix(strings.TrimPrefix(s.Remote, "."), "/")
+		d.Syncs = present.Selection(&s.Settings)
+		d.Runs = present.Runs(&s.Settings)
+		if next := present.Next(st, now); next != "" {
+			d.Runs += ", " + next
+		}
+	}
+	if st.State == daemon.StateDisabled {
+		d.Runs = "never: it is turned off"
+	}
+	return toJSON(d), nil
+}
 
 // SyncNow asks for a run of a shuttle.
 func (m *Daemon) SyncNow(name string) error { return m.d.SyncNow(name) }

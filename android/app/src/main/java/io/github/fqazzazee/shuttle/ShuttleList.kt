@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 
 /** What the list's buttons do. */
 class ListActions(
+    val open: (String) -> Unit,
     val syncNow: (String) -> Unit,
     val setPaused: (String, Boolean) -> Unit,
     val setPausedAll: (Boolean) -> Unit,
@@ -44,7 +45,7 @@ fun ShuttleList(shuttles: List<ShuttleStatus>, pausedAll: Boolean, actions: List
 
 @Composable
 private fun ShuttleCard(s: ShuttleStatus, actions: ListActions) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(onClick = { actions.open(s.name) }, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${s.arrow} ${s.name}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))

@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -50,6 +51,7 @@ class MainActivity : ComponentActivity() {
     private var pausedAll by mutableStateOf(false)
     private var adding by mutableStateOf(false)
     private var tab by mutableStateOf(Tab.SHUTTLES)
+    private var selected by mutableStateOf<String?>(null)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -82,10 +84,23 @@ class MainActivity : ComponentActivity() {
                     } else {
                         AppTabs(tab, { tab = it }) { t ->
                             when (t) {
-                                Tab.SHUTTLES -> Main(
-                                    access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
-                                    ::allow, pausedAll, actions,
-                                ) { adding = true }
+                                Tab.SHUTTLES -> {
+                                    // Read again whenever its status comes, so the panel follows a run;
+                                    // a shuttle gone from the config shows the list again.
+                                    val json = selected?.let { name ->
+                                        Core.statuses[name]?.let { runCatching { Core.current?.detailJSON(name) }.getOrNull() }
+                                    }
+                                    if (json != null) {
+                                        // Back to the list, by the button or Android's back gesture.
+                                        BackHandler { selected = null }
+                                        DetailScreen(Detail.parse(json)) { selected = null }
+                                    } else {
+                                        Main(
+                                            access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
+                                            ::allow, pausedAll, actions,
+                                        ) { adding = true }
+                                    }
+                                }
                                 else -> Later(t)
                             }
                         }
@@ -127,6 +142,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val actions = ListActions(
+        open = { selected = it },
         syncNow = { SyncService.syncNow(this, it) },
         setPaused = { name, paused ->
             pauses.set(name, paused)
