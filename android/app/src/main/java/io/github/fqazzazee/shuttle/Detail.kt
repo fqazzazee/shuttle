@@ -5,6 +5,7 @@ package io.github.fqazzazee.shuttle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -66,12 +67,16 @@ data class Detail(
 
 /** The selected shuttle in full, as the TUI's panel: label and value, then what failed and what was left out. */
 @Composable
-fun DetailScreen(d: Detail, onBack: () -> Unit) {
+fun DetailScreen(d: Detail, onBack: () -> Unit, onSettings: () -> Unit) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+        Row(Modifier.fillMaxWidth()) {
+            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onSettings) { Text(stringResource(R.string.settings)) }
+        }
         Text("${d.arrow} ${d.name}", style = MaterialTheme.typography.headlineMedium)
         Text(
             listOf(d.mode, d.profile.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.detail_profile, it) })

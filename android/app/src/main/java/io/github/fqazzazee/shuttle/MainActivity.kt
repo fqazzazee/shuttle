@@ -52,6 +52,9 @@ class MainActivity : ComponentActivity() {
     private var adding by mutableStateOf(false)
     private var tab by mutableStateOf(Tab.SHUTTLES)
     private var selected by mutableStateOf<String?>(null)
+    private var settingsOf by mutableStateOf<String?>(null)
+    // Bumped after a setting is saved: the rows are read from the config file again.
+    private var settingsRead by mutableStateOf(0)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -90,10 +93,16 @@ class MainActivity : ComponentActivity() {
                                     val json = selected?.let { name ->
                                         Core.statuses[name]?.let { runCatching { Core.current?.detailJSON(name) }.getOrNull() }
                                     }
-                                    if (json != null) {
+                                    val rows = settingsOf?.let { name ->
+                                        settingsRead.let { runCatching { Core.current?.settingsJSON(name) }.getOrNull() }
+                                    }
+                                    if (rows != null) {
+                                        BackHandler { settingsOf = null }
+                                        SettingsScreen(settingsOf!!, Setting.parseAll(rows), ::setSetting) { settingsOf = null }
+                                    } else if (json != null) {
                                         // Back to the list, by the button or Android's back gesture.
                                         BackHandler { selected = null }
-                                        DetailScreen(Detail.parse(json)) { selected = null }
+                                        DetailScreen(Detail.parse(json), { selected = null }) { settingsOf = selected }
                                     } else {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
@@ -154,6 +163,18 @@ class MainActivity : ComponentActivity() {
             Core.async { Core.current?.setPaused("", paused) }
         },
     )
+
+    /** Sets one of the open shuttle's settings: null, or why it was refused. */
+    private fun setSetting(key: String, text: String): String? {
+        val name = settingsOf ?: return null
+        return try {
+            Core.current?.setSetting(name, key, text)
+            settingsRead++
+            null
+        } catch (e: Exception) {
+            e.message
+        }
+    }
 
     private fun allow(p: Permission) {
         val name = p.system

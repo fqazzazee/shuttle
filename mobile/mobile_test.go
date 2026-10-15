@@ -695,3 +695,46 @@ func TestDetailJSON(t *testing.T) {
 		t.Errorf("an unknown shuttle: %v", err)
 	}
 }
+
+// A shuttle's settings as rows, set and reset, as the TUI's editor does.
+func TestSettings(t *testing.T) {
+	f := newFixture(t)
+	m := f.start(t)
+	out, err := m.SettingsJSON("s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []struct {
+		Key, Label, Value, Inherited, From, Off string
+		Choices                                 []string
+	}
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatal(err)
+	}
+	byKey := map[string]int{}
+	for i, r := range rows {
+		byKey[r.Key] = i
+	}
+	conflicts, ok := byKey["conflicts"]
+	if !ok || rows[conflicts].Value != "" || rows[conflicts].From != "default" || len(rows[conflicts].Choices) == 0 {
+		t.Fatalf("rows = %s", out)
+	}
+	if err := m.SetSetting("s", "conflicts", "ask"); err != nil {
+		t.Fatal(err)
+	}
+	if doc, _ := os.ReadFile(f.opts.ConfigPath); !strings.Contains(string(doc), `conflicts = "ask"`) {
+		t.Errorf("config:\n%s", doc)
+	}
+	if err := m.SetSetting("s", "conflicts", "maybe"); err == nil {
+		t.Error("a choice not offered taken")
+	}
+	if err := m.SetSetting("s", "conflicts", ""); err != nil {
+		t.Fatal(err)
+	}
+	if doc, _ := os.ReadFile(f.opts.ConfigPath); strings.Contains(string(doc), "conflicts") {
+		t.Errorf("reset left the key:\n%s", doc)
+	}
+	if _, err := m.SettingsJSON("nope"); !errors.Is(err, daemon.ErrUnknownShuttle) {
+		t.Errorf("an unknown shuttle: %v", err)
+	}
+}

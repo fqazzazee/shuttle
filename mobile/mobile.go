@@ -565,6 +565,41 @@ func (m *Daemon) DetailJSON(name string) (string, error) {
 	return toJSON(d), nil
 }
 
+// setting is one row of a shuttle's settings, as the TUI's editor and
+// GNOME's preferences have it (config.RowState), less what JSON cannot hold.
+type setting struct {
+	Key, Label, Hint string
+	Choices          []string // a choice among these; none: typed text
+	List, Number     bool     // typed as a comma-separated list; a number
+	Value            string   // the shuttle's own; "" when it sets none
+	Inherited, From  string   // what applies otherwise, and whence: "profile phone", "default"
+	Off              string   // why the row does not apply as things stand; "" when it does
+}
+
+// SettingsJSON is every setting of the named shuttle, as a JSON array of
+// rows, from the config file as it is on disk.
+func (m *Daemon) SettingsJSON(name string) (string, error) {
+	rows, err := m.d.ShuttleSettings(name)
+	if err != nil {
+		return "", err
+	}
+	out := make([]setting, len(rows))
+	for i := range rows {
+		r := &rows[i]
+		out[i] = setting{Key: r.Key, Label: r.Label, Hint: r.Hint, Choices: r.Choices, List: r.List, Number: r.Number,
+			Value: r.Value, Inherited: r.Inherited, From: r.From, Off: r.Off}
+	}
+	return toJSON(out), nil
+}
+
+// SetSetting sets one of the named shuttle's settings, the text as its row
+// takes it; "" removes the shuttle's own, so its profile's or the default
+// applies again. Only that key changes in the config file; one the row
+// refuses, or that does not apply, is an error saying why.
+func (m *Daemon) SetSetting(name, key, text string) error {
+	return m.d.SetShuttleSetting(name, key, text)
+}
+
 // SyncNow asks for a run of a shuttle.
 func (m *Daemon) SyncNow(name string) error { return m.d.SyncNow(name) }
 
