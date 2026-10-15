@@ -295,31 +295,14 @@ func checkShare(before []byte, home string, sh *config.Share) error {
 	return err
 }
 
-// storePassword keeps sh's password in the keyring. With none typed, an
-// edit that moved the share to another server, share or user takes the
-// stored one along. It returns a note for the user.
+// storePassword is shares.StorePassword, with a note for the user when the
+// share is left without a password.
 func storePassword(ctx context.Context, store secrets.Store, old, sh *config.Share, password string) (string, error) {
-	k, needs := shares.Key(sh)
-	switch {
-	case !needs:
-		return "", nil
-	case password != "":
-		return "", store.Set(ctx, k, password)
-	case old == nil:
-		return "; no password is stored for it yet", nil
+	none, err := shares.StorePassword(ctx, store, old, sh, password)
+	if none {
+		return "; no password is stored for it yet", err
 	}
-	was, had := shares.Key(old)
-	if !had || was == k {
-		return "", nil
-	}
-	pw, err := store.Get(ctx, was)
-	if errors.Is(err, secrets.ErrNotFound) {
-		return "; no password is stored for it yet", nil
-	}
-	if err != nil {
-		return "", err
-	}
-	return "", store.Set(ctx, k, pw)
+	return "", err
 }
 
 func (f *shareForm) lines(width int) []string {
