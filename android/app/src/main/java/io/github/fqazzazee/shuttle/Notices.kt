@@ -71,7 +71,7 @@ object Notices {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val note = Notification.Builder(context, Channel.of(n.kind).id)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle(n.summary)
             .setContentText(n.body.lineSequence().first())
             .setStyle(Notification.BigTextStyle().bigText(n.body))

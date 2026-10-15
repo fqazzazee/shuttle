@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
 <resources>
-    <!-- The desktop icon's blue. -->
-    <color name="ic_launcher_background">#1C71D8</color>
+    <!-- The TUI's ink, its background: internal/tui/theme.go, and the project page's page colour. -->
+    <color name="ic_launcher_background">#1B1E26</color>
 </resources>

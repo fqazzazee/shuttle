@@ -68,7 +68,7 @@ class SyncService : Service() {
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
         )
         return Notification.Builder(this, Channel.SERVICE.id)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle(getString(R.string.service_title))
             .setContentText(getString(R.string.service_text))
             .setContentIntent(open)
