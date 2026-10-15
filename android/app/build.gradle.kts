@@ -5,6 +5,21 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// A release's version, from its tag: -PshuttleVersion=1.2.3 (make apk passes it). Its versionCode is
+// major·10000 + minor·100 + patch (DECISIONS 2026-10-14), so each release installs over the one
+// before; a version that is not plain X.Y.Z, under 100 each but the major, is refused.
+val shuttleVersion = providers.gradleProperty("shuttleVersion").orNull
+val shuttleVersionCode = shuttleVersion?.let { v ->
+    val parts = Regex("""(\d+)\.(\d+)\.(\d+)""").matchEntire(v)?.groupValues?.drop(1)?.map(String::toInt)
+    require(parts != null && parts[1] < 100 && parts[2] < 100) { "shuttleVersion $v: want X.Y.Z, minor and patch under 100" }
+    parts[0] * 10000 + parts[1] * 100 + parts[2]
+}
+
+// The release key, from the environment: the release workflow writes it from its secrets
+// (SHUTTLE_SIGNING_KEYSTORE, a PKCS12 file; SHUTTLE_SIGNING_PASSWORD; SHUTTLE_SIGNING_ALIAS). It is
+// never in the repository. Without it, a release build is left unsigned.
+val signingKeystore = providers.environmentVariable("SHUTTLE_SIGNING_KEYSTORE").orNull
+
 android {
     namespace = "io.github.fqazzazee.shuttle"
     compileSdk = 37
@@ -13,9 +28,28 @@ android {
         // Android 11: where "All files access" arrived (DECISIONS 2026-10-14).
         minSdk = 30
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.0.0-dev"
+        versionCode = shuttleVersionCode ?: 1
+        versionName = shuttleVersion ?: "0.0.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    signingConfigs {
+        if (signingKeystore != null) {
+            create("release") {
+                storeFile = file(signingKeystore)
+                storeType = "pkcs12"
+                storePassword = providers.environmentVariable("SHUTTLE_SIGNING_PASSWORD").get()
+                keyAlias = providers.environmentVariable("SHUTTLE_SIGNING_ALIAS").get()
+                // A PKCS12 file has one password, for the file and the key.
+                keyPassword = storePassword
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release")
+            // Releases carry arm64 only (DECISIONS 2026-10-14): the .aar's one ABI, said here too.
+            ndk { abiFilters += "arm64-v8a" }
+        }
     }
     buildFeatures {
         compose = true
@@ -28,6 +62,8 @@ android {
         warningsAsErrors = true
         // A newer AndroidX or SDK is a pull request of its own, not a lint failure.
         disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion", "OldTargetApi")
+        // Releases are arm64 only (DECISIONS 2026-10-14): x86_64 ChromeOS is left out on purpose.
+        disable += "ChromeOsAbiSupport"
     }
 }
 

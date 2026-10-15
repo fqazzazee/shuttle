@@ -29,6 +29,9 @@ archives:
 
 checksum:
   name_template: checksums.txt
+  # The Android app, built and signed before goreleaser runs (make apk).
+  extra_files:
+    - glob: build/apk/*.apk
 
 nfpms:
   - package_name: shuttle
@@ -72,6 +75,8 @@ nfpms:
 
 # What each release's page says above its changelog.
 release:
+  extra_files:
+    - glob: build/apk/*.apk
   header: |
     Install as a package, for amd64 (tested on Fedora 44 and Debian stable) or arm64
     (built, not yet tested):
