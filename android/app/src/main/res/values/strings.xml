@@ -99,6 +99,15 @@
     <string name="share_saved_no_password">Saved the share %1$s; no password is stored for it yet.</string>
     <string name="share_deleted">Deleted the share %1$s.</string>
     <string name="profiles_none">No profiles yet. A profile is a set of settings that shuttles share.</string>
+    <string name="profile_add">Add a profile</string>
+    <string name="profile_new">New profile</string>
+    <string name="profile_new_hint">Its other settings are set next, one by one.</string>
+    <string name="profile_name">Name</string>
+    <string name="profile_title">The profile %1$s</string>
+    <string name="profile_duplicate">Duplicate</string>
+    <string name="profile_duplicate_title">Duplicate %1$s as</string>
+    <string name="profile_delete_ask">Delete the profile %1$s from the config?</string>
+    <string name="profile_deleted">Deleted the profile %1$s.</string>
     <string name="sync_now">Sync now</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>

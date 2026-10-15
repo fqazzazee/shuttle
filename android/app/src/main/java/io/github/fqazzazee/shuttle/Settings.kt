@@ -30,7 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 
-/** One setting of a shuttle, as the TUI's editor and GNOME's preferences have it (the binding's SettingsJSON). */
+/** One setting of a shuttle or a profile, as the TUI's editor and GNOME's preferences have it (the binding's SettingsJSON). */
 data class Setting(
     val key: String,
     val label: String,
@@ -62,19 +62,26 @@ data class Setting(
 }
 
 /**
- * A shuttle's settings: every row, with what applies and whence. A row is set from its editor, or
- * reset to what the shuttle's profile (or the default) says. set returns why a value was refused,
- * or null.
+ * A shuttle's settings, or a profile's: every row, with what applies and whence. A row is set from
+ * its editor, or reset to what the shuttle's profile (or the default) says. set returns why a value
+ * was refused, or null. head comes under the title: a profile's own buttons.
  */
 @Composable
-fun SettingsScreen(name: String, rows: List<Setting>, set: (key: String, text: String) -> String?, onBack: () -> Unit) {
+fun SettingsScreen(
+    title: String,
+    rows: List<Setting>,
+    set: (key: String, text: String) -> String?,
+    head: @Composable () -> Unit = {},
+    onBack: () -> Unit,
+) {
     var editing by remember { mutableStateOf<Setting?>(null) }
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-        Text(stringResource(R.string.settings_title, name), style = MaterialTheme.typography.headlineMedium)
+        Text(title, style = MaterialTheme.typography.headlineMedium)
+        head()
         for (r in rows) {
             val off = r.off.isNotEmpty()
             Column(
@@ -119,17 +126,15 @@ private fun EditSetting(r: Setting, set: (String, String) -> String?, close: () 
                     OutlinedTextField(text, { text = it }, singleLine = true)
                 }
                 if (r.hint.isNotEmpty()) Text(r.hint, style = MaterialTheme.typography.bodySmall)
+                // Here rather than by Save: what it names can be long ("none: each shuttle must say"),
+                // and would push Cancel out of the dialog.
+                if (r.value.isNotEmpty()) {
+                    TextButton(onClick = { save("") }) { Text(stringResource(R.string.settings_reset, r.from, r.inherited)) }
+                }
                 refused?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = { TextButton(onClick = { save(text) }) { Text(stringResource(R.string.settings_save)) } },
-        dismissButton = {
-            Row {
-                if (r.value.isNotEmpty()) {
-                    TextButton(onClick = { save("") }) { Text(stringResource(R.string.settings_reset, r.from, r.inherited)) }
-                }
-                TextButton(onClick = close) { Text(stringResource(R.string.add_cancel)) }
-            }
-        },
+        dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.add_cancel)) } },
     )
 }

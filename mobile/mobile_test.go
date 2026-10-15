@@ -939,3 +939,81 @@ func TestProfilesJSON(t *testing.T) {
 		t.Errorf("profiles = %s", out)
 	}
 }
+
+// The profile editor: a new profile with its mode, its rows set one by one,
+// a copy, and a delete refused while a shuttle uses it.
+func TestProfileEditor(t *testing.T) {
+	f := newFixture(t)
+	doc := strings.Replace(mustRead(t, f.opts.ConfigPath), `remote = "mnt:"`, "remote = \"mnt:\"\nprofile = \"phone\"", 1) +
+		"\n[profiles.phone]\nmode = \"push\"\n"
+	if err := os.WriteFile(f.opts.ConfigPath, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+
+	if err := m.NewProfile("quiet", "pull"); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ name, mode, want string }{
+		{"quiet", "pull", "a profile named quiet already"},
+		{"", "pull", "needs a name"},
+		{"bad name", "pull", "name must start with"},
+		{"other", "sideways", "mode"},
+	} {
+		if err := m.NewProfile(tc.name, tc.mode); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("NewProfile(%q, %q) = %v, want %q", tc.name, tc.mode, err, tc.want)
+		}
+	}
+	if err := m.SetProfileSetting("quiet", "conflicts", "ask"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := m.ProfileSettingsJSON("quiet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []struct{ Key, Value, Inherited, From, Off string }
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range rows {
+		switch r.Key {
+		case "mode", "conflicts":
+			if r.Value == "" {
+				t.Errorf("%s: %+v; want the profile's own", r.Key, r)
+			}
+		case "metered":
+			if r.Value != "" || r.From != "default" {
+				t.Errorf("metered: %+v; want the default", r)
+			}
+		}
+	}
+	if _, err := m.ProfileSettingsJSON("nope"); !errors.Is(err, config.ErrNoProfile) {
+		t.Errorf("an unknown profile: %v", err)
+	}
+
+	if err := m.DuplicateProfile("quiet", "quiet-copy"); err != nil {
+		t.Fatal(err)
+	}
+	if doc := mustRead(t, f.opts.ConfigPath); !strings.Contains(doc, "[profiles.quiet-copy]\nmode = \"pull\"\nconflicts = \"ask\"\n") {
+		t.Errorf("the copy:\n%s", doc)
+	}
+	if err := m.DuplicateProfile("quiet", "phone"); err == nil || !strings.Contains(err.Error(), "already") {
+		t.Errorf("a copy over a profile: %v", err)
+	}
+	if err := m.DuplicateProfile("nope", "other"); err == nil || !strings.Contains(err.Error(), "no profile named nope") {
+		t.Errorf("a copy of nothing: %v", err)
+	}
+
+	if err := m.DeleteProfile("phone"); err == nil || !strings.Contains(err.Error(), "used by s") {
+		t.Errorf("deleting a profile in use: %v", err)
+	}
+	if err := m.DeleteProfile("quiet-copy"); err != nil {
+		t.Fatal(err)
+	}
+	if doc := mustRead(t, f.opts.ConfigPath); strings.Contains(doc, "quiet-copy") || !strings.Contains(doc, "[profiles.quiet]") {
+		t.Errorf("after the delete:\n%s", doc)
+	}
+	if err := m.DeleteProfile("quiet-copy"); err == nil {
+		t.Error("deleting a profile that is not there taken")
+	}
+}
