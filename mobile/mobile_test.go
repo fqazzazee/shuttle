@@ -657,3 +657,41 @@ func TestAddShareAndShuttle(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 }
+
+// The selected shuttle in full, in the TUI panel's words.
+func TestDetailJSON(t *testing.T) {
+	f := newFixture(t)
+	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := os.ReadFile(f.opts.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc = append(doc, "triggers = [\"realtime\"]\nexclude = [\"cache\"]\n"...)
+	if err := os.WriteFile(f.opts.ConfigPath, doc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	if _, err := m.SyncAndWait("s", 10_000); err != nil {
+		t.Fatal(err)
+	}
+	out, err := m.DetailJSON("s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d struct {
+		Name, Arrow, Local, Remote, Syncs, Runs, LastRun, LocalRoom string
+		Errors                                                       []engine.Issue
+	}
+	if err := json.Unmarshal([]byte(out), &d); err != nil {
+		t.Fatal(err)
+	}
+	if d.Name != "s" || d.Arrow != "↑" || d.Local != f.local || d.Remote != "mnt:/" || d.Syncs != "all but cache" ||
+		!strings.HasPrefix(d.Runs, "as files change") || d.LastRun != "just now: 1 copied" || !strings.Contains(d.LocalRoom, "free of") {
+		t.Errorf("detail = %s", out)
+	}
+	if _, err := m.DetailJSON("nope"); !errors.Is(err, daemon.ErrUnknownShuttle) {
+		t.Errorf("an unknown shuttle: %v", err)
+	}
+}
