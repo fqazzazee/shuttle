@@ -62,6 +62,10 @@ class MainActivity : ComponentActivity() {
     private var resolveError by mutableStateOf<String?>(null)
     private var activityShuttle by mutableStateOf("")
     private var problemsOnly by mutableStateOf(false)
+    private var shareEditing by mutableStateOf<Pair<ShareForm, Boolean>?>(null) // the form, and whether it is new
+    private var shareBusy by mutableStateOf(false)
+    private var shareMessage by mutableStateOf<String?>(null)
+    private var sharesNote by mutableStateOf<String?>(null)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -139,8 +143,21 @@ class MainActivity : ComponentActivity() {
                                 Tab.SHARES -> {
                                     // Read again with every status: a share's state and room come from its shuttles.
                                     Core.statuses
-                                    val json = runCatching { Core.current?.sharesJSON() }.getOrNull()
-                                    SharesScreen(json?.let(ShareRow::parseAll) ?: emptyList())
+                                    val rows = runCatching { Core.current?.sharesJSON() }.getOrNull()?.let(ShareRow::parseAll) ?: emptyList()
+                                    val editing = shareEditing
+                                    if (editing != null) {
+                                        BackHandler { shareEditing = null }
+                                        val (form, isNew) = editing
+                                        ShareEditor(
+                                            form, isNew, rows.firstOrNull { it.name == form.name }?.usedBy ?: emptyList(),
+                                            shareBusy, shareMessage, shareActions,
+                                        )
+                                    } else {
+                                        SharesScreen(rows, sharesNote, ::openShare) {
+                                            shareMessage = null
+                                            shareEditing = ShareForm() to true
+                                        }
+                                    }
                                 }
                                 else -> Later(t)
                             }
@@ -194,6 +211,53 @@ class MainActivity : ComponentActivity() {
             pausedAll = paused
             Core.async { Core.current?.setPaused("", paused) }
         },
+    )
+
+    private fun openShare(name: String) {
+        val json = runCatching { Core.current?.shareJSON(name) }.getOrNull() ?: return
+        shareMessage = null
+        shareEditing = ShareForm.of(json) to false
+    }
+
+    /** Runs a share editor's action off the main thread: a test or a save reaches the server or the file. */
+    private fun shareTask(f: () -> String?) {
+        shareBusy = true
+        shareMessage = null
+        Thread {
+            shareMessage = try {
+                f()
+            } catch (e: Exception) {
+                e.message
+            }
+            shareBusy = false
+        }.start()
+    }
+
+    private val shareActions = ShareActions(
+        test = { form ->
+            shareTask {
+                Core.current?.testShare(form.json(), form.password)
+                getString(R.string.add_tested)
+            }
+        },
+        save = { form ->
+            val isNew = shareEditing?.second ?: true
+            shareTask {
+                val none = Core.current?.saveShare(form.json(), form.password, isNew) ?: return@shareTask getString(R.string.add_no_daemon)
+                sharesNote = getString(if (none) R.string.share_saved_no_password else R.string.share_saved, form.name.trim())
+                shareEditing = null
+                null
+            }
+        },
+        delete = { name ->
+            shareTask {
+                Core.current?.deleteShare(name)
+                sharesNote = getString(R.string.share_deleted, name)
+                shareEditing = null
+                null
+            }
+        },
+        cancel = { shareEditing = null },
     )
 
     /** Settles a conflict, off the main thread: the daemon waits for a run in progress to finish its file. */

@@ -868,3 +868,47 @@ func TestSharesJSON(t *testing.T) {
 		t.Errorf("nas = %+v", nas)
 	}
 }
+
+// The share editor: a new share, its fields read back, an edit that moves
+// it to another server taking its password along, and a delete refused
+// while a shuttle uses it.
+func TestShareEditor(t *testing.T) {
+	f := newFixture(t)
+	m := f.start(t)
+	pw := f.opts.Passwords.(*passwords)
+
+	share := `{"Name": "nas", "Type": "smb", "Host": "nas.invalid", "Share": "home", "User": "user"}`
+	if none, err := m.SaveShare(share, "", true); err != nil || !none {
+		t.Errorf("new with no password: none %v, %v", none, err)
+	}
+	if _, err := m.SaveShare(share, "fake-pw", true); err == nil {
+		t.Error("the same name twice taken")
+	}
+	if none, err := m.SaveShare(share, "fake-pw", false); err != nil || none {
+		t.Errorf("password typed: none %v, %v", none, err)
+	}
+	got, err := m.ShareJSON("nas")
+	if err != nil || !strings.Contains(got, `"Host":"nas.invalid"`) {
+		t.Errorf("ShareJSON = %s, %v", got, err)
+	}
+	moved := strings.Replace(share, "nas.invalid", "nas2.invalid", 1)
+	if none, err := m.SaveShare(moved, "", false); err != nil || none {
+		t.Errorf("moved: none %v, %v", none, err)
+	}
+	if pw.m["smb://user@nas2.invalid/home"] != "fake-pw" {
+		t.Errorf("passwords = %v, want the password moved along", pw.m)
+	}
+	if _, err := m.SaveShare(`{"Name": "ghost", "Type": "path", "Path": "/tmp"}`, "", false); err == nil {
+		t.Error("an edit of a share that is not there taken")
+	}
+
+	if err := m.DeleteShare("mnt"); err == nil || !strings.Contains(err.Error(), "used by s") {
+		t.Errorf("deleting a share in use: %v", err)
+	}
+	if err := m.DeleteShare("nas"); err != nil {
+		t.Fatal(err)
+	}
+	if doc := mustRead(t, f.opts.ConfigPath); strings.Contains(doc, "[shares.nas]") {
+		t.Errorf("config still has the share:\n%s", doc)
+	}
+}

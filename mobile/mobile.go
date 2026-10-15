@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"os"
@@ -406,26 +407,95 @@ func (m *Daemon) TestShare(shareJSON, password string) (string, error) {
 	return toJSON(space), nil
 }
 
-// AddShare adds a share to the config, as TestShare takes it, after storing
-// its password in the app's password store when one is given: a share with
-// no password would fail its first run, a password with no share harms
-// nothing. A share by that name already there is an error.
+// AddShare adds a share to the config, as TestShare takes it: SaveShare for
+// a new one.
 func (m *Daemon) AddShare(shareJSON, password string) error {
+	_, err := m.SaveShare(shareJSON, password, true)
+	return err
+}
+
+// SaveShare adds a share to the config (isNew), or changes the one by its
+// name, as TestShare takes it; a share is not renamed. Its password goes into
+// the app's password store first, as the TUI does: typed, it is stored;
+// with none typed, an edit that moves the share to another server, share
+// or user takes the stored one along. noPassword reports a share left with
+// none, whose first run will need one. A new share by a name already there
+// is an error, as is a change to one that is not.
+func (m *Daemon) SaveShare(shareJSON, password string, isNew bool) (noPassword bool, err error) {
 	var sh config.Share
 	if err := json.Unmarshal([]byte(shareJSON), &sh); err != nil {
+		return false, err
+	}
+	cfg, err := m.fileConfig()
+	if err != nil {
+		return false, err
+	}
+	old, had := cfg.Shares[sh.Name]
+	switch {
+	case isNew && had:
+		return false, fmt.Errorf("there is a share named %s already", sh.Name)
+	case !isNew && !had:
+		return false, fmt.Errorf("there is no share named %s", sh.Name)
+	}
+	var was *config.Share
+	if had {
+		was = &old
+	}
+	none, err := shares.StorePassword(context.Background(), store{m.passwords}, was, &sh, password)
+	if err != nil {
+		return false, err
+	}
+	return none, m.edit(func(d *config.Doc) error { return d.SetShare(&sh) })
+}
+
+// ShareJSON is the named share's fields, as SaveShare takes them, from the
+// config file.
+func (m *Daemon) ShareJSON(name string) (string, error) {
+	cfg, err := m.fileConfig()
+	if err != nil {
+		return "", err
+	}
+	sh, ok := cfg.Shares[name]
+	if !ok {
+		return "", fmt.Errorf("there is no share named %s", name)
+	}
+	return toJSON(sh), nil
+}
+
+// DeleteShare removes the named share from the config. One a shuttle uses
+// is refused, with which: change or remove them first, as the TUI says. Its
+// password stays in the store, where it harms nothing.
+func (m *Daemon) DeleteShare(name string) error {
+	cfg, err := m.fileConfig()
+	if err != nil {
 		return err
 	}
-	if k, needs := shares.Key(&sh); needs && password != "" {
-		if err := (store{m.passwords}).Set(context.Background(), k, password); err != nil {
-			return err
+	var users []string
+	for i := range cfg.Shuttles {
+		if cfg.Shuttles[i].Share == name {
+			users = append(users, cfg.Shuttles[i].Name)
 		}
 	}
-	return m.edit(func(d *config.Doc) error {
-		if d.HasTable([]string{"shares", sh.Name}) {
-			return fmt.Errorf("there is a share named %s already", sh.Name)
-		}
-		return d.SetShare(&sh)
-	})
+	if len(users) > 0 {
+		return fmt.Errorf("%s is used by %s: change or remove them first", name, strings.Join(users, ", "))
+	}
+	return m.edit(func(d *config.Doc) error { return d.DeleteShare(name) })
+}
+
+// fileConfig is the config as the file has it now, which the daemon may
+// not have reloaded yet: an edit just made is in it.
+func (m *Daemon) fileConfig() (*config.Config, error) {
+	data, err := os.ReadFile(m.configPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		data = nil
+	} else if err != nil {
+		return nil, err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	return config.Parse(data, home)
 }
 
 // newShuttle is what AddShuttle takes: the least a shuttle needs.
@@ -495,15 +565,7 @@ func (m *Daemon) makeFolder(share, folder string) error {
 	if folder == "" {
 		return nil
 	}
-	data, err := os.ReadFile(m.configPath)
-	if err != nil {
-		return err
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	cfg, err := config.Parse(data, home)
+	cfg, err := m.fileConfig()
 	if err != nil {
 		return err
 	}
