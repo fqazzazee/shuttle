@@ -111,7 +111,10 @@ class MainActivity : ComponentActivity() {
                                         ) { adding = true }
                                     }
                                 }
-                                Tab.CONFLICTS -> ConflictsScreen(ConflictItem.held(Core.statuses), resolveError, ::resolve)
+                                Tab.CONFLICTS -> ConflictsScreen(
+                                    ConflictItem.held(Core.statuses), HeldDeletions.of(Core.statuses), resolveError, ::resolve,
+                                    ::allowDeletions,
+                                )
                                 else -> Later(t)
                             }
                         }
@@ -172,6 +175,18 @@ class MainActivity : ComponentActivity() {
         Thread {
             try {
                 Core.current?.resolve(c.shuttle, c.path, keep.choice)
+            } catch (e: Exception) {
+                resolveError = e.message
+            }
+        }.start()
+    }
+
+    /** Lets the shuttle's next run make the deletions the guard held back; it starts that run. */
+    private fun allowDeletions(shuttle: String) {
+        resolveError = null
+        Thread {
+            try {
+                Core.current?.allowDeletions(shuttle)
             } catch (e: Exception) {
                 resolveError = e.message
             }

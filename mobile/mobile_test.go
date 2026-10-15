@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -782,4 +783,52 @@ func mustRead(t *testing.T, name string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// Deletions the guard held back, allowed from the app: the next run makes them.
+func TestAllowDeletions(t *testing.T) {
+	f := newFixture(t)
+	doc := strings.Replace(mustRead(t, f.opts.ConfigPath), `mode = "push"`, `mode = "sync"`, 1)
+	if err := os.WriteFile(f.opts.ConfigPath, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 20 {
+		if err := os.WriteFile(filepath.Join(f.local, fmt.Sprintf("f%d", i)), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := f.start(t)
+	if _, err := m.SyncAndWait("s", 10_000); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 15 { // 75%: the guard holds them
+		if err := os.Remove(filepath.Join(f.local, fmt.Sprintf("f%d", i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := m.SyncAndWait("s", 10_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"HeldDeletions":15`) {
+		t.Fatalf("status = %s, want 15 deletions held", out)
+	}
+	if err := m.AllowDeletions("s"); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	// Deleted files go to the versions folder: look for the files themselves.
+	gone := func(name string) bool {
+		_, err := os.Stat(filepath.Join(f.share, name))
+		return errors.Is(err, fs.ErrNotExist)
+	}
+	for !gone("f0") || !gone("f14") {
+		if time.Now().After(deadline) {
+			t.Fatal("the allowed deletions did not happen")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if gone("f19") {
+		t.Error("a file still on the phone was deleted from the share")
+	}
 }

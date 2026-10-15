@@ -609,6 +609,10 @@ func (m *Daemon) Resolve(name, path, choice string) error {
 	return m.d.Resolve(ctx, name, path, engine.Choice(choice))
 }
 
+// AllowDeletions lets the named shuttle's next run delete what the deletion
+// guard has been holding back, and starts that run.
+func (m *Daemon) AllowDeletions(name string) error { return m.d.AllowDeletions(name) }
+
 // resolveTimeout bounds Resolve: a run in progress finishes its file first.
 const resolveTimeout = 2 * time.Minute
 
