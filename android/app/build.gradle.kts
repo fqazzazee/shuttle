@@ -31,6 +31,9 @@ android {
         versionCode = shuttleVersionCode ?: 1
         versionName = shuttleVersion ?: "0.0.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The release key's certificate, as the release workflow checks it: About says whether this
+        // copy is signed with it.
+        resValue("string", "release_cert_sha256", rootProject.file("release-cert.sha256").readText().trim())
     }
     signingConfigs {
         if (signingKeystore != null) {
@@ -57,6 +60,7 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = true
     }
     // THIRD_PARTY_NOTICES, which make android-notices writes there, read by the app's About screen.
     sourceSets.getByName("main").assets.directories.add("build/notices")

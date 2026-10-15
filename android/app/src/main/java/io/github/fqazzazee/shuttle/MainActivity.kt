@@ -132,8 +132,12 @@ class MainActivity : ComponentActivity() {
                                         BackHandler { about = false }
                                         val version = remember { packageManager.getPackageInfo(packageName, 0).versionName.orEmpty() }
                                         val notices = remember { readNotices(this@MainActivity) }
+                                        // The APK is read whole for its checksum: off the main thread.
+                                        val copy by produceState<ThisCopy?>(null) {
+                                            value = withContext(Dispatchers.IO) { ThisCopy.of(this@MainActivity) }
+                                        }
                                         AboutScreen(
-                                            version, notices, wallpaperColors.takeIf { hasWallpaperColors },
+                                            version, copy, notices, wallpaperColors.takeIf { hasWallpaperColors },
                                             { on -> wallpaperColors = on; prefs.edit { putBoolean(WALLPAPER_COLORS, on) } },
                                         ) { about = false }
                                     } else if (w != null) {

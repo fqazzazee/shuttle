@@ -50,6 +50,17 @@
     <string name="about_version">Version %1$s</string>
     <string name="about_license">shuttle is source-available: you may use it under the PolyForm Noncommercial License 1.0.0 or the PolyForm Internal Use License 1.0.0, as its LICENSE file says. Its source is at github.com/fqazzazee/shuttle.</string>
     <string name="about_notices">Third-party notices</string>
+    <string name="about_github">Source on GitHub</string>
+    <string name="about_page">Project page</string>
+    <string name="about_releases">Releases</string>
+    <string name="about_coffee">Buy me a coffee</string>
+    <string name="about_this_copy">This copy</string>
+    <string name="about_reading">Reading its checksums…</string>
+    <string name="about_release_key">Signed with shuttle\'s release key: each release installs over it, keeping its setup.</string>
+    <string name="about_not_release_key">Not signed with shuttle\'s release key: a build of your own or a test build. A release does not install over it; uninstall it first.</string>
+    <string name="about_apk_sha256">This APK\'s SHA-256, as the release\'s checksums.txt lists it</string>
+    <string name="about_cert_sha256">Its signing certificate\'s SHA-256</string>
+    <string name="about_unreadable">cannot be read here</string>
     <string name="about_wallpaper">The wallpaper\'s colours</string>
     <string name="about_wallpaper_hint">Material You, in place of shuttle\'s own colours: the terminal\'s and the project page\'s.</string>
     <string name="about_no_notices">This build was made without them: a release carries them.</string>

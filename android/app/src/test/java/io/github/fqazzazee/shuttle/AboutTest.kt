@@ -27,7 +27,7 @@ class AboutTest {
     fun theVersionTheLicenseAndTheNotices() {
         var back = false
         val notices = listOf("Third-party notices for shuttle's Android app") + (1..200).map { "paragraph $it" }
-        compose.setContent { AboutScreen("0.3.0", notices, null, {}) { back = true } }
+        compose.setContent { AboutScreen("0.3.0", null, notices, null, {}) { back = true } }
         compose.onNodeWithText("Version 0.3.0").assertExists()
         compose.onNodeWithText("PolyForm Noncommercial License 1.0.0", substring = true).assertExists()
         compose.onNodeWithText("Third-party notices for shuttle's Android app").assertExists()
@@ -41,7 +41,7 @@ class AboutTest {
 
     @Test
     fun aBuildWithoutNotices() {
-        compose.setContent { AboutScreen("0.0.0-dev", null, null, {}) {} }
+        compose.setContent { AboutScreen("0.0.0-dev", null, null, null, {}) {} }
         compose.onNodeWithText("This build was made without them: a release carries them.").assertExists()
     }
 
@@ -72,7 +72,7 @@ class AboutTest {
     @Test
     fun theWallpapersColours() {
         val set = mutableListOf<Boolean>()
-        compose.setContent { AboutScreen("0.3.0", null, false, { set += it }) {} }
+        compose.setContent { AboutScreen("0.3.0", null, null, false, { set += it }) {} }
         compose.onNodeWithText("The wallpaper's colours").assertExists()
         compose.onNode(isToggleable()).assertIsOff().performClick()
         assertEquals(listOf(true), set)
@@ -80,7 +80,33 @@ class AboutTest {
 
     @Test
     fun noWallpaperColoursToOffer() {
-        compose.setContent { AboutScreen("0.3.0", null, null, {}) {} }
+        compose.setContent { AboutScreen("0.3.0", null, null, null, {}) {} }
         compose.onNodeWithText("The wallpaper's colours").assertDoesNotExist()
+    }
+
+    private val released = "9dbba13a372fe3d1f3bba5f5ae41d7ab05fb0d425146467245d529f0d7797742"
+
+    // A release: its checksums, said to be the release key's; the links.
+    @Test
+    fun aReleasedCopy() {
+        compose.setContent { AboutScreen("0.2.0", ThisCopy("ab12", released), null, null, {}) {} }
+        compose.onNodeWithText("Signed with shuttle's release key", substring = true).assertExists()
+        compose.onNodeWithText("ab12").assertExists()
+        compose.onNodeWithText(released).assertExists()
+        for (link in listOf("Source on GitHub", "Project page", "Releases", "Buy me a coffee")) compose.onNodeWithText(link).assertExists()
+    }
+
+    // A build of one's own, or one whose checksums cannot be read.
+    @Test
+    fun anotherCopy() {
+        compose.setContent { AboutScreen("0.0.0-dev", ThisCopy(null, "ffff"), null, null, {}) {} }
+        compose.onNodeWithText("Not signed with shuttle's release key", substring = true).assertExists()
+        compose.onNodeWithText("cannot be read here").assertExists()
+    }
+
+    @Test
+    fun whileTheChecksumsAreRead() {
+        compose.setContent { AboutScreen("0.2.0", null, null, null, {}) {} }
+        compose.onNodeWithText("Reading its checksums…").assertExists()
     }
 }
