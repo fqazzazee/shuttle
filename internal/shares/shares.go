@@ -15,10 +15,14 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/nfs3"
 	"github.com/fqazzazee/shuttle/internal/secrets"
@@ -63,6 +67,53 @@ func OpenShare(ctx context.Context, share *config.Share, folder string, store se
 		return openNFS(ctx, share, folder)
 	}
 	return nil, fmt.Errorf("share %s: unknown type %q", share.Name, share.Type)
+}
+
+// Entry is one thing in a folder on a share, as the shuttle wizard shows it.
+type Entry struct {
+	Name string
+	Dir  bool
+}
+
+// List lists dir, a slash path from f's top ("/" for the top itself), as
+// the shuttle wizard shows it, in the TUI and on the phone: folders first,
+// as in a file manager, and hidden ones after the rest, as a home folder
+// has many. What a run never syncs is left out, so it is never marked: the
+// versions folder, temp files of a run in progress, and what is neither
+// file nor folder.
+func List(ctx context.Context, f fsys.FS, dir string) ([]Entry, error) {
+	rel := strings.TrimPrefix(dir, "/")
+	if rel == "" {
+		rel = "."
+	}
+	infos, err := f.ReadDir(ctx, rel)
+	if err != nil {
+		return nil, err
+	}
+	out := []Entry{}
+	for _, fi := range infos {
+		base := path.Base(fi.Name)
+		if base == engine.VersionsDir || fsys.IsTemp(base) || fi.Kind != fsys.KindDir && fi.Kind != fsys.KindFile {
+			continue
+		}
+		out = append(out, Entry{Name: base, Dir: fi.Kind == fsys.KindDir})
+	}
+	slices.SortFunc(out, func(a, b Entry) int {
+		if a.Dir != b.Dir {
+			if a.Dir {
+				return -1
+			}
+			return 1
+		}
+		if ha, hb := strings.HasPrefix(a.Name, "."), strings.HasPrefix(b.Name, "."); ha != hb {
+			if hb {
+				return -1
+			}
+			return 1
+		}
+		return cmp.Compare(a.Name, b.Name)
+	})
+	return out, nil
 }
 
 // Test checks that share can be reached and read: an SMB share is logged

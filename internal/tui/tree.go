@@ -3,7 +3,6 @@
 package tui
 
 import (
-	"cmp"
 	"context"
 	"path"
 	"path/filepath"
@@ -14,8 +13,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/shares"
 )
 
 // picking is what a shuttle syncs of its folder.
@@ -116,23 +115,13 @@ func localTree(dir, home string) *tree {
 
 // listFS lists dir, a slash path from f's top, as the tree shows it.
 func listFS(ctx context.Context, f fsys.FS, dir string) ([]entry, error) {
-	rel := strings.TrimPrefix(dir, "/")
-	if rel == "" {
-		rel = "."
-	}
-	infos, err := f.ReadDir(ctx, rel)
+	list, err := shares.List(ctx, f, dir)
 	if err != nil {
 		return nil, err
 	}
-	var out []entry
-	for _, fi := range infos {
-		base := path.Base(fi.Name)
-		// Never synced, so never marked: the versions folder, temp files
-		// of a run in progress, and what is neither file nor folder.
-		if base == engine.VersionsDir || fsys.IsTemp(base) || fi.Kind != fsys.KindDir && fi.Kind != fsys.KindFile {
-			continue
-		}
-		out = append(out, entry{name: base, dir: fi.Kind == fsys.KindDir})
+	out := make([]entry, len(list))
+	for i, e := range list {
+		out[i] = entry{name: e.Name, dir: e.Dir}
 	}
 	return out, nil
 }
@@ -155,23 +144,6 @@ func (t *tree) load(ctx context.Context, n *node) tea.Cmd {
 		ctx, cancel := context.WithTimeout(ctx, keyringTimeout)
 		defer cancel()
 		entries, err := list(ctx, dir)
-		// Folders first, as in a file manager, and hidden ones after the
-		// rest: a home folder has many.
-		slices.SortFunc(entries, func(a, b entry) int {
-			if a.dir != b.dir {
-				if a.dir {
-					return -1
-				}
-				return 1
-			}
-			if ha, hb := strings.HasPrefix(a.name, "."), strings.HasPrefix(b.name, "."); ha != hb {
-				if hb {
-					return -1
-				}
-				return 1
-			}
-			return cmp.Compare(a.name, b.name)
-		})
 		return treeListedMsg{id: id, dir: dir, entries: entries, err: err}
 	}
 }

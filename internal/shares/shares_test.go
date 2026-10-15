@@ -391,3 +391,41 @@ func TestStorePassword(t *testing.T) {
 		t.Errorf("path share: none %v, %v", none, err)
 	}
 }
+
+// A folder as the wizard lists it: folders first, hidden ones last, and
+// nothing a run never syncs.
+func TestList(t *testing.T) {
+	dir := t.TempDir()
+	for _, d := range []string{"b", "a", ".git", engine.VersionsDir} {
+		if err := os.Mkdir(filepath.Join(dir, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, f := range []string{"z.txt", ".hidden", "c.txt", fsys.TempPrefix + "x"} {
+		if err := os.WriteFile(filepath.Join(dir, f), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink("a", filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	f, err := fsys.OpenLocal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	got, err := List(context.Background(), f, "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Entry{{"a", true}, {"b", true}, {".git", true}, {"c.txt", false}, {"z.txt", false}, {".hidden", false}}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("List = %v, want %v", got, want)
+	}
+	if got, err := List(context.Background(), f, "/a"); err != nil || len(got) != 0 || got == nil {
+		t.Errorf("an empty folder: %#v, %v; want an empty list", got, err)
+	}
+	if _, err := List(context.Background(), f, "/nope"); err == nil {
+		t.Error("a folder that is not there listed")
+	}
+}
