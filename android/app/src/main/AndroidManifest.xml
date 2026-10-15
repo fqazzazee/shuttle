@@ -22,6 +22,7 @@
     <!-- Passwords are kept under a Keystore key that a restored phone does not have:
          nothing is backed up, and a restored phone asks for them again (DECISIONS 2026-10-14). -->
     <application
+        android:name=".ShuttleApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
