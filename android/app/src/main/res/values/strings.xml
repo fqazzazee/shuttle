@@ -42,7 +42,6 @@
     <string name="tab_activity">Activity</string>
     <string name="tab_profiles">Profiles</string>
     <string name="tab_shares">Shares</string>
-    <string name="tab_later">Not on the phone yet: coming in this version\'s next steps.</string>
     <string name="back">← Back</string>
     <string name="detail_profile">profile %1$s</string>
     <string name="detail_phone">This phone</string>
@@ -99,6 +98,7 @@
     <string name="share_saved">Saved the share %1$s.</string>
     <string name="share_saved_no_password">Saved the share %1$s; no password is stored for it yet.</string>
     <string name="share_deleted">Deleted the share %1$s.</string>
+    <string name="profiles_none">No profiles yet. A profile is a set of settings that shuttles share.</string>
     <string name="sync_now">Sync now</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
