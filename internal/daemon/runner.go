@@ -157,6 +157,13 @@ func (r *runner) meteredLocked() bool {
 	return r.shuttle.Settings.Metered == config.MeteredPause && r.d.isMetered()
 }
 
+// waiting is why the shuttle cannot run now (Options.Waiting), or "".
+func (r *runner) waiting() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.waitingLocked()
+}
+
 // waitingLocked is why the shuttle cannot run now (Options.Waiting), or "".
 func (r *runner) waitingLocked() string {
 	if r.d.o.Waiting == nil {
