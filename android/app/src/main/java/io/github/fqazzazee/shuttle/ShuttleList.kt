@@ -109,6 +109,10 @@ private fun detail(s: ShuttleStatus): String {
     if (s.waiting.isNotEmpty() && !s.paused) return s.waiting
     if (s.error.isNotEmpty()) return s.error
     val last = s.lastRun ?: return stringResource(R.string.never_run)
+    // Android's own wording says "0 minutes ago" for the last minute.
+    if (System.currentTimeMillis() - last.toEpochMilli() < DateUtils.MINUTE_IN_MILLIS) {
+        return stringResource(R.string.last_run_just_now)
+    }
     return stringResource(
         R.string.last_run,
         DateUtils.getRelativeTimeSpanString(last.toEpochMilli(), System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),

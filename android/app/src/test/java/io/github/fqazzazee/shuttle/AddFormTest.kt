@@ -25,6 +25,16 @@ class AddFormTest {
     }
 
     @Test
+    fun aServerOnAnotherPort() {
+        val j = JSONObject(filled.copy(host = "10.0.2.2:1445").shareJSON())
+        assertEquals("10.0.2.2", j.getString("Host"))
+        assertEquals(1445, j.getInt("Port"))
+        assertTrue("no port given: the protocol's", !JSONObject(filled.shareJSON()).has("Port"))
+        // An IPv6 address is not a host and a port.
+        assertEquals("fe80::1", JSONObject(filled.copy(host = "fe80::1").shareJSON()).getString("Host"))
+    }
+
+    @Test
     fun anNfsShareByItsExport() {
         val j = JSONObject(filled.copy(shareType = "nfs3", share = "/export/media").shareJSON())
         assertEquals("nfs3", j.getString("Type"))

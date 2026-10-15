@@ -94,12 +94,13 @@ var (
 
 // Daemon is the process's running daemon.
 type Daemon struct {
-	d         *daemon.Daemon
-	passwords Passwords
-	cancel    context.CancelFunc
-	done      chan error
-	log       *os.File
-	access    *access
+	d          *daemon.Daemon
+	passwords  Passwords
+	configPath string
+	cancel     context.CancelFunc
+	done       chan error
+	log        *os.File
+	access     *access
 }
 
 // access is the permissions the app last reported, read by the daemon's
@@ -159,7 +160,7 @@ func Start(o *Options) (*Daemon, error) {
 		d.WatchReloads(func(r *daemon.Reloaded) { l.OnReload(toJSON(r)) })
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	m := &Daemon{d: d, passwords: o.Passwords, cancel: cancel, done: make(chan error, 1), log: logf, access: acc}
+	m := &Daemon{d: d, passwords: o.Passwords, configPath: o.ConfigPath, cancel: cancel, done: make(chan error, 1), log: logf, access: acc}
 	go func() { m.done <- d.Run(ctx) }()
 	select {
 	case <-d.Ready():
@@ -422,9 +423,17 @@ type newShuttle struct {
 // "Triggers": ["realtime"]}. A shuttle by that name already there is an
 // error; so is a config that would not load, such as two shuttles on one
 // folder.
+//
+// The folder on the share is made if it is not there: the user named it.
+// A run never makes it (a missing folder is more often a share that is not
+// what it seems), so without this the shuttle's first run would fail. A
+// share that cannot be reached saves nothing, and says why.
 func (m *Daemon) AddShuttle(shuttleJSON string) error {
 	var s newShuttle
 	if err := json.Unmarshal([]byte(shuttleJSON), &s); err != nil {
+		return err
+	}
+	if err := m.makeFolder(s.Share, s.Folder); err != nil {
 		return err
 	}
 	table := []string{"shuttles", s.Name}
@@ -456,6 +465,39 @@ func (m *Daemon) AddShuttle(shuttleJSON string) error {
 		}
 		return nil
 	})
+}
+
+// makeFolder makes folder on the named share, as the config file has it
+// now (AddShare may have just written it), if it is not there yet.
+func (m *Daemon) makeFolder(share, folder string) error {
+	folder = strings.Trim(folder, "/")
+	if folder == "" {
+		return nil
+	}
+	data, err := os.ReadFile(m.configPath)
+	if err != nil {
+		return err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Parse(data, home)
+	if err != nil {
+		return err
+	}
+	sh, ok := cfg.Shares[share]
+	if !ok {
+		return fmt.Errorf("there is no share named %s", share)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), shareTimeout)
+	defer cancel()
+	f, err := shares.OpenShare(ctx, &sh, ".", store{m.passwords})
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.MkdirAll(ctx, folder)
 }
 
 // edit changes the config. The daemon applies it in the background, and the
