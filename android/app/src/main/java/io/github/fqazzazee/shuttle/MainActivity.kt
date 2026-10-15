@@ -43,8 +43,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import io.github.fqazzazee.shuttle.mobile.Mobile
+import io.github.fqazzazee.shuttle.mobile.Picker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
@@ -67,6 +70,9 @@ class MainActivity : ComponentActivity() {
     private var shareMessage by mutableStateOf<String?>(null)
     private var sharesNote by mutableStateOf<String?>(null)
     private var wizard by mutableStateOf<WizardState?>(null)
+    // What the wizard marks; replaced with each new wizard, or another share.
+    private var picker: Picker = Mobile.newPicker("/")
+    private var marksRev by mutableStateOf(0)
     // Bumped by Try again: the folder is read again.
     private var browseTry by mutableStateOf(0)
     private var profileOf by mutableStateOf<String?>(null)
@@ -131,7 +137,7 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
-                                            ::allow, pausedAll, actions, { wizard = WizardState() },
+                                            ::allow, pausedAll, actions, ::openWizard,
                                         ) { adding = true }
                                     }
                                 }
@@ -334,25 +340,72 @@ class MainActivity : ComponentActivity() {
         when (w.step) {
             WizardStep.SHARE -> {
                 val shares = runCatching { Core.current?.sharesJSON() }.getOrNull()?.let(ShareRow::parseAll) ?: emptyList()
-                WizardShareStep(shares, w.share, { wizard = w.copy(share = it, dir = "/") }, { wizard = w.copy(step = WizardStep.FOLDER) }, ::closeWizard)
+                WizardShareStep(shares, w.share, ::chooseShare, { wizard = w.copy(step = WizardStep.FOLDER) }, ::closeWizard)
             }
             WizardStep.FOLDER -> {
                 // Read off the main thread: the share is reached over the network.
-                val listing by produceState<Listing?>(null, w.share, w.dir, browseTry) {
-                    value = null
-                    value = withContext(Dispatchers.IO) {
-                        try {
-                            val json = Core.current?.browseJSON(w.share, w.dir)
-                            if (json == null) Listing(null, getString(R.string.add_no_daemon)) else Listing(FolderEntry.parseAll(json), null)
-                        } catch (e: Exception) {
-                            Listing(null, e.message)
-                        }
-                    }
+                val listing = listing(w.share, w.dir)
+                WizardFolderStep(w, listing, { wizard = it }, { browseTry++ }, ::wizardBack) {
+                    // Marks outside the folder now chosen are kept, and do not count.
+                    picker.setRoot(w.dir)
+                    wizard = w.copy(step = WizardStep.WHAT, inner = if (within(w.inner, w.dir)) w.inner else w.dir)
                 }
-                WizardFolderStep(w, listing, { wizard = it }, { browseTry++ }, ::wizardBack) { wizard = w.copy(step = WizardStep.LATER) }
             }
-            WizardStep.LATER -> WizardLater(w.remote, ::closeWizard)
+            WizardStep.WHAT -> {
+                val listing = listing(w.share, w.inner)
+                // Read again when a mark changes: the picker holds them.
+                val view = marksRev.let { MarksView(picker.mode().toInt(), { picker.synced(it).toInt() }, marks()) }
+                WizardWhatStep(
+                    w, listing, view,
+                    { picker.setMode(it.toLong()); marksRev++ },
+                    { picker.toggle(it); marksRev++ },
+                    { wizard = it }, { browseTry++ }, ::wizardBack,
+                ) { wizard = w.copy(step = WizardStep.LATER) }
+            }
+            WizardStep.LATER -> {
+                val view = marksRev.let { MarksView(picker.mode().toInt(), { picker.synced(it).toInt() }, marks()) }
+                WizardLater(w.remote, if (view.mode == 0) stringResource(R.string.wizard_everything) else marksLine(view), ::closeWizard)
+            }
         }
+    }
+
+    private fun marks(): List<String> = JSONArray(picker.marksJSON()).let { a -> (0 until a.length()).map { a.getString(it) } }
+
+    /** Lists dir on the share off the main thread, as the picker is told; null while it is read. */
+    @Composable
+    private fun listing(share: String, dir: String): Listing? {
+        val listing by produceState<Listing?>(null, share, dir, browseTry) {
+            value = null
+            value = withContext(Dispatchers.IO) {
+                try {
+                    val json = Core.current?.browseJSON(share, dir)
+                    if (json == null) {
+                        Listing(null, getString(R.string.add_no_daemon))
+                    } else {
+                        picker.listed(dir, json)
+                        Listing(FolderEntry.parseAll(json), null)
+                    }
+                } catch (e: Exception) {
+                    Listing(null, e.message)
+                }
+            }
+        }
+        return listing
+    }
+
+    // Marks on another share mean nothing there: they start again, as in the TUI.
+    private fun chooseShare(share: String) {
+        val w = wizard ?: return
+        if (share == w.share) return
+        wizard = w.copy(share = share, dir = "/", inner = "/")
+        picker = Mobile.newPicker("/")
+        marksRev++
+    }
+
+    private fun openWizard() {
+        picker = Mobile.newPicker("/")
+        marksRev++
+        wizard = WizardState()
     }
 
     private fun wizardBack() {
@@ -360,7 +413,8 @@ class MainActivity : ComponentActivity() {
         when (w.step) {
             WizardStep.SHARE -> closeWizard()
             WizardStep.FOLDER -> wizard = w.copy(step = WizardStep.SHARE)
-            WizardStep.LATER -> wizard = w.copy(step = WizardStep.FOLDER)
+            WizardStep.WHAT -> wizard = w.copy(step = WizardStep.FOLDER)
+            WizardStep.LATER -> wizard = w.copy(step = WizardStep.WHAT)
         }
     }
 

@@ -2,10 +2,18 @@
 
 package io.github.fqazzazee.shuttle
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -96,5 +104,67 @@ class WizardTest {
         compose.setContent { WizardFolderStep(WizardState(WizardStep.FOLDER, "nas"), Listing(emptyList(), null), {}, {}, {}) {} }
         compose.onNodeWithText("Nothing in this folder.").assertExists()
         compose.onNodeWithText("Use this folder").assertIsEnabled()
+    }
+
+    @Test
+    fun pathsInsideTheFolder() {
+        assertEquals(true, within("/a/b", "/a"))
+        assertEquals(false, within("/ab", "/a"))
+        assertEquals(true, within("/x", "/"))
+        assertEquals("/a/b", child("/a", "b"))
+        assertEquals("/b", child("/", "b"))
+    }
+
+    private fun view(mode: Int, marks: List<String> = emptyList(), synced: Map<String, Int> = emptyMap()) =
+        MarksView(mode, { synced[it] ?: if (mode == 0) 2 else 0 }, marks)
+
+    // Ticks mark by full path; a folder opens inside the shuttle's folder; what each tick shows
+    // comes from the picker.
+    @Test
+    fun whatToSyncIsMarked() {
+        val toggled = mutableListOf<String>()
+        val opened = mutableListOf<String>()
+        val modes = mutableListOf<Int>()
+        val state = WizardState(WizardStep.WHAT, "nas", "/Media", "/Media")
+        val v = view(1, listOf("Photos/"), mapOf("/Media/Photos" to 2, "/Media/Music" to 1))
+        compose.setContent {
+            WizardWhatStep(state, Listing(FolderEntry.parseAll(json), null), v, { modes += it }, { toggled += it }, { opened += it.inner }, {}, {}) {}
+        }
+        compose.onNodeWithText("Synced only: Photos/").assertExists()
+        compose.onNodeWithText("↑ Up a folder").assertDoesNotExist() // the shuttle's folder is the top here
+        compose.onNode(hasText("Photos/") and hasClickAction()).performClick()
+        compose.onNodeWithText("All but what is marked").performClick()
+        compose.onAllNodes(isToggleable())[0] // Music: something in it
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Indeterminate))
+        compose.onAllNodes(isToggleable())[1].assertIsOn() // Photos: all of it
+        compose.onAllNodes(isToggleable())[2].assertIsOff().performScrollTo().performClick() // a.txt
+        assertEquals(listOf("/Media/a.txt"), toggled)
+        assertEquals(listOf("/Media/Photos"), opened)
+        assertEquals(listOf(2), modes)
+        compose.onNodeWithText("Next").performScrollTo().assertIsEnabled()
+    }
+
+    @Test
+    fun onlyWhatIsMarkedNeedsAMark() {
+        compose.setContent {
+            WizardWhatStep(WizardState(WizardStep.WHAT, "nas", "/Media", "/Media"), Listing(emptyList(), null), view(1), {}, {}, {}, {}, {}) {}
+        }
+        compose.onNodeWithText("Nothing marked yet: tick what to sync.").assertExists()
+        compose.onNodeWithText("Next").performScrollTo().assertIsNotEnabled()
+    }
+
+    // Everything: no ticks, and folders still open, to look.
+    @Test
+    fun everythingHasNoTicks() {
+        val opened = mutableListOf<String>()
+        val state = WizardState(WizardStep.WHAT, "nas", "/Media", "/Media/Old")
+        compose.setContent {
+            WizardWhatStep(state, Listing(FolderEntry.parseAll(json), null), view(0), {}, {}, { opened += it.inner }, {}, {}) {}
+        }
+        compose.onAllNodes(isToggleable()).assertCountEquals(0)
+        compose.onNodeWithText("nas:/Media/Old").assertExists()
+        compose.onNodeWithText("↑ Up a folder").performClick()
+        assertEquals(listOf("/Media"), opened)
+        compose.onNodeWithText("Next").performScrollTo().assertIsEnabled()
     }
 }
