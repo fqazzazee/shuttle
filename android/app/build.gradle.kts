@@ -47,6 +47,10 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release")
+            // Shrunk: unshrunk, Compose and its icons were 24 MB of the APK's 35.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Releases carry arm64 only (DECISIONS 2026-10-14): the .aar's one ABI, said here too.
             ndk { abiFilters += "arm64-v8a" }
         }
