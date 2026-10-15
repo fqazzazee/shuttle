@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
+<resources>
+    <!-- From Android 12, the splash screen as the icon: the bus on the TUI's ink, not the system's grey. -->
+    <style name="Theme.Shuttle" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+    </style>
+</resources>

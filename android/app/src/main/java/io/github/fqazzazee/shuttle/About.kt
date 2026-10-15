@@ -4,14 +4,19 @@ package io.github.fqazzazee.shuttle
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -50,10 +55,12 @@ private const val REFLOW_WIDTH = 50
 
 /**
  * About the app: its version, its license, and the third-party notices of what it includes, the Go
- * core's modules and the Java and Kotlin libraries, as the release carries them.
+ * core's modules and the Java and Kotlin libraries, as the release carries them. wallpaper is
+ * whether the app takes the wallpaper's colours in place of shuttle's palette; null where Android
+ * has none to offer.
  */
 @Composable
-fun AboutScreen(version: String, notices: List<String>?, onBack: () -> Unit) {
+fun AboutScreen(version: String, notices: List<String>?, wallpaper: Boolean?, onWallpaper: (Boolean) -> Unit, onBack: () -> Unit) {
     // Lazily: the notices are a few thousand lines.
     LazyColumn(
         Modifier.safeDrawingPadding().padding(horizontal = 24.dp),
@@ -63,6 +70,17 @@ fun AboutScreen(version: String, notices: List<String>?, onBack: () -> Unit) {
         item { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium) }
         item { Text(stringResource(R.string.about_version, version), style = MaterialTheme.typography.bodyLarge) }
         item { Text(stringResource(R.string.about_license), style = MaterialTheme.typography.bodyMedium) }
+        wallpaper?.let { on ->
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.about_wallpaper), style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.about_wallpaper_hint), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(on, onWallpaper)
+                }
+            }
+        }
         item { Text(stringResource(R.string.about_notices), style = MaterialTheme.typography.titleMedium) }
         if (notices == null) {
             item { Text(stringResource(R.string.about_no_notices), style = MaterialTheme.typography.bodyMedium) }

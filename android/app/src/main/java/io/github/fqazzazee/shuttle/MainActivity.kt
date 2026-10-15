@@ -3,7 +3,6 @@
 package io.github.fqazzazee.shuttle
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.storage.StorageManager
@@ -14,7 +13,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,10 +28,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -42,7 +36,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
@@ -75,6 +68,8 @@ class MainActivity : ComponentActivity() {
     private var sharesNote by mutableStateOf<String?>(null)
     private var wizard by mutableStateOf<WizardState?>(null)
     private var about by mutableStateOf(false)
+    // The wallpaper's colours (Material You) in place of shuttle's palette, as the About screen sets.
+    private var wallpaperColors by mutableStateOf(false)
     // What the wizard marks; replaced with each new wizard, or another share.
     private var picker: Picker = Mobile.newPicker("/")
     private var marksRev by mutableStateOf(0)
@@ -103,6 +98,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         openTab(intent)
         firstRunSeen = prefs.getBoolean(FIRST_RUN_SEEN, false)
+        wallpaperColors = prefs.getBoolean(WALLPAPER_COLORS, false)
         pausedAll = pauses.all
         // Opening the app after a force stop starts syncing again (the screen holds the daemon,
         // which starts the service and plans the jobs); say that it had stopped.
@@ -112,7 +108,7 @@ class MainActivity : ComponentActivity() {
         if (forceStopped) Log.i("shuttle", "force stop noticed; syncing starts again")
         prefs.edit { putLong(LAST_EXIT_SEEN, newestExit(exits, lastSeen)) }
         setContent {
-            ShuttleTheme {
+            ShuttleTheme(wallpaperColors) {
                 Surface(Modifier.fillMaxSize()) {
                     if (!firstRunSeen) {
                         PermissionsScreen(access, ::allow) {
@@ -136,7 +132,10 @@ class MainActivity : ComponentActivity() {
                                         BackHandler { about = false }
                                         val version = remember { packageManager.getPackageInfo(packageName, 0).versionName.orEmpty() }
                                         val notices = remember { readNotices(this@MainActivity) }
-                                        AboutScreen(version, notices) { about = false }
+                                        AboutScreen(
+                                            version, notices, wallpaperColors.takeIf { hasWallpaperColors },
+                                            { on -> wallpaperColors = on; prefs.edit { putBoolean(WALLPAPER_COLORS, on) } },
+                                        ) { about = false }
                                     } else if (w != null) {
                                         BackHandler { wizardBack() }
                                         Wizard(w)
@@ -654,6 +653,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val FIRST_RUN_SEEN = "first_run_seen"
+        const val WALLPAPER_COLORS = "wallpaper_colors"
         const val SCREEN = "screen"
         const val LAST_EXIT_SEEN = "last_exit_seen"
 
@@ -708,15 +708,3 @@ private fun ForceStopped(onSeen: () -> Unit) {
     }
 }
 
-/** Light or dark as the phone is set; in the phone's own colours from Android 12, which has them. */
-@Composable
-fun ShuttleTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val colors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        val context = LocalContext.current
-        if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } else {
-        if (dark) darkColorScheme() else lightColorScheme()
-    }
-    MaterialTheme(colorScheme = colors, content = content)
-}
