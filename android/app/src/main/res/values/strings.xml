@@ -76,6 +76,11 @@
     <string name="conflict_none_here">none</string>
     <string name="conflict_folder">a folder</string>
     <string name="conflict_rename">Rename one of them yourself: the phone cannot keep both names.</string>
+    <string name="activity_every">Every shuttle</string>
+    <string name="activity_problems">Problems only</string>
+    <string name="activity_no_problems">No problems in the activity shown.</string>
+    <string name="activity_reading">Reading the activity…</string>
+    <string name="activity_none">Nothing yet: entries appear as shuttles copy, delete or run into problems.</string>
     <string name="sync_now">Sync now</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
