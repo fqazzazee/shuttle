@@ -1,7 +1,7 @@
 # shuttle
 
 Push, pull and sync folders between SMB/NFS network shares and local storage, from a
-terminal UI, with a GNOME top-bar indicator and a Quick Settings toggle.
+terminal UI, with a GNOME top-bar indicator and a Quick Settings toggle, and on Android phones.
 
 **[The project page](https://fqazzazee.github.io/shuttle/)** shows what shuttle is for and what it
 does, at a glance.
@@ -21,6 +21,7 @@ does, at a glance.
 [![systemd user service](https://img.shields.io/badge/systemd-user%20service-30D475)](https://systemd.io)
 [![SMB 2 and 3](https://img.shields.io/badge/SMB-2%20%2F%203-6F42C1)](https://github.com/cloudsoda/go-smb2)
 [![NFSv3](https://img.shields.io/badge/NFS-v3-6F42C1)](https://www.rfc-editor.org/rfc/rfc1813)
+[![Android 11+](https://img.shields.io/badge/Android-11%2B%20arm64-34A853?logo=android&logoColor=white)](#android)
 
 [![License: PolyForm Noncommercial or Internal Use](https://img.shields.io/badge/license-PolyForm%20Noncommercial%20%7C%20Internal%20Use-F5C451)](#license)
 [![Extension: GPL-2.0-or-later](https://img.shields.io/badge/extension-GPL--2.0--or--later-61AFEF)](extension/LICENSE)
@@ -52,6 +53,7 @@ terminal interface and the GNOME Shell 50 extension work. SMB is tested against 
 server; NFS against the Linux kernel's server (NFSv3 directly, NFSv4 through a mount) and an
 in-process one. Packages are on [GitHub Releases](https://github.com/fqazzazee/shuttle/releases):
 the RPM and the DEB are install-tested on amd64; the arm64 ones are built, not yet tested.
+The Android app, a signed APK in the same releases, runs the same engine on the phone.
 
 ### Not planned as of right now but could be an addition in the future if requested
 
@@ -98,6 +100,33 @@ as below). Either way, the service is yours to enable.
 
 **Requires:** Go 1.26+ to build, systemd, and a Secret Service (GNOME Keyring) for share
 passwords. Developed and tested on Fedora 44; CI also builds and runs it on Arch and Debian.
+
+### Android
+
+The same shuttles on a phone with Android 11 or later, arm64 (nearly every phone of the last
+several years). Each release has a signed `shuttle_X.Y.Z_android_arm64.apk`: open the
+[latest release](https://github.com/fqazzazee/shuttle/releases/latest) on the phone, download
+the APK and open it. Android asks once to allow installs from your browser or file manager.
+It is not on Google Play or F-Droid; [Obtainium](https://github.com/ImranR98/Obtainium) can
+follow the releases and install each new one.
+
+A new release installs over the app and keeps its shares, shuttles and passwords. Every
+release is signed with the same key; the certificate's SHA-256 is in
+[`android/release-cert.sha256`](android/release-cert.sha256), and
+`apksigner verify --print-certs shuttle_X.Y.Z_android_arm64.apk` shows the one an APK carries.
+
+On its first run the app asks for three permissions, saying why: All files access, for the
+folders it syncs; local network access, to reach the NAS; and notifications. Shares, profiles
+and shuttles are set up in its tabs, as in the terminal interface: **Add a shuttle** walks
+through the share, the folder on it and what of it to sync, the folder on the phone, the
+profile and the settings. Passwords are encrypted with a key that never leaves the Android
+Keystore.
+
+What differs from the desktop: schedules are approximate (Android runs them around the time
+asked; a real-time shuttle keeps a notification up while it runs); force-stopping the app stops
+all syncing until it is opened again; and files on the share with names the phone cannot hold
+(with `: ? * " < > | \`) are listed as left out, not synced. Its About screen has the
+third-party notices.
 
 ## Configure
 

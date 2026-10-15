@@ -90,8 +90,13 @@ release:
     ```
 
     Then enable the service and, on GNOME 50, the extension: see the
-    [README](https://github.com/fqazzazee/shuttle#install). `checksums.txt` has every
-    file's SHA-256.
+    [README](https://github.com/fqazzazee/shuttle#install).
+
+    On Android 11 or later (arm64): download `shuttle_{{ .Version }}_android_arm64.apk` on the
+    phone and open it. It installs over an earlier release, keeping its setup; see the
+    [README](https://github.com/fqazzazee/shuttle#android).
+
+    `checksums.txt` has every file's SHA-256.
 
     shuttle is source-available under PolyForm Noncommercial 1.0.0 or PolyForm Internal Use
     1.0.0; its GNOME extension is GPL-2.0-or-later. See
