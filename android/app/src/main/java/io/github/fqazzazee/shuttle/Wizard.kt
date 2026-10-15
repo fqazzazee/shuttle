@@ -91,7 +91,11 @@ data class Volume(val label: String, val path: String)
  * Whether p is the top of the phone's storage, or above it: a shuttle there would sync all of it,
  * and the app's own folders, so the wizard does not choose it.
  */
-fun storageTop(p: String, volumes: List<Volume>) = p.trimEnd('/') in AddForm.STORAGE_ROOTS || volumes.any { it.path == p }
+fun storageTop(p: String, volumes: List<Volume>) = p.trimEnd('/') in STORAGE_ROOTS || volumes.any { it.path == p }
+
+/** The phone's storage as a whole, by each path it goes by. */
+@Suppress("SdCardPath") // paths refused as a whole folder to sync, never written to
+private val STORAGE_ROOTS = setOf("", "/storage", "/storage/emulated", "/storage/emulated/0", "/sdcard", "/mnt/sdcard")
 
 /** What the wizard's marks mean, as the binding's Picker has them (PickAll and so on), with their words. */
 val pickModes = listOf(0 to R.string.pick_all, 1 to R.string.pick_include, 2 to R.string.pick_exclude)

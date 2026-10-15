@@ -619,38 +619,61 @@ func TestAddShareAndShuttle(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("a"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	// A folder on the share that is not there yet is made.
-	shuttle := fmt.Sprintf(`{"Name": "photos", "Share": "card", "Folder": "new/photos", "Local": %q, "Mode": "push",
-		"Triggers": ["schedule"], "Interval": "1h"}`, f.local)
-	if err := m.AddShuttle(shuttle); err != nil {
+	// Through the wizard's steps: a folder on the share that is not there
+	// yet is made, then the shuttle on it is saved.
+	if _, err := m.MakeShareFolder("card", "/", "new"); err != nil {
 		t.Fatal(err)
 	}
-	if err := m.AddShuttle(shuttle); err == nil || !strings.Contains(err.Error(), "already") {
+	if _, err := m.MakeShareFolder("card", "/new", "photos"); err != nil {
+		t.Fatal(err)
+	}
+	d := m.NewDraft()
+	if err := d.SetName("photos"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.SetFolders("card", "/new/photos", f.local, `{"Include":null,"Exclude":null}`); err != nil {
+		t.Fatal(err)
+	}
+	for key, text := range map[string]string{"mode": "push", "triggers": "schedule"} {
+		if err := d.Set(key, text); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := d.Set("interval", "1h"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Save(); err == nil || !strings.Contains(err.Error(), "already") {
 		t.Errorf("the same shuttle twice: %v", err)
 	}
 	// One that would not load is refused, and the file left alone.
 	before, _ := os.ReadFile(f.opts.ConfigPath)
-	if err := m.AddShuttle(`{"Name": "bad", "Share": "nowhere", "Local": "/tmp/x", "Mode": "push"}`); err == nil {
+	bad := m.NewDraft()
+	if err := bad.SetName("bad"); err != nil {
+		t.Fatal(err)
+	}
+	if err := bad.SetFolders("nowhere", "/", "/tmp/x", `{"Include":null,"Exclude":null}`); err == nil {
 		t.Error("a shuttle on no share taken")
+	}
+	if err := bad.Save(); err == nil {
+		t.Error("a shuttle on no share saved")
 	}
 	if after, _ := os.ReadFile(f.opts.ConfigPath); !bytes.Equal(before, after) {
 		t.Errorf("config changed by a refused shuttle:\n%s", after)
 	}
-	for _, want := range []string{"[shares.card]", "[shares.nas]", "[shuttles.photos]", `remote = "card:new/photos"`, `triggers = ["schedule"]`, `interval = "1h"`} {
+	for _, want := range []string{"[shares.card]", "[shares.nas]", "[shuttles.photos]", `remote = "card:/new/photos"`, `triggers = ["schedule"]`, `interval = "1h"`} {
 		if !strings.Contains(string(before), want) {
 			t.Errorf("config lacks %s:\n%s", want, before)
 		}
 	}
-
 	if info, err := os.Stat(filepath.Join(f.share, "new", "photos")); err != nil || !info.IsDir() {
 		t.Errorf("the folder on the share: %v, %v", info, err)
 	}
-	// A share that cannot be reached saves nothing.
-	if err := m.AddShuttle(`{"Name": "far", "Share": "nas", "Folder": "x", "Local": "/tmp/far", "Mode": "push"}`); err == nil {
-		t.Error("a shuttle on an unreachable share's new folder taken")
-	}
-	if after, _ := os.ReadFile(f.opts.ConfigPath); strings.Contains(string(after), "far") {
-		t.Errorf("config has the refused shuttle:\n%s", after)
+	// A share that cannot be reached makes nothing.
+	if _, err := m.MakeShareFolder("nas", "/", "x"); err == nil {
+		t.Error("a folder made on an unreachable share")
 	}
 
 	// The daemon runs it: never ran, so its schedule is due. The file was

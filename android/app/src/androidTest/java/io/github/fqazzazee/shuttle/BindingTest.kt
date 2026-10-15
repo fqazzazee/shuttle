@@ -17,8 +17,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The Go core through the .aar, on a phone or emulator: a share and a shuttle added as the add
- * screen adds them, and a run. Everything in a folder of the app's cache, removed after.
+ * The Go core through the .aar, on a phone or emulator: a share added as the share editor adds it,
+ * a shuttle as the wizard makes it, and a run. Everything in a folder of the app's cache, removed
+ * after.
  */
 @RunWith(AndroidJUnit4::class)
 class BindingTest {
@@ -48,9 +49,13 @@ class BindingTest {
         }
         val d = Mobile.start(o)
         try {
-            val form = AddForm(shareType = "path", shareName = "card", name = "t", local = local.path, mode = "push")
-            d.addShare(JSONObject(form.shareJSON()).put("Path", share.path).toString(), "")
-            d.addShuttle(form.shuttleJSON())
+            d.addShare(JSONObject().put("Name", "card").put("Type", "path").put("Path", share.path).toString(), "")
+            d.newDraft().apply {
+                setName("t")
+                setFolders("card", "/", local.path, """{"Include":null,"Exclude":null}""")
+                set("mode", "push")
+                save()
+            }
             // The daemon applies the edit in the background.
             val deadline = System.currentTimeMillis() + 10_000
             while (JSONArray(d.statusesJSON()).length() == 0) {

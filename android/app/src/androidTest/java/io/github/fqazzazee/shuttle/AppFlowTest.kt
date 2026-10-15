@@ -2,6 +2,7 @@
 
 package io.github.fqazzazee.shuttle
 
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -21,11 +22,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The phase's exit test: a shuttle set up through the app, as a user would, against a test SMB
- * server, and a run that copies a file to it. make test-android-flow runs it on a phone against
- * the Samba container (smbHost etc. as instrumentation arguments) and checks the share
- * afterwards. It works on the app's own config and a folder in shared storage, so without those
- * arguments, as in make test-android-device, it does not run.
+ * The phase's exit test: a share and a shuttle set up through the app, as a user would (the Shares
+ * tab, then the wizard), against a test SMB server, and a run that copies a file to it. make
+ * test-android-flow runs it on a phone against the Samba container (smbHost etc. as
+ * instrumentation arguments) and checks the share afterwards. It works on the app's own config and
+ * a folder in shared storage, so without those arguments, as in make test-android-device, it does
+ * not run.
  */
 @RunWith(AndroidJUnit4::class)
 class AppFlowTest {
@@ -37,6 +39,11 @@ class AppFlowTest {
 
     private fun field(label: String, value: String) {
         compose.onNode(hasText(label) and hasSetTextAction()).performScrollTo().performTextReplacement(value)
+    }
+
+    // In a dialog, which does not scroll.
+    private fun dialogField(label: String, value: String) {
+        compose.onNode(hasText(label) and hasSetTextAction()).performTextReplacement(value)
     }
 
     private fun click(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
@@ -59,26 +66,51 @@ class AppFlowTest {
 
     private fun flow(host: String, local: File) {
         if (compose.onAllNodesWithText("Continue").fetchSemanticsNodes().isNotEmpty()) click("Continue")
-        click("Add a share and a shuttle")
+        // The share, as the Shares tab adds one.
+        compose.onNode(hasText("Shares") and hasClickAction()).performClick()
+        click("Add a share")
+        field("Name for the share", "ci-share")
         field("Server (name or address, :port if not the usual)", host)
         field("Share on the server", args.getString("smbShare")!!)
         field("User", args.getString("smbUser")!!)
         field("Password", args.getString("smbPassword")!!)
         click("Test the connection")
-        waitFor("the connection test") {
-            compose.onAllNodesWithText("Connected: the share is there.").fetchSemanticsNodes().isNotEmpty()
-        }
-        field("Name for the shuttle", "ci")
-        field("Folder on the share (empty: all of it)", "android-ci")
-        field("Folder on the phone", local.path)
-        click("Push to the share")
+        waitFor("the connection test") { shows("Connected: the share is there.") }
         click("Save")
+        waitFor("the share saved") { shows("Saved the share ci-share.") }
 
-        waitFor("the new shuttle in the list") { compose.onAllNodesWithText("↑ ci").fetchSemanticsNodes().isNotEmpty() }
+        // The shuttle, through the wizard: its name and share, a new folder on the share, everything
+        // in it, the folder on the phone, no profile, and push.
+        compose.onNode(hasText("Shuttles") and hasClickAction()).performClick()
+        click("Add a shuttle")
+        field("The shuttle's name", "ci")
+        click("ci-share")
+        click("Next")
+        waitFor("the share's top folder") { shows("New folder") }
+        click("New folder")
+        dialogField("Name", "android-ci")
+        compose.onNodeWithText("Make").performClick()
+        waitFor("the new folder on the share") { shows("ci-share:/android-ci") && shows("Nothing in this folder.") }
+        click("Use this folder")
+        click("Next")
+        waitFor("the phone's storage") { shows("${local.name}/") }
+        click("${local.name}/")
+        waitFor("the folder on the phone") { shows(local.path) && shows("Nothing in this folder.") }
+        click("Use this folder")
+        click("No profile")
+        click("Next")
+        click("Mode")
+        compose.onNodeWithText("push").performClick()
+        compose.onNodeWithText("Save").performClick()
+        click("Save the shuttle")
+
+        waitFor("the new shuttle in the list") { shows("↑ ci") }
         File(local, "from-the-app.txt").writeText("set up in the app, and synced\n")
         compose.onAllNodesWithText("Sync now")[0].performScrollTo().performClick()
         waitFor("the run to copy the file") {
             Core.statuses["ci"]?.let { JSONObject(it).getInt("Copied") == 1 } == true
         }
     }
+
+    private fun shows(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
 }
