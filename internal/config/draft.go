@@ -143,6 +143,31 @@ func (d *Draft) Check(data []byte, home string) error {
 	return err
 }
 
+// CheckFolders is what Check says of the draft's folders alone: one inside
+// another shuttle's, a path the config does not take, or include and
+// exclude both. The rest, such as its mode, may still be to set.
+func (d *Draft) CheckFolders(data []byte, home string) error {
+	// A shuttle that fails for the rest is not checked against the others:
+	// the folders alone, with any mode, are.
+	probe := Draft{Name: d.Name, Remote: d.Remote, Local: d.Local, Include: d.Include, Exclude: d.Exclude, New: d.New,
+		Settings: map[string]string{"mode": "push"}}
+	at := "shuttles." + d.Name
+	var out []error
+	for _, e := range split(probe.Check(data, home)) {
+		msg := e.Error()
+		for _, p := range []string{at + ".local:", at + ".remote:", at + ".include", at + ".exclude", at + ": set include or exclude"} {
+			if strings.HasPrefix(msg, p) {
+				out = append(out, e)
+				break
+			}
+		}
+		if strings.Contains(msg, "overlap") && (strings.HasPrefix(msg, at+":") || strings.HasPrefix(msg, at+" and ") || strings.Contains(msg, " and "+at+":")) {
+			out = append(out, e)
+		}
+	}
+	return errors.Join(out...)
+}
+
 // Moved reports whether a saved shuttle the draft edits would sync other
 // folders than it does: it then starts afresh, as on its first run.
 func (d *Draft) Moved(data []byte, home string) (bool, error) {

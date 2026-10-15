@@ -127,6 +127,33 @@ func TestDraftWithoutMode(t *testing.T) {
 	}
 }
 
+// The folders are checked as soon as they are chosen, before the mode and
+// the rest are.
+func TestDraftCheckFolders(t *testing.T) {
+	data := []byte(rowsConfig)
+	d := &Draft{Name: "photos", Remote: "nas:/photos", Local: "/p", New: true}
+	if err := d.CheckFolders(data, "/home/user"); err != nil {
+		t.Errorf("good folders, no mode yet: %v", err)
+	}
+	for _, c := range []struct {
+		remote, local string
+		include       []string
+		exclude       []string
+		why           string
+	}{
+		{"nas:/photos", "/d/inside", nil, nil, "folders overlap"},
+		{"nas:/photos", "relative", nil, nil, "shuttles.photos.local:"},
+		{"ghost:/photos", "/p", nil, nil, "no share named"},
+		{"nas:/photos", "/p", []string{"a"}, []string{"b"}, "set include or exclude"},
+		{"nas:/photos", "/p", []string{"../a"}, nil, "not a clean path"},
+	} {
+		d.Remote, d.Local, d.Include, d.Exclude = c.remote, c.local, c.include, c.exclude
+		if err := d.CheckFolders(data, "/home/user"); err == nil || !strings.Contains(err.Error(), c.why) || strings.Contains(err.Error(), "mode") {
+			t.Errorf("%+v: %v; want %q alone", c, err, c.why)
+		}
+	}
+}
+
 func TestDraftSaveNew(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(rowsConfig), 0o600); err != nil {
