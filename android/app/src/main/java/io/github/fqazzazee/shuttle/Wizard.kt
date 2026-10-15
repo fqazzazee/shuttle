@@ -46,12 +46,12 @@ data class FolderEntry(val name: String, val dir: Boolean) {
 /** What a listing came to: what is in the folder, or why it could not be read. */
 data class Listing(val entries: List<FolderEntry>?, val error: String?)
 
-enum class WizardStep { SHARE, FOLDER, WHAT, LOCAL, LATER }
+enum class WizardStep { SHARE, FOLDER, WHAT, LOCAL, PROFILE, SETTINGS }
 
 /**
  * Where the wizard is: its step, the share chosen, the folder on it (a slash path from its top),
- * the folder inside that shown while marking what to sync, and the folder on the phone (a full
- * path; "" until that step first shows).
+ * the folder inside that shown while marking what to sync, the folder on the phone (a full path;
+ * "" until that step first shows), the shuttle's name, and its profile ("" for none).
  */
 data class WizardState(
     val step: WizardStep = WizardStep.SHARE,
@@ -59,6 +59,8 @@ data class WizardState(
     val dir: String = "/",
     val inner: String = "/",
     val local: String = "",
+    val name: String = "",
+    val profile: String = "",
 ) {
     /** The folder as a shuttle's remote reads: "nas:/Photos". */
     val remote get() = "$share:$dir"
@@ -89,10 +91,20 @@ fun storageTop(p: String, volumes: List<Volume>) = p.trimEnd('/') in AddForm.STO
 /** What the wizard's marks mean, as the binding's Picker has them (PickAll and so on), with their words. */
 val pickModes = listOf(0 to R.string.pick_all, 1 to R.string.pick_include, 2 to R.string.pick_exclude)
 
-/** The wizard's first step: the share the shuttle syncs with. */
+/** The wizard's first step, as the TUI's: the shuttle's name, and the share it syncs with. problem is why Next did not go on. */
 @Composable
-fun WizardShareStep(shares: List<ShareRow>, chosen: String, onChoose: (String) -> Unit, onNext: () -> Unit, onCancel: () -> Unit) {
+fun WizardShareStep(
+    shares: List<ShareRow>,
+    chosen: String,
+    name: String,
+    problem: String?,
+    onName: (String) -> Unit,
+    onChoose: (String) -> Unit,
+    onNext: () -> Unit,
+    onCancel: () -> Unit,
+) {
     WizardPage(stringResource(R.string.wizard_share_title)) {
+        OutlinedTextField(name, onName, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.wizard_name)) }, singleLine = true)
         if (shares.isEmpty()) Text(stringResource(R.string.wizard_share_none))
         for (s in shares) {
             Row(
@@ -106,7 +118,8 @@ fun WizardShareStep(shares: List<ShareRow>, chosen: String, onChoose: (String) -
                 }
             }
         }
-        Buttons(onCancel, stringResource(R.string.add_cancel), stringResource(R.string.wizard_next), enabled = chosen.isNotEmpty(), onNext)
+        Problem(problem)
+        Buttons(onCancel, stringResource(R.string.add_cancel), stringResource(R.string.wizard_next), enabled = chosen.isNotEmpty() && name.isNotBlank(), onNext)
     }
 }
 
@@ -238,6 +251,7 @@ fun WizardLocalStep(
     state: WizardState,
     volumes: List<Volume>,
     listing: Listing?,
+    problem: String?,
     onOpen: (String) -> Unit,
     onMake: (String) -> String?,
     onRetry: () -> Unit,
@@ -266,6 +280,7 @@ fun WizardLocalStep(
         }
         if (listing?.entries != null) TextButton(onClick = { making = true }) { Text(stringResource(R.string.wizard_new_folder)) }
         if (top) Text(stringResource(R.string.wizard_storage_top), style = MaterialTheme.typography.bodyMedium)
+        Problem(problem)
         Buttons(onBack, stringResource(R.string.wizard_back), stringResource(R.string.wizard_use), enabled = listing?.entries != null && !top, onNext)
     }
     if (making) NewFolderDialog(state.local, onMake) { making = false }
@@ -296,13 +311,45 @@ private fun NewFolderDialog(dir: String, make: (String) -> String?, close: () ->
     )
 }
 
-/** Until the rest of the wizard is built: the folders chosen, what of them, and how to add the shuttle meanwhile. */
+/**
+ * The wizard's fifth step: the shuttle's profile, or none, each with its mode and triggers. What
+ * the shuttle does not set itself comes from it.
+ */
 @Composable
-fun WizardLater(remote: String, what: String, local: String, onClose: () -> Unit) {
-    WizardPage(stringResource(R.string.wizard_later_title)) {
-        Text(stringResource(R.string.wizard_later, remote, what, local))
-        Buttons(null, "", stringResource(R.string.ok), enabled = true, onClose)
+fun WizardProfileStep(profiles: List<ProfileRow>, chosen: String, onChoose: (String) -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
+    WizardPage(stringResource(R.string.wizard_profile_title)) {
+        Text(stringResource(R.string.wizard_profile_hint), style = MaterialTheme.typography.bodyMedium)
+        val none = stringResource(R.string.wizard_no_profile)
+        for ((name, line) in listOf("" to none) + profiles.map { it.name to listOf(it.mode.ifEmpty { "—" }, it.triggers).joinToString(" · ") }) {
+            Row(
+                Modifier.fillMaxWidth().selectable(selected = name == chosen) { onChoose(name) }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = name == chosen, onClick = { onChoose(name) })
+                Column {
+                    Text(name.ifEmpty { none }, style = MaterialTheme.typography.titleMedium)
+                    if (name.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        Buttons(onBack, stringResource(R.string.wizard_back), stringResource(R.string.wizard_next), enabled = true, onNext)
     }
+}
+
+/** Above the wizard's last step, its settings: whence what it does not set comes, why it was not saved, and Save. */
+@Composable
+fun WizardSaveHead(profile: String, problem: String?, onSave: () -> Unit) {
+    Text(
+        if (profile.isEmpty()) stringResource(R.string.wizard_settings_default) else stringResource(R.string.wizard_settings_from, profile),
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Problem(problem)
+    Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.wizard_save)) }
+}
+
+@Composable
+private fun Problem(problem: String?) {
+    problem?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
 }
 
 @Composable

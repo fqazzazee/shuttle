@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import io.github.fqazzazee.shuttle.mobile.Draft
 import io.github.fqazzazee.shuttle.mobile.Mobile
 import io.github.fqazzazee.shuttle.mobile.Picker
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +77,11 @@ class MainActivity : ComponentActivity() {
     // What the wizard marks; replaced with each new wizard, or another share.
     private var picker: Picker = Mobile.newPicker("/")
     private var marksRev by mutableStateOf(0)
+    // The shuttle the wizard makes, until it is saved; why its last Next did not go on.
+    private var draft: Draft? = null
+    private var wizardProblem by mutableStateOf<String?>(null)
+    // Bumped after the draft changes: its rows are read again.
+    private var draftRev by mutableStateOf(0)
     // Bumped by Try again: the folder is read again.
     private var browseTry by mutableStateOf(0)
     private var profileOf by mutableStateOf<String?>(null)
@@ -343,7 +349,10 @@ class MainActivity : ComponentActivity() {
         when (w.step) {
             WizardStep.SHARE -> {
                 val shares = runCatching { Core.current?.sharesJSON() }.getOrNull()?.let(ShareRow::parseAll) ?: emptyList()
-                WizardShareStep(shares, w.share, ::chooseShare, { wizard = w.copy(step = WizardStep.FOLDER) }, ::closeWizard)
+                WizardShareStep(
+                    shares, w.share, w.name, wizardProblem, { wizard = w.copy(name = it) }, ::chooseShare,
+                    { wizardNext(w.copy(step = WizardStep.FOLDER)) { it.setName(w.name.trim()) } }, ::closeWizard,
+                )
             }
             WizardStep.FOLDER -> {
                 // Read off the main thread: the share is reached over the network.
@@ -370,15 +379,37 @@ class MainActivity : ComponentActivity() {
                 val listing = readListing(w.local) { Mobile.localJSON(w.local) }
                 val storage = remember { volumes }
                 WizardLocalStep(
-                    w, storage, listing,
-                    { wizard = w.copy(local = it) },
+                    w, storage, listing, wizardProblem,
+                    { wizardProblem = null; wizard = w.copy(local = it) },
                     { name -> makeFolder(w.local, name) },
                     { browseTry++ }, ::wizardBack,
-                ) { wizard = w.copy(step = WizardStep.LATER) }
+                ) { wizardNext(w.copy(step = WizardStep.PROFILE)) { it.setFolders(w.share, w.dir, w.local, picker.selectionJSON()) } }
             }
-            WizardStep.LATER -> {
-                val view = marksRev.let { MarksView(picker.mode().toInt(), { picker.synced(it).toInt() }, marks()) }
-                WizardLater(w.remote, if (view.mode == 0) stringResource(R.string.wizard_everything) else marksLine(view), w.local, ::closeWizard)
+            WizardStep.PROFILE -> {
+                val profiles = runCatching { Core.current?.profilesJSON() }.getOrNull()?.let(ProfileRow::parseAll) ?: emptyList()
+                WizardProfileStep(profiles, w.profile, { wizard = w.copy(profile = it) }, ::wizardBack) {
+                    wizardNext(w.copy(step = WizardStep.SETTINGS)) { it.setProfile(w.profile) }
+                    draftRev++
+                }
+            }
+            WizardStep.SETTINGS -> {
+                val rows = draftRev.let { runCatching { draft?.settingsJSON() }.getOrNull() } ?: "[]"
+                SettingsScreen(
+                    stringResource(R.string.wizard_settings_title, w.name.trim()), Setting.parseAll(rows),
+                    { key, text ->
+                        try {
+                            draft?.set(key, text)
+                            draftRev++
+                            // Why the last Save failed may be what was just set.
+                            wizardProblem = null
+                            null
+                        } catch (e: Exception) {
+                            e.message
+                        }
+                    },
+                    head = { WizardSaveHead(w.profile, wizardProblem, ::saveDraft) },
+                    onBack = ::wizardBack,
+                )
             }
         }
     }
@@ -438,17 +469,48 @@ class MainActivity : ComponentActivity() {
     private fun openWizard() {
         picker = Mobile.newPicker("/")
         marksRev++
+        draft = Core.current?.newDraft()
+        wizardProblem = null
         wizard = WizardState()
+    }
+
+    /** Goes on to next once check, on the draft, passes; else says why, and stays. */
+    private fun wizardNext(next: WizardState, check: (Draft) -> Unit) {
+        val d = draft ?: Core.current?.newDraft()?.also { draft = it }
+        wizardProblem = if (d == null) {
+            getString(R.string.add_no_daemon)
+        } else {
+            try {
+                check(d)
+                null
+            } catch (e: Exception) {
+                e.message
+            }
+        }
+        if (wizardProblem == null) wizard = next
+    }
+
+    /** Saves the wizard's shuttle and closes it; the daemon follows the file. Else says why. */
+    private fun saveDraft() {
+        wizardProblem = try {
+            draft?.save() ?: throw IllegalStateException(getString(R.string.add_no_daemon))
+            null
+        } catch (e: Exception) {
+            e.message
+        }
+        if (wizardProblem == null) closeWizard()
     }
 
     private fun wizardBack() {
         val w = wizard ?: return
+        wizardProblem = null
         when (w.step) {
             WizardStep.SHARE -> closeWizard()
             WizardStep.FOLDER -> wizard = w.copy(step = WizardStep.SHARE)
             WizardStep.WHAT -> wizard = w.copy(step = WizardStep.FOLDER)
             WizardStep.LOCAL -> wizard = w.copy(step = WizardStep.WHAT)
-            WizardStep.LATER -> wizard = w.copy(step = WizardStep.LOCAL)
+            WizardStep.PROFILE -> wizard = w.copy(step = WizardStep.LOCAL)
+            WizardStep.SETTINGS -> wizard = w.copy(step = WizardStep.PROFILE)
         }
     }
 
@@ -456,6 +518,7 @@ class MainActivity : ComponentActivity() {
     // progress holds it.
     private fun closeWizard() {
         wizard = null
+        draft = null
         Thread { Core.current?.endBrowse() }.start()
     }
 
