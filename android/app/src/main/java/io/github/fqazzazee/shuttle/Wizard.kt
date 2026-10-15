@@ -12,14 +12,20 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -40,13 +46,20 @@ data class FolderEntry(val name: String, val dir: Boolean) {
 /** What a listing came to: what is in the folder, or why it could not be read. */
 data class Listing(val entries: List<FolderEntry>?, val error: String?)
 
-enum class WizardStep { SHARE, FOLDER, WHAT, LATER }
+enum class WizardStep { SHARE, FOLDER, WHAT, LOCAL, LATER }
 
 /**
  * Where the wizard is: its step, the share chosen, the folder on it (a slash path from its top),
- * and the folder inside that shown while marking what to sync.
+ * the folder inside that shown while marking what to sync, and the folder on the phone (a full
+ * path; "" until that step first shows).
  */
-data class WizardState(val step: WizardStep = WizardStep.SHARE, val share: String = "", val dir: String = "/", val inner: String = "/") {
+data class WizardState(
+    val step: WizardStep = WizardStep.SHARE,
+    val share: String = "",
+    val dir: String = "/",
+    val inner: String = "/",
+    val local: String = "",
+) {
     /** The folder as a shuttle's remote reads: "nas:/Photos". */
     val remote get() = "$share:$dir"
 
@@ -63,6 +76,15 @@ fun within(p: String, top: String) = top == "/" || p == top || p.startsWith("$to
 
 /** The folder the slash path p is in. */
 fun parent(p: String) = p.substringBeforeLast('/').ifEmpty { "/" }
+
+/** A place the phone keeps shared files: its own storage, or an SD card. */
+data class Volume(val label: String, val path: String)
+
+/**
+ * Whether p is the top of the phone's storage, or above it: a shuttle there would sync all of it,
+ * and the app's own folders, so the wizard does not choose it.
+ */
+fun storageTop(p: String, volumes: List<Volume>) = p.trimEnd('/') in AddForm.STORAGE_ROOTS || volumes.any { it.path == p }
 
 /** What the wizard's marks mean, as the binding's Picker has them (PickAll and so on), with their words. */
 val pickModes = listOf(0 to R.string.pick_all, 1 to R.string.pick_include, 2 to R.string.pick_exclude)
@@ -206,11 +228,79 @@ private fun MarkRow(e: FolderEntry, marking: Boolean, synced: Int, onToggle: () 
     HorizontalDivider()
 }
 
-/** Until the rest of the wizard is built: the folder chosen, what of it, and how to add the shuttle meanwhile. */
+/**
+ * The wizard's fourth step: the folder on the phone, browsed from the top of its storage, or made
+ * in the folder shown. The top itself is not chosen; on a phone with an SD card, the top of either
+ * goes to the other.
+ */
 @Composable
-fun WizardLater(remote: String, what: String, onClose: () -> Unit) {
+fun WizardLocalStep(
+    state: WizardState,
+    volumes: List<Volume>,
+    listing: Listing?,
+    onOpen: (String) -> Unit,
+    onMake: (String) -> String?,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+) {
+    var making by remember { mutableStateOf(false) }
+    val top = storageTop(state.local, volumes)
+    WizardPage(stringResource(R.string.wizard_local_title)) {
+        Text(state.local, style = MaterialTheme.typography.bodyLarge)
+        if (top) {
+            for (v in volumes) if (v.path != state.local) FolderRow("${v.label} (${v.path})") { onOpen(v.path) }
+        } else {
+            FolderRow(stringResource(R.string.wizard_up)) { onOpen(parent(state.local)) }
+        }
+        when {
+            listing == null -> Text(stringResource(R.string.wizard_reading))
+            listing.entries == null -> {
+                Text(listing.error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.wizard_retry)) }
+            }
+            listing.entries.isEmpty() -> Text(stringResource(R.string.wizard_empty))
+            else -> for (e in listing.entries) {
+                if (e.dir) FolderRow(e.name + "/") { onOpen(child(state.local, e.name)) } else FolderRow(e.name, null)
+            }
+        }
+        if (listing?.entries != null) TextButton(onClick = { making = true }) { Text(stringResource(R.string.wizard_new_folder)) }
+        if (top) Text(stringResource(R.string.wizard_storage_top), style = MaterialTheme.typography.bodyMedium)
+        Buttons(onBack, stringResource(R.string.wizard_back), stringResource(R.string.wizard_use), enabled = listing?.entries != null && !top, onNext)
+    }
+    if (making) NewFolderDialog(state.local, onMake) { making = false }
+}
+
+/** Asks for the new folder's name; make makes it, or says why it could not. */
+@Composable
+private fun NewFolderDialog(dir: String, make: (String) -> String?, close: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var refused by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text(stringResource(R.string.wizard_new_folder)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.wizard_new_folder_in, dir), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.wizard_folder_name)) }, singleLine = true)
+                refused?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                refused = make(name)
+                if (refused == null) close()
+            }) { Text(stringResource(R.string.wizard_make)) }
+        },
+        dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.add_cancel)) } },
+    )
+}
+
+/** Until the rest of the wizard is built: the folders chosen, what of them, and how to add the shuttle meanwhile. */
+@Composable
+fun WizardLater(remote: String, what: String, local: String, onClose: () -> Unit) {
     WizardPage(stringResource(R.string.wizard_later_title)) {
-        Text(stringResource(R.string.wizard_later, remote, what))
+        Text(stringResource(R.string.wizard_later, remote, what, local))
         Buttons(null, "", stringResource(R.string.ok), enabled = true, onClose)
     }
 }

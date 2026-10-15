@@ -5,6 +5,8 @@ package io.github.fqazzazee.shuttle
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.os.storage.StorageManager
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -36,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -360,11 +363,22 @@ class MainActivity : ComponentActivity() {
                     { picker.setMode(it.toLong()); marksRev++ },
                     { picker.toggle(it); marksRev++ },
                     { wizard = it }, { browseTry++ }, ::wizardBack,
+                ) { wizard = w.copy(step = WizardStep.LOCAL, local = w.local.ifEmpty { volumes.first().path }) }
+            }
+            WizardStep.LOCAL -> {
+                // Local, but on storage that can be slow to wake: off the main thread too.
+                val listing = readListing(w.local) { Mobile.localJSON(w.local) }
+                val storage = remember { volumes }
+                WizardLocalStep(
+                    w, storage, listing,
+                    { wizard = w.copy(local = it) },
+                    { name -> makeFolder(w.local, name) },
+                    { browseTry++ }, ::wizardBack,
                 ) { wizard = w.copy(step = WizardStep.LATER) }
             }
             WizardStep.LATER -> {
                 val view = marksRev.let { MarksView(picker.mode().toInt(), { picker.synced(it).toInt() }, marks()) }
-                WizardLater(w.remote, if (view.mode == 0) stringResource(R.string.wizard_everything) else marksLine(view), ::closeWizard)
+                WizardLater(w.remote, if (view.mode == 0) stringResource(R.string.wizard_everything) else marksLine(view), w.local, ::closeWizard)
             }
         }
     }
@@ -373,24 +387,43 @@ class MainActivity : ComponentActivity() {
 
     /** Lists dir on the share off the main thread, as the picker is told; null while it is read. */
     @Composable
-    private fun listing(share: String, dir: String): Listing? {
-        val listing by produceState<Listing?>(null, share, dir, browseTry) {
+    private fun listing(share: String, dir: String): Listing? = readListing(share, dir) {
+        Core.current?.browseJSON(share, dir)?.also { picker.listed(dir, it) }
+    }
+
+    /** What read gives off the main thread, again for new keys or Try again; null while it is read. */
+    @Composable
+    private fun readListing(vararg keys: Any, read: () -> String?): Listing? {
+        val listing by produceState<Listing?>(null, *keys, browseTry) {
             value = null
             value = withContext(Dispatchers.IO) {
                 try {
-                    val json = Core.current?.browseJSON(share, dir)
-                    if (json == null) {
-                        Listing(null, getString(R.string.add_no_daemon))
-                    } else {
-                        picker.listed(dir, json)
-                        Listing(FolderEntry.parseAll(json), null)
-                    }
+                    val json = read()
+                    if (json == null) Listing(null, getString(R.string.add_no_daemon)) else Listing(FolderEntry.parseAll(json), null)
                 } catch (e: Exception) {
                     Listing(null, e.message)
                 }
             }
         }
         return listing
+    }
+
+    /** The phone's storage the wizard browses: its own first, then any SD card. */
+    private val volumes: List<Volume>
+        get() {
+            val found = getSystemService(StorageManager::class.java).storageVolumes
+                .filter { it.state == Environment.MEDIA_MOUNTED }
+                .mapNotNull { v -> v.directory?.let { Volume(v.getDescription(this), it.path) } }
+            return found.ifEmpty { listOf(Volume(getString(R.string.wizard_phone_storage), Environment.getExternalStorageDirectory().path)) }
+        }
+
+    /** Makes the folder name in dir and opens it: null, or why it was not made. */
+    private fun makeFolder(dir: String, name: String): String? = try {
+        val made = Mobile.makeFolder(dir, name)
+        wizard = wizard?.copy(local = made)
+        null
+    } catch (e: Exception) {
+        e.message
     }
 
     // Marks on another share mean nothing there: they start again, as in the TUI.
@@ -414,7 +447,8 @@ class MainActivity : ComponentActivity() {
             WizardStep.SHARE -> closeWizard()
             WizardStep.FOLDER -> wizard = w.copy(step = WizardStep.SHARE)
             WizardStep.WHAT -> wizard = w.copy(step = WizardStep.FOLDER)
-            WizardStep.LATER -> wizard = w.copy(step = WizardStep.WHAT)
+            WizardStep.LOCAL -> wizard = w.copy(step = WizardStep.WHAT)
+            WizardStep.LATER -> wizard = w.copy(step = WizardStep.LOCAL)
         }
     }
 

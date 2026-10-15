@@ -118,8 +118,15 @@
     <string name="wizard_marks_none_exclude">Nothing marked yet: tick what to leave out.</string>
     <string name="wizard_synced_only">Synced only: %1$s</string>
     <string name="wizard_left_out">Left out: %1$s</string>
-    <string name="wizard_later_title">The folder on the share</string>
-    <string name="wizard_later">The shuttle would sync %1$s.\n%2$s\n\nThe folder on the phone, and its name and settings are the next steps of this editor, still to come: until then, “Add a share and a shuttle” adds one.</string>
+    <string name="wizard_local_title">Which folder on the phone</string>
+    <string name="wizard_new_folder">New folder</string>
+    <string name="wizard_new_folder_in">In %1$s</string>
+    <string name="wizard_folder_name">Name</string>
+    <string name="wizard_make">Make</string>
+    <string name="wizard_phone_storage">The phone\'s storage</string>
+    <string name="wizard_storage_top">Choose a folder in it, or make one: a shuttle does not sync all of the phone\'s storage.</string>
+    <string name="wizard_later_title">The folders</string>
+    <string name="wizard_later">The shuttle would sync %1$s with %3$s on the phone.\n%2$s\n\nIts name and settings are the next step of this editor, still to come: until then, “Add a share and a shuttle” adds one.</string>
     <string name="wizard_everything">Everything in it.</string>
     <string name="profile_add">Add a profile</string>
     <string name="profile_new">New profile</string>
