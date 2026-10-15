@@ -12,7 +12,7 @@ val shuttleVersion = providers.gradleProperty("shuttleVersion").orNull
 val shuttleVersionCode = shuttleVersion?.let { v ->
     val parts = Regex("""(\d+)\.(\d+)\.(\d+)""").matchEntire(v)?.groupValues?.drop(1)?.map(String::toInt)
     require(parts != null && parts[1] < 100 && parts[2] < 100) { "shuttleVersion $v: want X.Y.Z, minor and patch under 100" }
-    parts[0] * 10000 + parts[1] * 100 + parts[2]
+    (parts[0] * 10000 + parts[1] * 100 + parts[2]).also { require(it > 0) { "shuttleVersion $v: 0.0.0 has no versionCode" } }
 }
 
 // The release key, from the environment: the release workflow writes it from its secrets
