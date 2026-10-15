@@ -21,6 +21,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -47,21 +50,28 @@ class WizardTest {
         assertEquals("/", top.into("Photos").up().dir)
     }
 
+    // A name and a share before Next; why Next did not go on shows.
     @Test
-    fun aShareIsChosenBeforeNext() {
+    fun aNameAndAShareBeforeNext() {
         val shares = listOf(ShareRow("nas", "smb", "nas.example/home", emptyList(), "", "", false))
-        var chosen = ""
+        var chosen by mutableStateOf("")
+        var name by mutableStateOf("")
         var next = 0
-        compose.setContent { WizardShareStep(shares, chosen, { chosen = it }, { next++ }) {} }
+        compose.setContent { WizardShareStep(shares, chosen, name, "there is a shuttle named photos already", { name = it }, { chosen = it }, { next++ }) {} }
         compose.onNodeWithText("Next").assertIsNotEnabled()
         compose.onNodeWithText("smb · nas.example/home").assertExists()
         compose.onNodeWithText("nas").performClick()
         assertEquals("nas", chosen)
+        compose.onNodeWithText("Next").assertIsNotEnabled()
+        compose.onNodeWithText("The shuttle's name").performTextInput("photos")
+        compose.onNodeWithText("there is a shuttle named photos already").assertExists()
+        compose.onNodeWithText("Next").assertIsEnabled().performClick()
+        assertEquals(1, next)
     }
 
     @Test
     fun noShareYet() {
-        compose.setContent { WizardShareStep(emptyList(), "", {}, {}) {} }
+        compose.setContent { WizardShareStep(emptyList(), "", "", null, {}, {}, {}) {} }
         compose.onNodeWithText("There is no share yet: add one on the Shares tab.").assertExists()
     }
 
@@ -187,7 +197,7 @@ class WizardTest {
         val opened = mutableListOf<String>()
         var next = 0
         val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0/Media")
-        compose.setContent { WizardLocalStep(state, listOf(phone), Listing(FolderEntry.parseAll(json), null), { opened += it }, { null }, {}, {}) { next++ } }
+        compose.setContent { WizardLocalStep(state, listOf(phone), Listing(FolderEntry.parseAll(json), null), null, { opened += it }, { null }, {}, {}) { next++ } }
         compose.onNodeWithText("/storage/emulated/0/Media").assertExists()
         compose.onNodeWithText("Photos/").performClick()
         compose.onNodeWithText("↑ Up a folder").performClick()
@@ -202,7 +212,7 @@ class WizardTest {
     fun theTopOfStorageGoesToTheCard() {
         val opened = mutableListOf<String>()
         val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0")
-        compose.setContent { WizardLocalStep(state, listOf(phone, card), Listing(FolderEntry.parseAll(json), null), { opened += it }, { null }, {}, {}) {} }
+        compose.setContent { WizardLocalStep(state, listOf(phone, card), Listing(FolderEntry.parseAll(json), null), null, { opened += it }, { null }, {}, {}) {} }
         compose.onNodeWithText("↑ Up a folder").assertDoesNotExist()
         compose.onNodeWithText("Internal storage (/storage/emulated/0)").assertDoesNotExist()
         compose.onNodeWithText("SD card (/storage/1234-ABCD)").performClick()
@@ -217,7 +227,7 @@ class WizardTest {
         val asked = mutableListOf<String>()
         val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0/Media")
         compose.setContent {
-            WizardLocalStep(state, listOf(phone), Listing(emptyList(), null), {}, { asked += it; if (it == "a:b") "the phone cannot hold that name" else null }, {}, {}) {}
+            WizardLocalStep(state, listOf(phone), Listing(emptyList(), null), null, {}, { asked += it; if (it == "a:b") "the phone cannot hold that name" else null }, {}, {}) {}
         }
         compose.onNodeWithText("Nothing in this folder.").assertExists()
         compose.onNodeWithText("New folder").performScrollTo().performClick()
@@ -237,11 +247,49 @@ class WizardTest {
     fun aPhoneFolderThatCouldNotBeRead() {
         var retried = 0
         val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0/Media")
-        compose.setContent { WizardLocalStep(state, listOf(phone), Listing(null, "permission denied"), {}, { null }, { retried++ }, {}) {} }
+        compose.setContent { WizardLocalStep(state, listOf(phone), Listing(null, "permission denied"), null, {}, { null }, { retried++ }, {}) {} }
         compose.onNodeWithText("permission denied").assertExists()
         compose.onNodeWithText("Try again").performClick()
         assertEquals(1, retried)
         compose.onNodeWithText("New folder").assertDoesNotExist()
         compose.onNodeWithText("Use this folder").performScrollTo().assertIsNotEnabled()
+    }
+
+    // Folders inside another shuttle's are said on the step that chose them.
+    @Test
+    fun aPhoneFolderRefused() {
+        val state = WizardState(WizardStep.LOCAL, "nas", "/Media", local = "/storage/emulated/0/Media")
+        compose.setContent { WizardLocalStep(state, listOf(phone), Listing(emptyList(), null), "shuttles.photos and shuttles.s: folders overlap", {}, { null }, {}, {}) {} }
+        compose.onNodeWithText("shuttles.photos and shuttles.s: folders overlap").assertExists()
+    }
+
+    private val profiles = listOf(ProfileRow("live", "sync", "realtime", listOf("docs")), ProfileRow("quiet", "", "", emptyList()))
+
+    @Test
+    fun aProfileOrNone() {
+        var chosen by mutableStateOf("")
+        var next = 0
+        compose.setContent { WizardProfileStep(profiles, chosen, { chosen = it }, {}) { next++ } }
+        compose.onNodeWithText("No profile").assertExists()
+        compose.onNodeWithText("sync · realtime").assertExists()
+        compose.onNodeWithText("live").performClick()
+        assertEquals("live", chosen)
+        compose.onNodeWithText("Next").performScrollTo().performClick()
+        assertEquals(1, next)
+    }
+
+    // The last step: its settings, whence the rest comes, and Save, which says why it did not.
+    @Test
+    fun theSettingsAndSave() {
+        var saved = 0
+        val rows = listOf(Setting("mode", "Mode", "", listOf("push", "pull", "sync"), false, "", "sync", "profile live", ""))
+        compose.setContent {
+            SettingsScreen("Settings of photos", rows, { _, _ -> null }, head = { WizardSaveHead("live", "shuttles.photos: mode is not set", { saved++ }) }) {}
+        }
+        compose.onNodeWithText("What it does not set comes from live. Tap a setting to give it one of its own.").assertExists()
+        compose.onNodeWithText("shuttles.photos: mode is not set").assertExists()
+        compose.onNodeWithText("Save the shuttle").performClick()
+        assertEquals(1, saved)
+        compose.onNodeWithText("Mode").assertExists()
     }
 }
