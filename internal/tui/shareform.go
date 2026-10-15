@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/fqazzazee/shuttle/internal/config"
+	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 	"github.com/fqazzazee/shuttle/internal/shares"
 )
@@ -172,7 +173,7 @@ func (m *model) formKey(msg tea.KeyPressMsg) tea.Cmd {
 			f.result, f.failed = err.Error(), true
 			return nil
 		}
-		f.busy, f.result = "testing "+where(&sh)+"…", ""
+		f.busy, f.result = "testing "+present.Where(&sh)+"…", ""
 		return m.test(&sh, f.inputs["password"].Value(), true)
 	}
 	if f.focus == "type" {

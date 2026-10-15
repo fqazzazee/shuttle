@@ -274,3 +274,26 @@ func Room(sp fsys.Space) string {
 func Low(sp fsys.Space) bool {
 	return sp.Total > 0 && sp.Free < sp.Total/10
 }
+
+// Where says where a share is: smb://user@host/share, nfs://host/export, or
+// the mounted folder.
+func Where(sh *config.Share) string {
+	host := sh.Host
+	if sh.Port != 0 {
+		host += ":" + strconv.Itoa(sh.Port)
+	}
+	switch sh.Type {
+	case config.ShareSMB:
+		user := sh.User
+		if sh.Domain != "" {
+			user = sh.Domain + ";" + user
+		}
+		if user != "" {
+			user += "@"
+		}
+		return "smb://" + user + host + "/" + sh.Share
+	case config.ShareNFS3:
+		return "nfs://" + host + sh.Export
+	}
+	return sh.Path
+}

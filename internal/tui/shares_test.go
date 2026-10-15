@@ -148,15 +148,6 @@ func TestSharesList(t *testing.T) {
 			t.Errorf("screen lacks %q:\n%s", want, s)
 		}
 	}
-	for sh, want := range map[config.Share]string{
-		{Type: config.ShareSMB, Host: "h", Port: 1445, Share: "s", User: "u", Domain: "D"}: "smb://D;u@h:1445/s",
-		{Type: config.ShareSMB, Host: "h", Share: "s"}:                                     "smb://h/s",
-		{Type: config.ShareNFS3, Host: "h", Export: "/e"}:                                  "nfs://h/e",
-	} {
-		if got := where(&sh); got != want {
-			t.Errorf("where(%+v) = %q, want %q", sh, got, want)
-		}
-	}
 }
 
 func TestAddAShare(t *testing.T) {

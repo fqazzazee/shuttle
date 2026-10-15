@@ -187,3 +187,16 @@ func TestRoom(t *testing.T) {
 		t.Errorf("Interval = %q", got)
 	}
 }
+
+func TestWhere(t *testing.T) {
+	for sh, want := range map[config.Share]string{
+		{Type: config.ShareSMB, Host: "h", Port: 1445, Share: "s", User: "u", Domain: "D"}: "smb://D;u@h:1445/s",
+		{Type: config.ShareSMB, Host: "h", Share: "s"}:                                     "smb://h/s",
+		{Type: config.ShareNFS3, Host: "h", Export: "/e"}:                                  "nfs://h/e",
+		{Type: config.SharePath, Path: "/mnt/usb"}:                                         "/mnt/usb",
+	} {
+		if got := Where(&sh); got != want {
+			t.Errorf("Where(%+v) = %q, want %q", sh, got, want)
+		}
+	}
+}
