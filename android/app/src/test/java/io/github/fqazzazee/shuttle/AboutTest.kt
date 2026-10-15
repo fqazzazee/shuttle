@@ -4,7 +4,9 @@ package io.github.fqazzazee.shuttle
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -25,7 +27,7 @@ class AboutTest {
     fun theVersionTheLicenseAndTheNotices() {
         var back = false
         val notices = listOf("Third-party notices for shuttle's Android app") + (1..200).map { "paragraph $it" }
-        compose.setContent { AboutScreen("0.3.0", notices) { back = true } }
+        compose.setContent { AboutScreen("0.3.0", notices, null, {}) { back = true } }
         compose.onNodeWithText("Version 0.3.0").assertExists()
         compose.onNodeWithText("PolyForm Noncommercial License 1.0.0", substring = true).assertExists()
         compose.onNodeWithText("Third-party notices for shuttle's Android app").assertExists()
@@ -39,7 +41,7 @@ class AboutTest {
 
     @Test
     fun aBuildWithoutNotices() {
-        compose.setContent { AboutScreen("0.0.0-dev", null) {} }
+        compose.setContent { AboutScreen("0.0.0-dev", null, null, {}) {} }
         compose.onNodeWithText("This build was made without them: a release carries them.").assertExists()
     }
 
@@ -64,5 +66,21 @@ class AboutTest {
         assertEquals(list, reflow(list))
         val heading = "==============================================================================\n== Apache-2.0"
         assertEquals(heading, reflow(heading))
+    }
+
+    // The wallpaper's colours, where Android offers them: a switch that says what it does.
+    @Test
+    fun theWallpapersColours() {
+        val set = mutableListOf<Boolean>()
+        compose.setContent { AboutScreen("0.3.0", null, false, { set += it }) {} }
+        compose.onNodeWithText("The wallpaper's colours").assertExists()
+        compose.onNode(isToggleable()).assertIsOff().performClick()
+        assertEquals(listOf(true), set)
+    }
+
+    @Test
+    fun noWallpaperColoursToOffer() {
+        compose.setContent { AboutScreen("0.3.0", null, null, {}) {} }
+        compose.onNodeWithText("The wallpaper's colours").assertDoesNotExist()
     }
 }

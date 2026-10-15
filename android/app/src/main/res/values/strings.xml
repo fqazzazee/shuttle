@@ -50,6 +50,8 @@
     <string name="about_version">Version %1$s</string>
     <string name="about_license">shuttle is source-available: you may use it under the PolyForm Noncommercial License 1.0.0 or the PolyForm Internal Use License 1.0.0, as its LICENSE file says. Its source is at github.com/fqazzazee/shuttle.</string>
     <string name="about_notices">Third-party notices</string>
+    <string name="about_wallpaper">The wallpaper\'s colours</string>
+    <string name="about_wallpaper_hint">Material You, in place of shuttle\'s own colours: the terminal\'s and the project page\'s.</string>
     <string name="about_no_notices">This build was made without them: a release carries them.</string>
     <string name="enable">Enable</string>
     <string name="disable">Disable</string>

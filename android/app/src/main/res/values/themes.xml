@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
+<resources>
+    <!-- The window under the Compose screens, which draw shuttle's palette themselves (Theme.kt). -->
+    <style name="Theme.Shuttle" parent="android:Theme.Material.NoActionBar" />
+</resources>
