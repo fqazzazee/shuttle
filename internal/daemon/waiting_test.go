@@ -5,6 +5,7 @@ package daemon
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -166,5 +167,49 @@ interval = "1h"`)
 				t.Errorf("after resuming: %+v", st)
 			}
 		})
+	}
+}
+
+// A share its shuttles cannot probe for want of a permission is not lost:
+// on Android without local network access every dial fails. No notice
+// either way while they wait.
+func TestNoShareNoticesWhileWaiting(t *testing.T) {
+	fast(t)
+	f := newFixture(t, "push", "")
+	share := t.TempDir()
+	if err := os.Mkdir(filepath.Join(share, "a"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f.writeConfig(fmt.Sprintf("[shares.nas]\ntype = \"path\"\npath = %q\n[shuttles.a]\nmode = \"push\"\nlocal = %q\nremote = \"nas:/a\"\n",
+		share, t.TempDir()))
+	var reason atomic.Value
+	reason.Store("")
+	waitWhile(f, &reason)
+	f.waitFor("a", "the first probe", func(st Status) bool { return st.Share == ShareOnline })
+	// The shuttle's view comes first, then the share's, under shareMu:
+	// wait for that too, or the wait below would begin before it.
+	f.waitFor("a", "the share seen online", func(Status) bool {
+		f.d.shareMu.Lock()
+		defer f.d.shareMu.Unlock()
+		return f.d.shares["nas"] == ShareOnline
+	})
+
+	reason.Store("needs Local network access")
+	f.d.Recheck()
+	if err := os.Rename(share, share+".away"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("a", "the failed probe", func(st Status) bool { return st.Share == ShareOffline })
+	time.Sleep(4 * probeEvery)
+	if got := f.allEvents(); len(got) != 0 {
+		t.Fatalf("events while waiting = %+v, want none", got)
+	}
+
+	// Given the permission, the share is seen as it is: here, gone.
+	reason.Store("")
+	f.d.Recheck()
+	f.d.ProbeNow()
+	if lost := f.waitEvents(EventShareLost, 1); lost[0].Share != "nas" {
+		t.Errorf("share lost = %+v", lost[0])
 	}
 }

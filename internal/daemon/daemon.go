@@ -330,10 +330,18 @@ func (d *Daemon) isMetered() bool {
 }
 
 // Recheck asks Options.Waiting again for every shuttle, after what it
-// depends on changed: shuttles that no longer wait run what was pending.
+// depends on changed: shuttles that no longer wait run what was pending,
+// and each share is looked at again with them counted (see shareChanged).
 func (d *Daemon) Recheck() {
+	shares := map[string]bool{}
 	for _, r := range d.all() {
 		r.pausedChanged()
+		shares[r.shuttle.Share] = true
+	}
+	d.shareMu.Lock()
+	defer d.shareMu.Unlock()
+	for _, share := range slices.Sorted(maps.Keys(shares)) {
+		d.shareChanged(share)
 	}
 }
 
