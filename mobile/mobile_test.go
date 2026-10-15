@@ -1017,3 +1017,50 @@ func TestProfileEditor(t *testing.T) {
 		t.Error("deleting a profile that is not there taken")
 	}
 }
+
+// The wizard's listing of a share: folders first, into a folder, and again
+// once the open share has stopped working.
+func TestBrowse(t *testing.T) {
+	f := newFixture(t)
+	for _, d := range []string{"Photos/2024", "Music"} {
+		if err := os.MkdirAll(filepath.Join(f.share, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(f.share, "a.txt"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	got, err := m.BrowseJSON("mnt", "/")
+	if want := `[{"Name":"Music","Dir":true},{"Name":"Photos","Dir":true},{"Name":"a.txt","Dir":false}]`; err != nil || got != want {
+		t.Errorf("the top: %s, %v; want %s", got, err, want)
+	}
+	if got, err := m.BrowseJSON("mnt", "/Photos"); err != nil || got != `[{"Name":"2024","Dir":true}]` {
+		t.Errorf("Photos: %s, %v", got, err)
+	}
+
+	// The folder the open share is on is deleted, and another made in its
+	// place: the open share fails, as a stale connection would, and is
+	// opened again.
+	if err := os.RemoveAll(f.share); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(f.share, "Photos", "2025"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := m.BrowseJSON("mnt", "/Photos"); err != nil || got != `[{"Name":"2025","Dir":true}]` {
+		t.Errorf("Photos, replaced: %s, %v", got, err)
+	}
+
+	if _, err := m.BrowseJSON("mnt", "/nope"); err == nil {
+		t.Error("a folder that is not there listed")
+	}
+	if _, err := m.BrowseJSON("ghost", "/"); err == nil || !strings.Contains(err.Error(), "no share named ghost") {
+		t.Errorf("an unknown share: %v", err)
+	}
+	m.EndBrowse()
+	m.EndBrowse() // nothing open: nothing to do
+	if _, err := m.BrowseJSON("mnt", "/"); err != nil {
+		t.Errorf("after EndBrowse: %v", err)
+	}
+}
