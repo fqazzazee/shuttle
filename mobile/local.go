@@ -32,18 +32,28 @@ func LocalJSON(dir string) (string, error) {
 	return toJSON(list), nil
 }
 
-// MakeFolder makes the folder name in dir, a full path on the phone, and
-// returns its path. A folder by that name already there is not an error: the
-// wizard opens it. A name the phone's storage cannot hold is refused before
-// anything is made, saying why (localNames).
-func MakeFolder(dir, name string) (string, error) {
+// folderName is a new folder's name as typed, trimmed, or why it is none.
+func folderName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	switch {
 	case name == "":
 		return "", errors.New("the folder needs a name")
 	case name == "." || name == ".." || strings.Contains(name, "/"):
 		return "", fmt.Errorf("%q cannot be a folder's name", name)
-	case !path.IsAbs(dir):
+	}
+	return name, nil
+}
+
+// MakeFolder makes the folder name in dir, a full path on the phone, and
+// returns its path. A folder by that name already there is not an error: the
+// wizard opens it. A name the phone's storage cannot hold is refused before
+// anything is made, saying why (localNames).
+func MakeFolder(dir, name string) (string, error) {
+	name, err := folderName(name)
+	if err != nil {
+		return "", err
+	}
+	if !path.IsAbs(dir) {
 		return "", fmt.Errorf("%q is not a full path", dir)
 	}
 	names := localNames(dir)

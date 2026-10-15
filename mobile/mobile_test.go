@@ -1066,6 +1066,36 @@ func TestBrowse(t *testing.T) {
 	}
 }
 
+// A folder made on the share from the wizard, which then opens it.
+func TestMakeShareFolder(t *testing.T) {
+	f := newFixture(t)
+	m := f.start(t)
+	made, err := m.MakeShareFolder("mnt", "/", " Backups ")
+	if err != nil || made != "/Backups" {
+		t.Fatalf("made %q, %v", made, err)
+	}
+	if made, err = m.MakeShareFolder("mnt", "/Backups", "2026"); err != nil || made != "/Backups/2026" {
+		t.Fatalf("made %q, %v", made, err)
+	}
+	if info, err := os.Stat(filepath.Join(f.share, "Backups", "2026")); err != nil || !info.IsDir() {
+		t.Errorf("on the share: %v", err)
+	}
+	if again, err := m.MakeShareFolder("mnt", "/Backups", "2026"); err != nil || again != made {
+		t.Errorf("made again: %q, %v", again, err)
+	}
+	if got, err := m.BrowseJSON("mnt", "/Backups"); err != nil || got != `[{"Name":"2026","Dir":true}]` {
+		t.Errorf("listed: %s, %v", got, err)
+	}
+	for _, name := range []string{"", "a/b", ".."} {
+		if _, err := m.MakeShareFolder("mnt", "/", name); err == nil {
+			t.Errorf("%q made", name)
+		}
+	}
+	if _, err := m.MakeShareFolder("ghost", "/", "x"); err == nil || !strings.Contains(err.Error(), "no share named ghost") {
+		t.Errorf("an unknown share: %v", err)
+	}
+}
+
 // A shuttle turned off and on, and deleted, as the TUI does: its files stay.
 func TestEnableAndDeleteShuttle(t *testing.T) {
 	f := newFixture(t)
