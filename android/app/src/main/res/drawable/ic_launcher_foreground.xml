@@ -1,22 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
-<!-- The front of a shuttle bus, from the GNOME extension's symbolic icon. -->
+<!-- The launcher icon: the bus of shuttle's desktop icon (packaging/icons), in its colours, as the
+     TUI draws it, on the TUI's ink (ic_launcher_background). The desktop icon's folder and sync badge
+     are left out: a phone's round mask would cut them, or shrink the bus to fit them. Its outline is
+     the TUI's sky, the colour it draws the bus in: the desktop's near-black would vanish on ink. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:scaleX="0.5"
-        android:scaleY="0.5"
-        android:translateX="22.0"
-        android:translateY="22.0">
-        <path
-            android:fillColor="#FFFFFF"
-            android:fillType="evenOdd"
-            android:pathData="M46 12h36a16 16 0 0 1 16 16v56a16 16 0 0 1-16 16H46a16 16 0 0 1-16-16V28a16 16 0 0 1 16-16zm2 9a9 9 0 0 0-9 9v52a9 9 0 0 0 9 9h32a9 9 0 0 0 9-9V30a9 9 0 0 0-9-9z" />
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M54,27h20a4,4 0 0 1 4,4v0a4,4 0 0 1 -4,4h-20a4,4 0 0 1 -4,-4v0a4,4 0 0 1 4,-4zM49,42h30a5,5 0 0 1 5,5v14a5,5 0 0 1 -5,5h-30a5,5 0 0 1 -5,-5v-14a5,5 0 0 1 5,-5zM30 40v9H22v13a4 4 0 0 1-8 0V44a4 4 0 0 1 4-4zM98 40v9h8v13a4 4 0 0 0 8 0V44a4 4 0 0 0-4-4zM42,80a6,6 0 1 0 12,0a6,6 0 1 0 -12,0zM74,80a6,6 0 1 0 12,0a6,6 0 1 0 -12,0zM61,77h6a3,3 0 0 1 3,3v0a3,3 0 0 1 -3,3h-6a3,3 0 0 1 -3,-3v0a3,3 0 0 1 3,-3zM42,96h6a4,4 0 0 1 4,4v10a4,4 0 0 1 -4,4h-6a4,4 0 0 1 -4,-4v-10a4,4 0 0 1 4,-4zM80,96h6a4,4 0 0 1 4,4v10a4,4 0 0 1 -4,4h-6a4,4 0 0 1 -4,-4v-10a4,4 0 0 1 4,-4z" />
+    <!-- The desktop icon's 128 units, the bus centred and 62 of the 66 the masks keep. -->
+    <group android:scaleX="0.6" android:scaleY="0.6" android:translateX="15.6" android:translateY="17.4">
+        <path android:fillColor="#FFF6F5F4" android:pathData="M46,12h36a16,16 0 0 1 16,16v56a16,16 0 0 1 -16,16h-36a16,16 0 0 1 -16,-16v-56a16,16 0 0 1 16,-16z" />
+        <path android:fillColor="#FFCDE3FB" android:pathData="M45,40h38a7,7 0 0 1 7,7v16a7,7 0 0 1 -7,7h-38a7,7 0 0 1 -7,-7v-16a7,7 0 0 1 7,-7z" />
+        <path android:fillColor="#FF241F31" android:pathData="M51,19h26a5,5 0 0 1 5,5v5a5,5 0 0 1 -5,5h-26a5,5 0 0 1 -5,-5v-5a5,5 0 0 1 5,-5z" />
+        <group android:translateX="55.5" android:translateY="20" android:scaleX="1.06" android:scaleY="0.84">
+            <path android:fillColor="#FFF6D32D" android:pathData="M11,1l4,3.5L11,8V5.5H2v-2h9zM5,8v2.5h9v2H5V15l-4,-3.5z" />
+        </group>
+        <path android:fillColor="#FFF6D32D" android:pathData="M41,85a5,5 0 1 0 10,0a5,5 0 1 0 -10,0zM77,85a5,5 0 1 0 10,0a5,5 0 1 0 -10,0z" />
+        <path android:strokeColor="#FF61AFEF" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M46,12h36a16,16 0 0 1 16,16v56a16,16 0 0 1 -16,16h-36a16,16 0 0 1 -16,-16v-56a16,16 0 0 1 16,-16zM45,40h38a7,7 0 0 1 7,7v16a7,7 0 0 1 -7,7h-38a7,7 0 0 1 -7,-7v-16a7,7 0 0 1 7,-7zM30,44H20v14M98,44h10v14M41,85a5,5 0 1 0 10,0a5,5 0 1 0 -10,0zM77,85a5,5 0 1 0 10,0a5,5 0 1 0 -10,0zM58,85h12M38,100v10h12v-10M78,100v10h12v-10" />
     </group>
 </vector>
