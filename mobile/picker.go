@@ -127,6 +127,20 @@ func (p *Picker) MarksJSON() string {
 	return toJSON(out)
 }
 
+// SetSelection marks what a shuttle includes or excludes, as SelectionJSON
+// gives it: {"Include": ["Photos"], "Exclude": null}, relative to the root.
+// It is how the wizard starts on a shuttle it edits.
+func (p *Picker) SetSelection(selectionJSON string) error {
+	var sel struct{ Include, Exclude []string }
+	if err := json.Unmarshal([]byte(selectionJSON), &sel); err != nil {
+		return err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.marks.SetSelection(p.root, sel.Include, sel.Exclude)
+	return nil
+}
+
 // SelectionJSON is what the shuttle includes or excludes, as the config
 // takes it: {"Include": ["Photos"], "Exclude": null}.
 func (p *Picker) SelectionJSON() string {

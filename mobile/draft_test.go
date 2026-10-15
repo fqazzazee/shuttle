@@ -101,3 +101,52 @@ func TestDraft(t *testing.T) {
 		t.Errorf("pulled a.jpg: %q, %v", b, err)
 	}
 }
+
+// A saved shuttle in the wizard: where it syncs, for its steps to start
+// from, and whether an edit moves it.
+func TestEditDraft(t *testing.T) {
+	f := newFixture(t)
+	m := f.start(t)
+	if _, err := m.EditDraft("nope"); err == nil {
+		t.Error("an unknown shuttle edited")
+	}
+	d, err := m.EditDraft("s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf(`{"Name":"s","Share":"mnt","Folder":"/","Local":%q,"Profile":"","Selection":{"Include":null,"Exclude":null}}`, f.local)
+	if got := d.JSON(); got != want {
+		t.Errorf("JSON = %s; want %s", got, want)
+	}
+	if moved, err := d.Moved(); err != nil || moved {
+		t.Errorf("unchanged: moved %v, %v", moved, err)
+	}
+	if err := d.SetName("s"); err != nil {
+		t.Errorf("an edit keeps its name: %v", err)
+	}
+	if err := d.SetFolders("mnt", "/", f.local, `{"Include":null,"Exclude":["cache"]}`); err != nil {
+		t.Fatal(err)
+	}
+	if moved, err := d.Moved(); err != nil || moved {
+		t.Errorf("only what it selects changed: moved %v, %v", moved, err)
+	}
+	other := t.TempDir()
+	if err := d.SetFolders("mnt", "/", other, `{"Include":null,"Exclude":["cache"]}`); err != nil {
+		t.Fatal(err)
+	}
+	if moved, err := d.Moved(); err != nil || !moved {
+		t.Errorf("another folder on the phone: moved %v, %v", moved, err)
+	}
+	if err := d.Set("conflicts", "ask"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Save(); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := os.ReadFile(f.opts.ConfigPath)
+	for _, w := range []string{"[shuttles.s]", `mode = "push"`, fmt.Sprintf("local = %q", other), `exclude = ["cache"]`, `conflicts = "ask"`} {
+		if !strings.Contains(string(saved), w) {
+			t.Errorf("config lacks %s:\n%s", w, saved)
+		}
+	}
+}

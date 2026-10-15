@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +52,8 @@ enum class WizardStep { SHARE, FOLDER, WHAT, LOCAL, PROFILE, SETTINGS }
 /**
  * Where the wizard is: its step, the share chosen, the folder on it (a slash path from its top),
  * the folder inside that shown while marking what to sync, the folder on the phone (a full path;
- * "" until that step first shows), the shuttle's name, and its profile ("" for none).
+ * "" until that step first shows), the shuttle's name, its profile ("" for none), and whether it
+ * edits a saved shuttle, which keeps its name.
  */
 data class WizardState(
     val step: WizardStep = WizardStep.SHARE,
@@ -61,6 +63,7 @@ data class WizardState(
     val local: String = "",
     val name: String = "",
     val profile: String = "",
+    val editing: Boolean = false,
 ) {
     /** The folder as a shuttle's remote reads: "nas:/Photos". */
     val remote get() = "$share:$dir"
@@ -91,7 +94,13 @@ fun storageTop(p: String, volumes: List<Volume>) = p.trimEnd('/') in AddForm.STO
 /** What the wizard's marks mean, as the binding's Picker has them (PickAll and so on), with their words. */
 val pickModes = listOf(0 to R.string.pick_all, 1 to R.string.pick_include, 2 to R.string.pick_exclude)
 
-/** The wizard's first step, as the TUI's: the shuttle's name, and the share it syncs with. problem is why Next did not go on. */
+/** The name of the shuttle the wizard edits, shown over each step; "" while it adds one. */
+val LocalWizardEditing = compositionLocalOf { "" }
+
+/**
+ * The wizard's first step, as the TUI's: the shuttle's name, and the share it syncs with. A saved
+ * shuttle keeps its name. problem is why Next did not go on.
+ */
 @Composable
 fun WizardShareStep(
     shares: List<ShareRow>,
@@ -104,7 +113,10 @@ fun WizardShareStep(
     onCancel: () -> Unit,
 ) {
     WizardPage(stringResource(R.string.wizard_share_title)) {
-        OutlinedTextField(name, onName, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.wizard_name)) }, singleLine = true)
+        OutlinedTextField(
+            name, onName, Modifier.fillMaxWidth(), enabled = LocalWizardEditing.current.isEmpty(),
+            label = { Text(stringResource(R.string.wizard_name)) }, singleLine = true,
+        )
         if (shares.isEmpty()) Text(stringResource(R.string.wizard_share_none))
         for (s in shares) {
             Row(
@@ -336,6 +348,17 @@ fun WizardProfileStep(profiles: List<ProfileRow>, chosen: String, onChoose: (Str
     }
 }
 
+/** Asks before an edit that moves a shuttle is saved: it starts afresh, as on its first run. */
+@Composable
+fun MovedDialog(name: String, onSave: () -> Unit, onCancel: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        text = { Text(stringResource(R.string.wizard_moved, name)) },
+        confirmButton = { TextButton(onClick = onSave) { Text(stringResource(R.string.wizard_moved_save)) } },
+        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.add_cancel)) } },
+    )
+}
+
 /** Above the wizard's last step, its settings: whence what it does not set comes, why it was not saved, and Save. */
 @Composable
 fun WizardSaveHead(profile: String, problem: String?, onSave: () -> Unit) {
@@ -358,7 +381,11 @@ private fun WizardPage(title: String, content: @Composable () -> Unit) {
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(R.string.wizard_add), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        val editing = LocalWizardEditing.current
+        Text(
+            if (editing.isEmpty()) stringResource(R.string.wizard_add) else stringResource(R.string.wizard_edit, editing),
+            style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+        )
         Text(title, style = MaterialTheme.typography.headlineMedium)
         content()
     }
