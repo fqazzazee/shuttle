@@ -11,7 +11,6 @@ import (
 	"maps"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -188,29 +187,6 @@ func editConfig(path, home string, before []byte, change func(*config.Doc) error
 	return err
 }
 
-// where says where a share is: smb://user@host/share, nfs://host/export, or
-// the mounted folder.
-func where(sh *config.Share) string {
-	host := sh.Host
-	if sh.Port != 0 {
-		host += ":" + strconv.Itoa(sh.Port)
-	}
-	switch sh.Type {
-	case config.ShareSMB:
-		user := sh.User
-		if sh.Domain != "" {
-			user = sh.Domain + ";" + user
-		}
-		if user != "" {
-			user += "@"
-		}
-		return "smb://" + user + host + "/" + sh.Share
-	case config.ShareNFS3:
-		return "nfs://" + host + sh.Export
-	}
-	return sh.Path
-}
-
 // lastTestWidth is what the Shares tab keeps for LAST TEST: "failed, 14:05".
 const lastTestWidth = 16
 
@@ -246,7 +222,7 @@ func (m *model) sharesLines(room int) []string {
 	for _, n := range names {
 		sh := m.cfg.Shares[n]
 		nameWidth = max(nameWidth, len(n))
-		whereWidth = max(whereWidth, len(where(&sh)))
+		whereWidth = max(whereWidth, len(present.Where(&sh)))
 	}
 	nameWidth += 2
 	whereWidth = min(whereWidth, 50) + 2
@@ -281,7 +257,7 @@ func (m *model) sharesLines(room int) []string {
 		if n == m.shareSel {
 			free = ansi.Strip(free)
 		}
-		line := row(n, string(sh.Type), where(&sh), orNone(strings.Join(m.usedBy(n), ", ")), free, test)
+		line := row(n, string(sh.Type), present.Where(&sh), orNone(strings.Join(m.usedBy(n), ", ")), free, test)
 		if n == m.shareSel {
 			line = selected.Render(pad(line, m.width))
 		}

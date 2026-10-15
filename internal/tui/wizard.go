@@ -16,6 +16,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/present"
 )
 
 // wizard adds a shuttle, or edits one, a step at a time: its name and
@@ -106,7 +107,7 @@ func (m *model) connect() tea.Cmd {
 		w.remoteFS = nil
 	}
 	sh := m.cfg.Shares[name]
-	w.busy = "connecting to " + where(&sh) + "…"
+	w.busy = "connecting to " + present.Where(&sh) + "…"
 	browse, store := m.o.Browse, m.o.Store
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, keyringTimeout)
@@ -407,9 +408,9 @@ func (w *wizard) lines(m *model, room int) []string {
 		body = append(body, mark[w.field == 0]+pad("Name", 8)+name, "", mark[w.field == 1]+"Share:")
 		for i, s := range w.shares {
 			sh := m.cfg.Shares[s]
-			line := "    " + pad(s, 12) + faint.Render(where(&sh))
+			line := "    " + pad(s, 12) + faint.Render(present.Where(&sh))
 			if i == w.share {
-				line = "  " + selected.Render("▸ "+pad(s, 12)) + faint.Render(where(&sh))
+				line = "  " + selected.Render("▸ "+pad(s, 12)) + faint.Render(present.Where(&sh))
 			}
 			body = append(body, line)
 		}
