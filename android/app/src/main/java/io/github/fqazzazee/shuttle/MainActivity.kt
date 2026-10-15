@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
     private var sharesNote by mutableStateOf<String?>(null)
     private var wizard by mutableStateOf<WizardState?>(null)
     private var about by mutableStateOf(false)
+    private var help by mutableStateOf(false)
     // The wallpaper's colours (Material You) in place of shuttle's palette, as the About screen sets.
     private var wallpaperColors by mutableStateOf(false)
     // What the wizard marks; replaced with each new wizard, or another share.
@@ -128,7 +129,10 @@ class MainActivity : ComponentActivity() {
                                         settingsRead.let { runCatching { Core.current?.settingsJSON(name) }.getOrNull() }
                                     }
                                     val w = wizard
-                                    if (about) {
+                                    if (help) {
+                                        BackHandler { help = false }
+                                        HelpScreen { help = false }
+                                    } else if (about) {
                                         BackHandler { about = false }
                                         val version = remember { packageManager.getPackageInfo(packageName, 0).versionName.orEmpty() }
                                         val notices = remember { readNotices(this@MainActivity) }
@@ -162,7 +166,7 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
-                                            ::allow, pausedAll, actions, ::openWizard,
+                                            ::allow, pausedAll, actions, ::openWizard, { help = true },
                                         ) { about = true }
                                     }
                                 }
@@ -678,6 +682,7 @@ private fun Main(
     pausedAll: Boolean,
     actions: ListActions,
     onWizard: () -> Unit,
+    onHelp: () -> Unit,
     onAbout: () -> Unit,
 ) {
     Column(
@@ -694,7 +699,10 @@ private fun Main(
             ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
         OutlinedButton(onClick = onWizard, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.wizard_add)) }
-        TextButton(onClick = onAbout) { Text(stringResource(R.string.about)) }
+        Row {
+            TextButton(onClick = onHelp) { Text(stringResource(R.string.help)) }
+            TextButton(onClick = onAbout) { Text(stringResource(R.string.about)) }
+        }
     }
 }
 
