@@ -5,6 +5,10 @@
     <string name="not_set_up">No shuttles yet. Setting them up on the phone comes in a later version.</string>
     <string name="start_failed">Syncing could not start: %1$s</string>
     <string name="service_channel">Syncing</string>
+    <string name="channel_errors">Errors</string>
+    <string name="channel_conflicts">Conflicts</string>
+    <string name="channel_completed">Finished syncs</string>
+    <string name="channel_share">Shares coming and going</string>
     <string name="service_title">shuttle is syncing</string>
     <string name="service_text">Watching your real-time shuttles, or finishing a run you asked for. Tap to open.</string>
 

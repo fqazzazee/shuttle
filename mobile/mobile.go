@@ -29,6 +29,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/notice"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
@@ -42,13 +43,14 @@ type Passwords interface {
 }
 
 // Listener hears from the daemon: a shuttle's status after each change,
-// what is worth a notification, and each reload of the config (the shuttles
-// it removed, or why it did not load), each as JSON. After a reload, the
-// app asks again which shuttles are real-time and what work to plan. It is
-// called on the daemon's goroutines and must not block.
+// what is worth a notification, worded as the desktop words it (a
+// notice.Note: its key, kind, summary, body), and each reload of the config
+// (the shuttles it removed, or why it did not load), each as JSON. After a
+// reload, the app asks again which shuttles are real-time and what work to
+// plan. It is called on the daemon's goroutines and must not block.
 type Listener interface {
 	OnStatus(statusJSON string)
-	OnEvent(eventJSON string)
+	OnNotice(noteJSON string)
 	OnReload(reloadedJSON string)
 }
 
@@ -195,7 +197,7 @@ func daemonOptions(o *Options, acc *access, log *slog.Logger) (*daemon.Options, 
 	}
 	if l := o.Listener; l != nil {
 		do.OnChange = func(st *daemon.Status) { l.OnStatus(toJSON(st)) }
-		do.OnEvent = func(e *daemon.Event) { l.OnEvent(toJSON(e)) }
+		do.OnEvent = func(e *daemon.Event) { l.OnNotice(toJSON(notice.Of(e))) }
 	}
 	return do, nil
 }
