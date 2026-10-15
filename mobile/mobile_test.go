@@ -689,11 +689,12 @@ func TestDetailJSON(t *testing.T) {
 	var d struct {
 		Name, Arrow, Local, Remote, Syncs, Runs, LastRun, LocalRoom string
 		Errors                                                      []engine.Issue
+		Enabled                                                     bool
 	}
 	if err := json.Unmarshal([]byte(out), &d); err != nil {
 		t.Fatal(err)
 	}
-	if d.Name != "s" || d.Arrow != "↑" || d.Local != f.local || d.Remote != "mnt:/" || d.Syncs != "all but cache" ||
+	if !d.Enabled || d.Name != "s" || d.Arrow != "↑" || d.Local != f.local || d.Remote != "mnt:/" || d.Syncs != "all but cache" ||
 		!strings.HasPrefix(d.Runs, "as files change") || d.LastRun != "just now: 1 copied" || !strings.Contains(d.LocalRoom, "free of") {
 		t.Errorf("detail = %s", out)
 	}
@@ -1062,5 +1063,43 @@ func TestBrowse(t *testing.T) {
 	m.EndBrowse() // nothing open: nothing to do
 	if _, err := m.BrowseJSON("mnt", "/"); err != nil {
 		t.Errorf("after EndBrowse: %v", err)
+	}
+}
+
+// A shuttle turned off and on, and deleted, as the TUI does: its files stay.
+func TestEnableAndDeleteShuttle(t *testing.T) {
+	f := newFixture(t)
+	if err := os.WriteFile(filepath.Join(f.local, "a.txt"), []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := f.start(t)
+	if err := m.SetEnabled("s", false); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		out, _ := m.DetailJSON("s")
+		if strings.Contains(out, `"Enabled":false`) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("not disabled: %s", out)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if err := m.SetEnabled("s", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.DeleteShuttle("s"); err != nil {
+		t.Fatal(err)
+	}
+	if doc, _ := os.ReadFile(f.opts.ConfigPath); strings.Contains(string(doc), "shuttles.s") || !strings.Contains(string(doc), "[shares.mnt]") {
+		t.Errorf("config:\n%s", doc)
+	}
+	if err := m.DeleteShuttle("s"); err == nil || !strings.Contains(err.Error(), "no shuttle named s") {
+		t.Errorf("deleted twice: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(f.local, "a.txt")); err != nil {
+		t.Errorf("its file: %v", err)
 	}
 }

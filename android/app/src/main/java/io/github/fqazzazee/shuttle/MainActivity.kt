@@ -145,7 +145,14 @@ class MainActivity : ComponentActivity() {
                                     } else if (json != null) {
                                         // Back to the list, by the button or Android's back gesture.
                                         BackHandler { selected = null }
-                                        DetailScreen(Detail.parse(json), { selected = null }, { selected?.let(::editWizard) }) { settingsOf = selected }
+                                        val name = selected!!
+                                        DetailScreen(
+                                            Detail.parse(json),
+                                            DetailActions(
+                                                back = { selected = null }, edit = { editWizard(name) }, settings = { settingsOf = name },
+                                                setEnabled = { setEnabled(name, it) }, delete = { deleteShuttle(name) },
+                                            ),
+                                        )
                                     } else {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
@@ -262,7 +269,22 @@ class MainActivity : ComponentActivity() {
             pausedAll = paused
             Core.async { Core.current?.setPaused("", paused) }
         },
+        enable = { setEnabled(it, true) },
     )
+
+    // The config file is written off the main thread; the daemon follows it, and the list with it.
+    private fun setEnabled(name: String, on: Boolean) {
+        Core.async { Core.current?.setEnabled(name, on) }
+    }
+
+    /** Deletes a shuttle from the config, and leaves its screen: null, or why it was not. */
+    private fun deleteShuttle(name: String): String? = try {
+        Core.current?.deleteShuttle(name) ?: throw IllegalStateException(getString(R.string.add_no_daemon))
+        selected = null
+        null
+    } catch (e: Exception) {
+        e.message
+    }
 
     private fun openShare(name: String) {
         val json = runCatching { Core.current?.shareJSON(name) }.getOrNull() ?: return

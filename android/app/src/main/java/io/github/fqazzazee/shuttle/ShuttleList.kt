@@ -29,6 +29,7 @@ class ListActions(
     val syncNow: (String) -> Unit,
     val setPaused: (String, Boolean) -> Unit,
     val setPausedAll: (Boolean) -> Unit,
+    val enable: (String) -> Unit,
 )
 
 /** The shuttles, as the dashboard lists them: each one's mode, state and progress, with its buttons. */
@@ -66,6 +67,8 @@ private fun ShuttleCard(s: ShuttleStatus, actions: ListActions) {
                         Text(stringResource(if (s.paused) R.string.resume else R.string.pause))
                     }
                     TextButton(onClick = { actions.syncNow(s.name) }) { Text(stringResource(R.string.sync_now)) }
+                } else {
+                    TextButton(onClick = { actions.enable(s.name) }) { Text(stringResource(R.string.enable)) }
                 }
             }
         }
