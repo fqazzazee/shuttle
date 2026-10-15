@@ -16,6 +16,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/pick"
 	"github.com/fqazzazee/shuttle/internal/present"
 )
 
@@ -144,7 +145,7 @@ func (m *model) opened(msg openedMsg) tea.Cmd {
 	}
 	switch {
 	case old != nil:
-		w.remote.pick, w.remote.marks = old.pick, old.marks
+		w.remote.marks = old.marks
 	case w.was != nil && w.was.Share == msg.share:
 		w.remote.setSelection(w.was.Settings.Include, w.was.Settings.Exclude)
 	}
@@ -254,7 +255,7 @@ func (m *model) next() tea.Cmd {
 		w.step = stepRemote
 		return m.connect()
 	case stepRemote:
-		if w.remote.pick == pickInclude && len(w.remote.inside()) == 0 {
+		if w.remote.marks.Mode == pick.Include && len(w.remote.inside()) == 0 {
 			return w.fail("nothing is marked to sync: space marks a file or folder, or m syncs everything")
 		}
 		w.dirs[0] = w.remote.dir()
@@ -267,7 +268,7 @@ func (m *model) next() tea.Cmd {
 		w.local.adopt(w.remote)
 		return cmd
 	case stepLocal:
-		if w.local.pick == pickInclude && len(w.local.inside()) == 0 {
+		if w.local.marks.Mode == pick.Include && len(w.local.inside()) == 0 {
 			return w.fail("nothing is marked to sync: space marks a file or folder, or m syncs everything")
 		}
 		dir := w.local.dir()
@@ -465,7 +466,7 @@ func (w *wizard) keys() [][2]string {
 			return [][2]string{{"enter", "use this path"}, {"esc", "back to the list"}}
 		}
 		keys := [][2]string{{"↑↓", "choose"}, {"→←", "open/close"}, {"o", "use as folder"}, {"⌫", "up"}, {"m", "what to sync"}}
-		if t != nil && t.pick != pickAll {
+		if t != nil && t.marks.Mode != pick.All {
 			keys = append(keys, [2]string{"space", "mark"})
 		}
 		return append(keys, [2]string{"enter", "next"}, [2]string{"t", "type a path"}, [2]string{"esc", "back"})

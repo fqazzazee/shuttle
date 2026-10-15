@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/fqazzazee/shuttle/internal/pick"
 )
 
 // fakeTree is a tree on /top whose folders are listed from dirs, each
@@ -37,28 +39,28 @@ func TestToggleSplitsAMarkedFolder(t *testing.T) {
 		"/top/a":   {{name: "b", dir: true}, {name: "c.txt"}},
 		"/top/a/b": {{name: "d.txt"}, {name: "e.txt"}},
 	}
-	for _, pick := range []picking{pickInclude, pickExclude} {
+	for _, mode := range []pick.Mode{pick.Include, pick.Exclude} {
 		tr := fakeTree(t, dirs)
-		tr.pick = pick
+		tr.marks.Mode = mode
 		tr.toggle(tr.find("/top/a"))
 		tr.toggle(tr.find("/top/a/b/d.txt"))
 		include, exclude := tr.selection()
 		got := include
-		if pick == pickExclude {
+		if mode == pick.Exclude {
 			got = exclude
 		}
 		if want := []string{"a/b/e.txt", "a/c.txt"}; !slices.Equal(got, want) {
-			t.Errorf("%s: marks %q, want %q", pickingNames[pick], got, want)
+			t.Errorf("%s: marks %q, want %q", pick.Names[mode], got, want)
 		}
 		all, some := tr.synced("/top/a")
 		if all || !some {
-			t.Errorf("%s: a is all=%v some=%v, want partly", pickingNames[pick], all, some)
+			t.Errorf("%s: a is all=%v some=%v, want partly", pick.Names[mode], all, some)
 		}
 		// Marking a folder takes in the marks inside it.
 		tr.toggle(tr.find("/top/a"))
 		include, exclude = tr.selection()
 		if got := slices.Concat(include, exclude); !slices.Equal(got, []string{"a"}) {
-			t.Errorf("%s: marks %q after marking a again", pickingNames[pick], got)
+			t.Errorf("%s: marks %q after marking a again", pick.Names[mode], got)
 		}
 	}
 }
@@ -66,9 +68,9 @@ func TestToggleSplitsAMarkedFolder(t *testing.T) {
 // Marks outside the shuttle's folder are neither shown nor saved.
 func TestMarksOutsideTheFolder(t *testing.T) {
 	tr := fakeTree(t, map[string][]entry{"/top": {{name: "a", dir: true}}})
-	tr.pick = pickInclude
-	tr.marks["/elsewhere"] = true
-	tr.marks["/"] = true
+	tr.marks.Mode = pick.Include
+	tr.marks.Add("/elsewhere")
+	tr.marks.Add("/")
 	if all, some := tr.synced("/top/a"); all || some {
 		t.Error("a mark above the shuttle's folder counts")
 	}
