@@ -3,9 +3,7 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/x/ansi"
 
@@ -46,17 +44,17 @@ func (m *model) panel() []string {
 		}
 		add("This computer", withSpace(m.homeText(s.Local), m.disks[s.Local]))
 		add("The share", withSpace(s.Share+":"+remotePath(s.Remote), m.shareSpace(s.Share)))
-		add("Syncs", selection(&s.Settings))
+		add("Syncs", present.Selection(&s.Settings))
 	}
 	now := m.now()
 	switch {
 	case st.State == daemon.StateDisabled:
 		add("Runs", "never: it is disabled (d turns it on)")
 	case s != nil:
-		add("Runs", joinNonEmpty(", ", runs(&s.Settings), nextText(st, now)))
+		add("Runs", joinNonEmpty(", ", runs(&s.Settings), present.Next(st, now)))
 	}
 	if !st.LastRun.IsZero() {
-		add("Last run", present.Ago(st.LastRun, now)+lastRunText(st))
+		add("Last run", present.Ago(st.LastRun, now)+": "+present.LastRun(st))
 	}
 	width := max(m.width-2-panelLabel, 20)
 	add("Now", present.Progress(&st.Progress))
@@ -113,92 +111,19 @@ func withSpace(dir string, sp fsys.Space) string {
 	if sp.Total <= 0 {
 		return dir
 	}
-	room := spaceText(sp)
-	if low(sp) {
+	room := present.Room(sp)
+	if present.Low(sp) {
 		room = heldStyle.Render(room)
 	}
 	return dir + faint.Render("  ·  ") + room
 }
 
-// selection says what of its folder a shuttle syncs.
-func selection(s *config.Settings) string {
-	switch {
-	case len(s.Include) > 0:
-		return "only " + strings.Join(s.Include, ", ")
-	case len(s.Exclude) > 0:
-		return "all but " + strings.Join(s.Exclude, ", ")
-	}
-	return "everything"
-}
-
-// runs says what starts a shuttle's runs, besides s.
+// runs is present.Runs with the key that runs a manual shuttle.
 func runs(s *config.Settings) string {
 	if len(s.Triggers) == 0 {
-		return "only when you ask (s)"
+		return present.Runs(s) + " (s)"
 	}
-	var parts []string
-	for _, t := range s.Triggers {
-		switch t {
-		case config.TriggerRealtime:
-			parts = append(parts, "as files change")
-		case config.TriggerShareAvailable:
-			parts = append(parts, "when the share comes online")
-		case config.TriggerSchedule:
-			if s.Interval > 0 {
-				parts = append(parts, "every "+durationText(s.Interval))
-			}
-			if len(s.At) > 0 {
-				at := make([]string, len(s.At))
-				for i, t := range s.At {
-					at[i] = t.String()
-				}
-				parts = append(parts, "at "+strings.Join(at, ", "))
-			}
-		}
-	}
-	return strings.Join(parts, ", ")
-}
-
-// nextText is when the schedule runs a shuttle next, unless it is running.
-func nextText(st *daemon.Status, now time.Time) string {
-	if st.State == daemon.StateRunning {
-		return ""
-	}
-	if next := present.Until(st.NextRun, now); next != "" {
-		return "next " + next
-	}
-	return ""
-}
-
-// lastRunText is what the last run did, after when it ended.
-func lastRunText(st *daemon.Status) string {
-	if st.Error != "" {
-		return ": it failed"
-	}
-	if st.Copied == 0 && st.Deleted == 0 {
-		return ": nothing to do"
-	}
-	var parts []string
-	if st.Copied > 0 {
-		parts = append(parts, fmt.Sprintf("%d copied", st.Copied))
-	}
-	if st.Deleted > 0 {
-		parts = append(parts, fmt.Sprintf("%d deleted", st.Deleted))
-	}
-	return ": " + strings.Join(parts, ", ")
-}
-
-// durationText is an interval as the config writes it: "90m", "1h", "2d".
-func durationText(d time.Duration) string {
-	switch {
-	case d%(24*time.Hour) == 0:
-		return fmt.Sprintf("%dd", d/(24*time.Hour))
-	case d%time.Hour == 0:
-		return fmt.Sprintf("%dh", d/time.Hour)
-	case d%time.Minute == 0:
-		return fmt.Sprintf("%dm", d/time.Minute)
-	}
-	return d.String()
+	return present.Runs(s)
 }
 
 func joinNonEmpty(sep string, parts ...string) string {
