@@ -351,3 +351,52 @@ func TestStatusHasTheMode(t *testing.T) {
 	f.writeConfig(f.shuttleDoc("sync", ""))
 	f.waitFor("s", "the new mode", func(st Status) bool { return st.Mode == config.ModeSync })
 }
+
+// EditConfig changes the file through the editor, keeping what it does not
+// touch, applies it as a reload, and leaves the file alone when the change
+// fails or would not load.
+func TestEditConfig(t *testing.T) {
+	f := newFixture(t, "push", "")
+	doc := "# mine\n" + f.shuttleDoc("push", "")
+	f.writeConfig(doc)
+	f.start()
+	_, local, remote := f.other()
+
+	if err := f.d.EditConfig(func(d *config.Doc) error {
+		return d.Set([]string{"shuttles", "t"}, "local", local)
+	}); err == nil {
+		t.Error("a shuttle with no mode or remote taken")
+	}
+	if err := f.d.EditConfig(func(*config.Doc) error { return errors.New("no") }); err == nil || err.Error() != "no" {
+		t.Errorf("a failing change: %v", err)
+	}
+	if got, _ := os.ReadFile(f.paths.Config); string(got) != doc {
+		t.Fatalf("config after refused edits:\n%s", got)
+	}
+
+	if err := f.d.EditConfig(func(d *config.Doc) error {
+		if err := d.SetShare(&config.Share{Name: "mnt2", Type: config.SharePath, Path: remote}); err != nil {
+			return err
+		}
+		for k, v := range map[string]string{"mode": "pull", "local": local, "remote": "mnt2:"} {
+			if err := d.Set([]string{"shuttles", "t"}, k, v); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("t", "the new shuttle", func(Status) bool { return true })
+	// What was there is kept, line for line and in order, the comment too;
+	// the editor puts the new share beside the old one.
+	got, _ := os.ReadFile(f.paths.Config)
+	rest := string(got)
+	for line := range strings.SplitSeq(doc, "\n") {
+		i := strings.Index(rest, line)
+		if i < 0 {
+			t.Fatalf("config after the edit lost %q:\n%s", line, got)
+		}
+		rest = rest[i+len(line):]
+	}
+}

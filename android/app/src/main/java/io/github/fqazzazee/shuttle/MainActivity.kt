@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
     private var forceStopped by mutableStateOf(false)
     private val pauses by lazy { Core.pauses(this) }
     private var pausedAll by mutableStateOf(false)
+    private var adding by mutableStateOf(false)
     private val prefs by lazy { getSharedPreferences("app", MODE_PRIVATE) }
 
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -73,8 +75,11 @@ class MainActivity : ComponentActivity() {
                             prefs.edit { putBoolean(FIRST_RUN_SEEN, true) }
                             firstRunSeen = true
                         }
+                    } else if (adding) {
+                        AddScreen { adding = false }
                     } else {
                         Main(access, Core.statuses, Core.startError, forceStopped, { forceStopped = false }, ::allow, pausedAll, actions)
+                        { adding = true }
                     }
                 }
             }
@@ -148,6 +153,7 @@ private fun Main(
     onAllow: (Permission) -> Unit,
     pausedAll: Boolean,
     actions: ListActions,
+    onAdd: () -> Unit,
 ) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -162,6 +168,7 @@ private fun Main(
         } else {
             ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
+        OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.add)) }
     }
 }
 

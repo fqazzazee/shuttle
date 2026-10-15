@@ -31,6 +31,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/notice"
 	"github.com/fqazzazee/shuttle/internal/secrets"
+	"github.com/fqazzazee/shuttle/internal/shares"
 )
 
 // Passwords is the app's password store, written in Kotlin over the Android
@@ -93,11 +94,12 @@ var (
 
 // Daemon is the process's running daemon.
 type Daemon struct {
-	d      *daemon.Daemon
-	cancel context.CancelFunc
-	done   chan error
-	log    *os.File
-	access *access
+	d         *daemon.Daemon
+	passwords Passwords
+	cancel    context.CancelFunc
+	done      chan error
+	log       *os.File
+	access    *access
 }
 
 // access is the permissions the app last reported, read by the daemon's
@@ -157,7 +159,7 @@ func Start(o *Options) (*Daemon, error) {
 		d.WatchReloads(func(r *daemon.Reloaded) { l.OnReload(toJSON(r)) })
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	m := &Daemon{d: d, cancel: cancel, done: make(chan error, 1), log: logf, access: acc}
+	m := &Daemon{d: d, passwords: o.Passwords, cancel: cancel, done: make(chan error, 1), log: logf, access: acc}
 	go func() { m.done <- d.Run(ctx) }()
 	select {
 	case <-d.Ready():
@@ -358,6 +360,108 @@ func quiet(statuses []daemon.Status, shuttles []config.Shuttle) bool {
 // ProbeNow looks for every share now: the app calls it when the phone joins
 // a network.
 func (m *Daemon) ProbeNow() { m.d.ProbeNow() }
+
+// shareTimeout bounds TestShare: a server that does not answer is a
+// failed test, not a stuck screen.
+const shareTimeout = 30 * time.Second
+
+// TestShare tries a share before it is saved: connects, logs in with
+// password and looks at its folder. shareJSON is a share's fields as the
+// config has them ({"Name": "nas", "Type": "smb", "Host": "nas.example",
+// "Share": "home", "User": "user"}). It returns the room there, as JSON
+// ({"Free": …, "Total": …}).
+func (m *Daemon) TestShare(shareJSON, password string) (string, error) {
+	var sh config.Share
+	if err := json.Unmarshal([]byte(shareJSON), &sh); err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), shareTimeout)
+	defer cancel()
+	space, err := shares.Test(ctx, &sh, password, store{m.passwords})
+	if err != nil {
+		return "", err
+	}
+	return toJSON(space), nil
+}
+
+// AddShare adds a share to the config, as TestShare takes it, after storing
+// its password in the app's password store when one is given: a share with
+// no password would fail its first run, a password with no share harms
+// nothing. A share by that name already there is an error.
+func (m *Daemon) AddShare(shareJSON, password string) error {
+	var sh config.Share
+	if err := json.Unmarshal([]byte(shareJSON), &sh); err != nil {
+		return err
+	}
+	if k, needs := shares.Key(&sh); needs && password != "" {
+		if err := (store{m.passwords}).Set(context.Background(), k, password); err != nil {
+			return err
+		}
+	}
+	return m.edit(func(d *config.Doc) error {
+		if d.HasTable([]string{"shares", sh.Name}) {
+			return fmt.Errorf("there is a share named %s already", sh.Name)
+		}
+		return d.SetShare(&sh)
+	})
+}
+
+// newShuttle is what AddShuttle takes: the least a shuttle needs.
+type newShuttle struct {
+	Name, Share string
+	Folder      string // on the share; "" for its top
+	Local       string // the folder on the phone
+	Mode        config.Mode
+	Triggers    []config.Trigger // none: it runs when asked
+	Interval    string           // with the schedule trigger, e.g. "1h"
+}
+
+// AddShuttle adds a shuttle to the config, with everything else from the
+// defaults. shuttleJSON: {"Name": "photos", "Share": "nas", "Folder":
+// "Photos", "Local": "/storage/emulated/0/DCIM", "Mode": "push",
+// "Triggers": ["realtime"]}. A shuttle by that name already there is an
+// error; so is a config that would not load, such as two shuttles on one
+// folder.
+func (m *Daemon) AddShuttle(shuttleJSON string) error {
+	var s newShuttle
+	if err := json.Unmarshal([]byte(shuttleJSON), &s); err != nil {
+		return err
+	}
+	table := []string{"shuttles", s.Name}
+	return m.edit(func(d *config.Doc) error {
+		if d.HasTable(table) {
+			return fmt.Errorf("there is a shuttle named %s already", s.Name)
+		}
+		set := func(key string, v any) error { return d.Set(table, key, v) }
+		if err := set("mode", string(s.Mode)); err != nil {
+			return err
+		}
+		if err := set("local", s.Local); err != nil {
+			return err
+		}
+		if err := set("remote", s.Share+":"+s.Folder); err != nil {
+			return err
+		}
+		if len(s.Triggers) > 0 {
+			triggers := make([]string, len(s.Triggers))
+			for i, t := range s.Triggers {
+				triggers[i] = string(t)
+			}
+			if err := set("triggers", triggers); err != nil {
+				return err
+			}
+		}
+		if s.Interval != "" {
+			return set("interval", s.Interval)
+		}
+		return nil
+	})
+}
+
+// edit changes the config. The daemon applies it in the background, and the
+// app hears when it has (Listener.OnReload), with the new shuttle's status
+// after it.
+func (m *Daemon) edit(change func(*config.Doc) error) error { return m.d.EditConfig(change) }
 
 // SyncNow asks for a run of a shuttle.
 func (m *Daemon) SyncNow(name string) error { return m.d.SyncNow(name) }

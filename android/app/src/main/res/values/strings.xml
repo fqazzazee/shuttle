@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0 -->
 <resources>
     <string name="app_name">shuttle</string>
-    <string name="not_set_up">No shuttles yet. Setting them up on the phone comes in a later version.</string>
+    <string name="not_set_up">No shuttles yet.</string>
     <string name="start_failed">Syncing could not start: %1$s</string>
     <string name="service_channel">Syncing</string>
     <string name="channel_errors">Errors</string>
@@ -12,6 +12,31 @@
     <string name="service_title">shuttle is syncing</string>
     <string name="service_text">Watching your real-time shuttles, or finishing a run you asked for. Tap to open.</string>
 
+    <string name="add">Add a share and a shuttle</string>
+    <string name="add_title">A share and a shuttle</string>
+    <string name="add_share_heading">The share</string>
+    <string name="add_share_name">Name for the share</string>
+    <string name="add_host">Server (name or address)</string>
+    <string name="add_share">Share on the server</string>
+    <string name="add_export">Export on the server</string>
+    <string name="add_user">User</string>
+    <string name="add_password">Password</string>
+    <string name="add_test">Test the connection</string>
+    <string name="add_tested">Connected: the share is there.</string>
+    <string name="add_shuttle_heading">The shuttle</string>
+    <string name="add_name">Name for the shuttle</string>
+    <string name="add_folder">Folder on the share (empty: all of it)</string>
+    <string name="add_local">Folder on the phone</string>
+    <string name="mode_push">Push to the share</string>
+    <string name="mode_pull">Pull from it</string>
+    <string name="mode_sync">Sync both ways</string>
+    <string name="runs_asked">When asked</string>
+    <string name="runs_realtime">In real time</string>
+    <string name="runs_hourly">Every hour</string>
+    <string name="add_save">Save</string>
+    <string name="add_cancel">Cancel</string>
+    <string name="add_missing">Still needed: %1$s</string>
+    <string name="add_no_daemon">Syncing is not running; open the app again.</string>
     <string name="sync_now">Sync now</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
