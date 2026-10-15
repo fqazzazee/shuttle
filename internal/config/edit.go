@@ -584,3 +584,25 @@ func Save(path string, before, after []byte, home string) error {
 	}
 	return os.Rename(tmp, path)
 }
+
+// Replace puts data in place of the config file at path, whatever it held: a
+// backup restored. data must be a config that loads (home is for Parse);
+// the file is replaced atomically, as Save does, or left as it was.
+func Replace(path, home string, data []byte) error {
+	var err error
+	// Another editor saving meanwhile is not an error: read it again.
+	for range 3 {
+		var before []byte
+		before, err = os.ReadFile(path) //nolint:gosec // the user's own config file
+		if errors.Is(err, fs.ErrNotExist) {
+			before, err = nil, nil
+		}
+		if err != nil {
+			return err
+		}
+		if err = Save(path, before, data, home); !errors.Is(err, ErrChanged) {
+			break
+		}
+	}
+	return err
+}
