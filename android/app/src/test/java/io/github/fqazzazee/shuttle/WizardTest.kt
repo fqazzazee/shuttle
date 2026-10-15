@@ -82,7 +82,7 @@ class WizardTest {
         val opened = mutableListOf<String>()
         var next = 0
         val state = WizardState(WizardStep.FOLDER, "nas", "/Media")
-        compose.setContent { WizardFolderStep(state, Listing(FolderEntry.parseAll(json), null), { opened += it.dir }, {}, {}) { next++ } }
+        compose.setContent { WizardFolderStep(state, Listing(FolderEntry.parseAll(json), null), { opened += it.dir }, { null }, {}, {}) { next++ } }
         compose.onNodeWithText("nas:/Media").assertExists()
         compose.onNodeWithText("Photos/").performClick()
         compose.onNodeWithText("↑ Up a folder").performClick()
@@ -96,7 +96,7 @@ class WizardTest {
     fun aFolderThatCouldNotBeReadIsTriedAgainAndNotChosen() {
         var tries = 0
         compose.setContent {
-            WizardFolderStep(WizardState(WizardStep.FOLDER, "nas"), Listing(null, "connection refused"), {}, { tries++ }, {}) {}
+            WizardFolderStep(WizardState(WizardStep.FOLDER, "nas"), Listing(null, "connection refused"), {}, { null }, { tries++ }, {}) {}
         }
         compose.onNodeWithText("↑ Up a folder").assertDoesNotExist()
         compose.onNodeWithText("connection refused").assertExists()
@@ -107,14 +107,14 @@ class WizardTest {
 
     @Test
     fun whileReadingAndEmpty() {
-        compose.setContent { WizardFolderStep(WizardState(WizardStep.FOLDER, "nas"), null, {}, {}, {}) {} }
+        compose.setContent { WizardFolderStep(WizardState(WizardStep.FOLDER, "nas"), null, {}, { null }, {}, {}) {} }
         compose.onNodeWithText("Reading the folder…").assertExists()
         compose.onNodeWithText("Use this folder").assertIsNotEnabled()
     }
 
     @Test
     fun anEmptyFolder() {
-        compose.setContent { WizardFolderStep(WizardState(WizardStep.FOLDER, "nas"), Listing(emptyList(), null), {}, {}, {}) {} }
+        compose.setContent { WizardFolderStep(WizardState(WizardStep.FOLDER, "nas"), Listing(emptyList(), null), {}, { null }, {}, {}) {} }
         compose.onNodeWithText("Nothing in this folder.").assertExists()
         compose.onNodeWithText("Use this folder").assertIsEnabled()
     }
@@ -316,5 +316,31 @@ class WizardTest {
         compose.onNodeWithText("Cancel").performClick()
         assertEquals(1, saved)
         assertEquals(1, cancelled)
+    }
+
+    // As on the phone: a folder made on the share, in the folder shown; a refusal keeps the dialog open.
+    @Test
+    fun aFolderIsMadeOnTheShare() {
+        val asked = mutableListOf<String>()
+        val state = WizardState(WizardStep.FOLDER, "nas", "/Media")
+        compose.setContent {
+            WizardFolderStep(state, Listing(emptyList(), null), {}, { asked += it; if (it == "a:b") "the share cannot hold that name" else null }, {}, {}) {}
+        }
+        compose.onNodeWithText("New folder").performScrollTo().performClick()
+        compose.onNodeWithText("In nas:/Media").assertExists()
+        compose.onNodeWithText("Name").performTextInput("a:b")
+        compose.onNodeWithText("Make").performClick()
+        compose.onNodeWithText("the share cannot hold that name").assertExists()
+        compose.onNodeWithText("Name").performTextClearance()
+        compose.onNodeWithText("Name").performTextInput("Backups")
+        compose.onNodeWithText("Make").performClick()
+        compose.onNodeWithText("Make").assertDoesNotExist()
+        assertEquals(listOf("a:b", "Backups"), asked)
+    }
+
+    @Test
+    fun noNewFolderInAFolderThatCouldNotBeRead() {
+        compose.setContent { WizardFolderStep(WizardState(WizardStep.FOLDER, "nas"), Listing(null, "connection refused"), {}, { null }, {}, {}) {} }
+        compose.onNodeWithText("New folder").assertDoesNotExist()
     }
 }

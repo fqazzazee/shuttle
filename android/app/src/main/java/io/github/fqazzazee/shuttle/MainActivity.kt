@@ -387,7 +387,7 @@ class MainActivity : ComponentActivity() {
             WizardStep.FOLDER -> {
                 // Read off the main thread: the share is reached over the network.
                 val listing = listing(w.share, w.dir)
-                WizardFolderStep(w, listing, { wizard = it }, { browseTry++ }, ::wizardBack) {
+                WizardFolderStep(w, listing, { wizard = it }, { name -> makeShareFolder(w.share, w.dir, name) }, { browseTry++ }, ::wizardBack) {
                     // Marks outside the folder now chosen are kept, and do not count.
                     picker.setRoot(w.dir)
                     wizard = w.copy(step = WizardStep.WHAT, inner = if (within(w.inner, w.dir)) w.inner else w.dir)
@@ -478,6 +478,16 @@ class MainActivity : ComponentActivity() {
                 .mapNotNull { v -> v.directory?.let { Volume(v.getDescription(this), it.path) } }
             return found.ifEmpty { listOf(Volume(getString(R.string.wizard_phone_storage), Environment.getExternalStorageDirectory().path)) }
         }
+
+    /** Makes the folder name in dir on the share, off the main thread, and opens it: null, or why it was not made. */
+    private suspend fun makeShareFolder(share: String, dir: String, name: String): String? = try {
+        val made = withContext(Dispatchers.IO) { Core.current?.makeShareFolder(share, dir, name) }
+            ?: throw IllegalStateException(getString(R.string.add_no_daemon))
+        wizard = wizard?.copy(dir = made)
+        null
+    } catch (e: Exception) {
+        e.message
+    }
 
     /** Makes the folder name in dir and opens it: null, or why it was not made. */
     private fun makeFolder(dir: String, name: String): String? = try {

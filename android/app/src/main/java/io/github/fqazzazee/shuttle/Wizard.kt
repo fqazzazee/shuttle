@@ -26,12 +26,14 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 
 /** One thing in a folder on a share, as the wizard lists it (the binding's BrowseJSON). */
@@ -136,19 +138,21 @@ fun WizardShareStep(
 }
 
 /**
- * The wizard's second step: the shuttle's folder on the share, browsed from its top. listing is
- * null while the folder is read; a folder that could not be read can be tried again, and is not
- * chosen.
+ * The wizard's second step: the shuttle's folder on the share, browsed from its top, or made in the
+ * folder shown. listing is null while the folder is read; a folder that could not be read can be
+ * tried again, and is not chosen.
  */
 @Composable
 fun WizardFolderStep(
     state: WizardState,
     listing: Listing?,
     onOpen: (WizardState) -> Unit,
+    onMake: suspend (String) -> String?,
     onRetry: () -> Unit,
     onBack: () -> Unit,
     onNext: () -> Unit,
 ) {
+    var making by remember { mutableStateOf(false) }
     WizardPage(stringResource(R.string.wizard_folder_title)) {
         Text(state.remote, style = MaterialTheme.typography.bodyLarge)
         if (state.dir != "/") FolderRow(stringResource(R.string.wizard_up)) { onOpen(state.up()) }
@@ -164,8 +168,10 @@ fun WizardFolderStep(
                 if (e.dir) FolderRow(e.name + "/") { onOpen(state.into(e.name)) } else FolderRow(e.name, null)
             }
         }
+        if (listing?.entries != null) TextButton(onClick = { making = true }) { Text(stringResource(R.string.wizard_new_folder)) }
         Buttons(onBack, stringResource(R.string.wizard_back), stringResource(R.string.wizard_use), enabled = listing?.entries != null, onNext)
     }
+    if (making) NewFolderDialog(state.remote, onMake) { making = false }
 }
 
 /** What the wizard's third step shows of the marks: what they mean, how much of each path they sync, and the marks. */
@@ -265,7 +271,7 @@ fun WizardLocalStep(
     listing: Listing?,
     problem: String?,
     onOpen: (String) -> Unit,
-    onMake: (String) -> String?,
+    onMake: suspend (String) -> String?,
     onRetry: () -> Unit,
     onBack: () -> Unit,
     onNext: () -> Unit,
@@ -298,11 +304,13 @@ fun WizardLocalStep(
     if (making) NewFolderDialog(state.local, onMake) { making = false }
 }
 
-/** Asks for the new folder's name; make makes it, or says why it could not. */
+/** Asks for the new folder's name; make makes it, or says why it could not, off the main thread if it must. */
 @Composable
-private fun NewFolderDialog(dir: String, make: (String) -> String?, close: () -> Unit) {
+private fun NewFolderDialog(dir: String, make: suspend (String) -> String?, close: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var refused by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     AlertDialog(
         onDismissRequest = close,
         title = { Text(stringResource(R.string.wizard_new_folder)) },
@@ -314,9 +322,13 @@ private fun NewFolderDialog(dir: String, make: (String) -> String?, close: () ->
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                refused = make(name)
-                if (refused == null) close()
+            TextButton(enabled = !busy, onClick = {
+                busy = true
+                scope.launch {
+                    refused = make(name)
+                    busy = false
+                    if (refused == null) close()
+                }
             }) { Text(stringResource(R.string.wizard_make)) }
         },
         dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.add_cancel)) } },

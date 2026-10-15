@@ -513,6 +513,45 @@ func (m *Daemon) fileConfig() (*config.Config, error) {
 // true}, …], folders first (shares.List). The share stays open for the
 // next listing, until EndBrowse or a listing of another share.
 func (m *Daemon) BrowseJSON(share, dir string) (string, error) {
+	var list []shares.Entry
+	err := m.browsed(share, func(ctx context.Context, f fsys.FS) (err error) {
+		list, err = shares.List(ctx, f, dir)
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return toJSON(list), nil
+}
+
+// MakeShareFolder makes the folder name in dir, a slash path from the top
+// of the named share, on the share BrowseJSON has open, and returns its
+// path: the wizard opens it. A folder by that name already there is not an
+// error. A name the share cannot hold is refused before anything is made.
+func (m *Daemon) MakeShareFolder(share, dir, name string) (string, error) {
+	name, err := folderName(name)
+	if err != nil {
+		return "", err
+	}
+	made := path.Join("/", dir, name)
+	err = m.browsed(share, func(ctx context.Context, f fsys.FS) error {
+		if err := fsys.RefuseName(f, name); err != nil {
+			return err
+		}
+		return f.MkdirAll(ctx, strings.TrimPrefix(made, "/"))
+	})
+	switch {
+	case errors.Is(err, fsys.ErrRefusedName):
+		return "", fmt.Errorf("the share cannot hold that name: %s", strings.TrimPrefix(err.Error(), fsys.ErrRefusedName.Error()+": "))
+	case err != nil:
+		return "", err
+	}
+	return made, nil
+}
+
+// browsed does do on the named share, kept open for the wizard between
+// calls until EndBrowse or a call on another share.
+func (m *Daemon) browsed(share string, do func(context.Context, fsys.FS) error) error {
 	b := &m.browse
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -521,22 +560,19 @@ func (m *Daemon) BrowseJSON(share, dir string) (string, error) {
 	reused := b.fs != nil && b.share == share
 	if !reused {
 		if err := m.openBrowse(ctx, share); err != nil {
-			return "", err
+			return err
 		}
 	}
-	list, err := shares.List(ctx, b.fs, dir)
-	if err != nil && reused {
+	err := do(ctx, b.fs)
+	if err != nil && reused && !errors.Is(err, fsys.ErrRefusedName) {
 		// The connection may have gone stale while it sat, as the phone
 		// slept: once more, connected anew.
 		if err := m.openBrowse(ctx, share); err != nil {
-			return "", err
+			return err
 		}
-		list, err = shares.List(ctx, b.fs, dir)
+		err = do(ctx, b.fs)
 	}
-	if err != nil {
-		return "", err
-	}
-	return toJSON(list), nil
+	return err
 }
 
 // openBrowse opens the named share for BrowseJSON, as the config file has
