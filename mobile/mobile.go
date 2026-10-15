@@ -107,6 +107,14 @@ type Daemon struct {
 	done       chan error
 	log        *os.File
 	access     *access
+	browse     browsing
+}
+
+// browsing is the share the wizard has open for its listings, one at a time.
+type browsing struct {
+	mu    sync.Mutex
+	share string
+	fs    fsys.FS
 }
 
 // access is the permissions the app last reported, read by the daemon's
@@ -237,6 +245,7 @@ func openLog(name string) (*os.File, error) {
 // Stop lets a run in progress finish its file, and returns once the state
 // is closed. The process can then Start a daemon again.
 func (m *Daemon) Stop() error {
+	m.EndBrowse()
 	m.cancel()
 	err := <-m.done
 	m.log.Close()
@@ -496,6 +505,73 @@ func (m *Daemon) fileConfig() (*config.Config, error) {
 		return nil, err
 	}
 	return config.Parse(data, home)
+}
+
+// BrowseJSON lists dir, a slash path from the top of the named share ("/"
+// for the top itself), as the wizard shows it: [{"Name": "Photos", "Dir":
+// true}, …], folders first (shares.List). The share stays open for the
+// next listing, until EndBrowse or a listing of another share.
+func (m *Daemon) BrowseJSON(share, dir string) (string, error) {
+	b := &m.browse
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), shareTimeout)
+	defer cancel()
+	reused := b.fs != nil && b.share == share
+	if !reused {
+		if err := m.openBrowse(ctx, share); err != nil {
+			return "", err
+		}
+	}
+	list, err := shares.List(ctx, b.fs, dir)
+	if err != nil && reused {
+		// The connection may have gone stale while it sat, as the phone
+		// slept: once more, connected anew.
+		if err := m.openBrowse(ctx, share); err != nil {
+			return "", err
+		}
+		list, err = shares.List(ctx, b.fs, dir)
+	}
+	if err != nil {
+		return "", err
+	}
+	return toJSON(list), nil
+}
+
+// openBrowse opens the named share for BrowseJSON, as the config file has
+// it now, closing what was open. The caller holds m.browse.mu.
+func (m *Daemon) openBrowse(ctx context.Context, share string) error {
+	b := &m.browse
+	if b.fs != nil {
+		b.fs.Close()
+		b.fs, b.share = nil, ""
+	}
+	cfg, err := m.fileConfig()
+	if err != nil {
+		return err
+	}
+	sh, ok := cfg.Shares[share]
+	if !ok {
+		return fmt.Errorf("there is no share named %s", share)
+	}
+	f, err := shares.OpenShare(ctx, &sh, ".", store{m.passwords})
+	if err != nil {
+		return err
+	}
+	b.fs, b.share = f, share
+	return nil
+}
+
+// EndBrowse closes the share BrowseJSON has open, if any: the wizard is done
+// with it.
+func (m *Daemon) EndBrowse() {
+	b := &m.browse
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.fs != nil {
+		b.fs.Close()
+		b.fs, b.share = nil, ""
+	}
 }
 
 // newShuttle is what AddShuttle takes: the least a shuttle needs.

@@ -66,6 +66,9 @@ class MainActivity : ComponentActivity() {
     private var shareBusy by mutableStateOf(false)
     private var shareMessage by mutableStateOf<String?>(null)
     private var sharesNote by mutableStateOf<String?>(null)
+    private var wizard by mutableStateOf<WizardState?>(null)
+    // Bumped by Try again: the folder is read again.
+    private var browseTry by mutableStateOf(0)
     private var profileOf by mutableStateOf<String?>(null)
     // Bumped after a profile is changed: its rows, and the list, are read from the config file again.
     private var profileRead by mutableStateOf(0)
@@ -112,7 +115,11 @@ class MainActivity : ComponentActivity() {
                                     val rows = settingsOf?.let { name ->
                                         settingsRead.let { runCatching { Core.current?.settingsJSON(name) }.getOrNull() }
                                     }
-                                    if (rows != null) {
+                                    val w = wizard
+                                    if (w != null) {
+                                        BackHandler { wizardBack() }
+                                        Wizard(w)
+                                    } else if (rows != null) {
                                         BackHandler { settingsOf = null }
                                         SettingsScreen(
                                             stringResource(R.string.settings_title, settingsOf!!), Setting.parseAll(rows), ::setSetting,
@@ -124,7 +131,7 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Main(
                                             access, Core.statuses, Core.startError, forceStopped, { forceStopped = false },
-                                            ::allow, pausedAll, actions,
+                                            ::allow, pausedAll, actions, { wizard = WizardState() },
                                         ) { adding = true }
                                     }
                                 }
@@ -322,6 +329,48 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Composable
+    private fun Wizard(w: WizardState) {
+        when (w.step) {
+            WizardStep.SHARE -> {
+                val shares = runCatching { Core.current?.sharesJSON() }.getOrNull()?.let(ShareRow::parseAll) ?: emptyList()
+                WizardShareStep(shares, w.share, { wizard = w.copy(share = it, dir = "/") }, { wizard = w.copy(step = WizardStep.FOLDER) }, ::closeWizard)
+            }
+            WizardStep.FOLDER -> {
+                // Read off the main thread: the share is reached over the network.
+                val listing by produceState<Listing?>(null, w.share, w.dir, browseTry) {
+                    value = null
+                    value = withContext(Dispatchers.IO) {
+                        try {
+                            val json = Core.current?.browseJSON(w.share, w.dir)
+                            if (json == null) Listing(null, getString(R.string.add_no_daemon)) else Listing(FolderEntry.parseAll(json), null)
+                        } catch (e: Exception) {
+                            Listing(null, e.message)
+                        }
+                    }
+                }
+                WizardFolderStep(w, listing, { wizard = it }, { browseTry++ }, ::wizardBack) { wizard = w.copy(step = WizardStep.LATER) }
+            }
+            WizardStep.LATER -> WizardLater(w.remote, ::closeWizard)
+        }
+    }
+
+    private fun wizardBack() {
+        val w = wizard ?: return
+        when (w.step) {
+            WizardStep.SHARE -> closeWizard()
+            WizardStep.FOLDER -> wizard = w.copy(step = WizardStep.SHARE)
+            WizardStep.LATER -> wizard = w.copy(step = WizardStep.FOLDER)
+        }
+    }
+
+    // The share stays open between listings; let it go off the main thread, as a listing in
+    // progress holds it.
+    private fun closeWizard() {
+        wizard = null
+        Thread { Core.current?.endBrowse() }.start()
+    }
+
     /** Sets one of the open profile's settings: null, or why it was refused. */
     private fun setProfileSetting(key: String, text: String): String? {
         val name = profileOf ?: return null
@@ -401,6 +450,7 @@ private fun Main(
     onAllow: (Permission) -> Unit,
     pausedAll: Boolean,
     actions: ListActions,
+    onWizard: () -> Unit,
     onAdd: () -> Unit,
 ) {
     Column(
@@ -416,6 +466,7 @@ private fun Main(
         } else {
             ShuttleList(statuses.toSortedMap().values.map(ShuttleStatus::parse), pausedAll, actions)
         }
+        OutlinedButton(onClick = onWizard, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.wizard_add)) }
         OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.add)) }
     }
 }
