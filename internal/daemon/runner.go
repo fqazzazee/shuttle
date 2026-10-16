@@ -430,7 +430,7 @@ func pairOf(cfg *config.Config, s *config.Shuttle) string {
 	case config.ShareNFS3:
 		// The IDs as sent: a uid spelled out that is the user's own is the
 		// same user.
-		uid, gid, _ := shares.NFSUser(&sh)
+		uid, gid, _, _ := shares.NFSUser(&sh) // without IDs on Windows it cannot be opened: any key does
 		server = fmt.Sprintf("nfs://%d:%d@%s:%d%s", uid, gid, strings.ToLower(sh.Host), cmp.Or(sh.Port, 2049), sh.Export)
 	default:
 		server = "path:" + sh.Path

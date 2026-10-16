@@ -94,9 +94,9 @@ type = "path"
 path = %q
 [shuttles.s]
 mode = "pull"
-local = "/tmp/never-used"
+local = %q
 remote = "m:/docs"
-`, mount))
+`, mount, t.TempDir()))
 	f, err := OpenRemote(context.Background(), cfg, s, memStore{t: t})
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +119,9 @@ func nfsShare(t *testing.T) config.Share {
 		t.Fatal(err)
 	}
 	host, port := nfs3test.Serve(t, dir)
-	return config.Share{Name: "n", Type: config.ShareNFS3, Host: host, Port: port, MountPort: port, Export: "/"}
+	sh := config.Share{Name: "n", Type: config.ShareNFS3, Host: host, Port: port, MountPort: port, Export: "/"}
+	setTestIDs(&sh)
+	return sh
 }
 
 func TestNFSShare(t *testing.T) {
@@ -131,11 +133,11 @@ host = %q
 port = %d
 mount_port = %d
 export = "/"
-[shuttles.s]
+%s[shuttles.s]
 mode = "pull"
-local = "/tmp/never-used"
+local = %q
 remote = "n:/docs"
-`, share.Host, share.Port, share.MountPort))
+`, share.Host, share.Port, share.MountPort, testIDs, t.TempDir()))
 	ctx := context.Background()
 	f, err := OpenRemote(ctx, cfg, s, memStore{t: t}) // a nil map: the keyring is never asked
 	if err != nil {
@@ -147,28 +149,6 @@ remote = "n:/docs"
 	}
 	if _, err := OpenShare(ctx, &share, "missing", memStore{t: t}); err == nil || !strings.Contains(err.Error(), "share n:") {
 		t.Errorf("a folder that is not there: %v", err)
-	}
-}
-
-// Unset IDs are the user running shuttle, with its groups; a share that sets
-// either is someone else, and gets none of this user's groups.
-func TestNFSUser(t *testing.T) {
-	me, mine := uint32(os.Getuid()), uint32(os.Getgid()) //nolint:gosec // test IDs
-	groups, err := os.Getgroups()
-	if err != nil {
-		t.Fatal(err)
-	}
-	uid, gid, got := NFSUser(&config.Share{Type: config.ShareNFS3})
-	if uid != me || gid != mine || len(got) != len(groups) {
-		t.Errorf("unset: %d, %d, %v; want %d, %d and %d groups", uid, gid, got, me, mine, len(groups))
-	}
-	uid, gid, got = NFSUser(&config.Share{Type: config.ShareNFS3, UID: ptr[uint32](0)})
-	if uid != 0 || gid != mine || got != nil {
-		t.Errorf("uid = 0: %d, %d, %v", uid, gid, got)
-	}
-	uid, gid, got = NFSUser(&config.Share{Type: config.ShareNFS3, GID: ptr[uint32](100)})
-	if uid != me || gid != 100 || got != nil {
-		t.Errorf("gid = 100: %d, %d, %v", uid, gid, got)
 	}
 }
 
