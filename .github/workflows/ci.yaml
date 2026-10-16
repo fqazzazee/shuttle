@@ -111,6 +111,24 @@ jobs:
         run: |
           go build ./...
           go vet ./...
+      # Windows: the same, so a Unix-only call fails the day it lands, in the
+      # code or its tests, not on a Windows runner later.
+      - name: cross-compile windows/amd64
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          go build ./...
+          go vet ./...
+      - name: cross-compile windows/arm64
+        env:
+          GOOS: windows
+          GOARCH: arm64
+          CGO_ENABLED: '0'
+        run: |
+          go build ./...
+          go vet ./...
 
   integration:
     name: integration
