@@ -5,6 +5,7 @@ package config
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -503,6 +504,30 @@ mode = "push"
 local = "/data/photos-old"
 remote = "nas:/photos-old"
 `)
+}
+
+// Local folders nest by the OS's separator ("\" on Windows), a share's by "/".
+func TestNested(t *testing.T) {
+	root := filepath.VolumeName(t.TempDir()) + string(filepath.Separator)
+	local := func(elem ...string) string { return filepath.Join(append([]string{root}, elem...)...) }
+	sep := string(filepath.Separator)
+	for _, tt := range []struct {
+		a, b, sep string
+		want      bool
+	}{
+		{local("data"), local("data", "photos"), sep, true},
+		{local("data", "photos"), local("data"), sep, true},
+		{local("data"), local("data"), sep, true},
+		{root, local("data"), sep, true},
+		{local("data", "photos"), local("data", "photos-old"), sep, false},
+		{"/photos", "/photos/2026", "/", true},
+		{"/", "/photos", "/", true},
+		{"/photos", "/photos-old", "/", false},
+	} {
+		if got := nested(tt.a, tt.b, tt.sep); got != tt.want {
+			t.Errorf("nested(%q, %q, %q) = %v, want %v", tt.a, tt.b, tt.sep, got, tt.want)
+		}
+	}
 }
 
 // An NFS share's user and group default to the user running shuttle, so
