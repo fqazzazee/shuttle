@@ -32,20 +32,20 @@ const watchBuffer = 64
 type pipeServer struct {
 	d        *daemon.Daemon
 	mu       sync.Mutex
-	watchers map[chan []byte]bool // each gets every change as its event's line
+	watchers map[chan []byte]bool // each gets every change, or every note (true), as its line
 }
 
 // Serve serves d on this user's pipe until ctx is done. Call it once d is
 // Ready.
-func Serve(ctx context.Context, d *daemon.Daemon) error {
+func Serve(ctx context.Context, d *daemon.Daemon, n *Notes) error {
 	name, err := PipeName()
 	if err != nil {
 		return err
 	}
-	return serve(ctx, d, name)
+	return serve(ctx, d, n, name)
 }
 
-func serve(ctx context.Context, d *daemon.Daemon, name string) error {
+func serve(ctx context.Context, d *daemon.Daemon, n *Notes, name string) error {
 	sd, err := pipeSecurity()
 	if err != nil {
 		return err
@@ -61,6 +61,10 @@ func serve(ctx context.Context, d *daemon.Daemon, name string) error {
 	s := &pipeServer{d: d, watchers: map[chan []byte]bool{}}
 	stop := d.Watch(s.changed)
 	defer stop()
+	if n != nil {
+		n.attach(s)
+		defer n.attach(nil)
+	}
 	go func() {
 		<-ctx.Done()
 		l.Close()
@@ -91,7 +95,7 @@ func (s *pipeServer) handle(ctx context.Context, c net.Conn) {
 			return
 		}
 		if req.Method == methodWatch {
-			s.watch(ctx, c, enc, req.ID)
+			s.watch(ctx, c, enc, req.ID, req.Notes)
 			return
 		}
 		r := s.call(&req)
@@ -145,13 +149,13 @@ func (s *pipeServer) call(req *request) *reply {
 	return r
 }
 
-// watch sends c every status change from now on, until c hangs up or ctx
-// is done. The reply to the watch request comes first: from then on, no
-// change is missed.
-func (s *pipeServer) watch(ctx context.Context, c net.Conn, enc *json.Encoder, id uint64) {
+// watch sends c every status change from now on, or every note, until c
+// hangs up or ctx is done. The reply to the watch request comes first: from
+// then on, nothing is missed.
+func (s *pipeServer) watch(ctx context.Context, c net.Conn, enc *json.Encoder, id uint64, notes bool) {
 	ch := make(chan []byte, watchBuffer)
 	s.mu.Lock()
-	s.watchers[ch] = true
+	s.watchers[ch] = notes
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
@@ -188,10 +192,17 @@ func (s *pipeServer) changed(st *daemon.Status) {
 	if err != nil {
 		return
 	}
-	line = append(line, '\n')
+	s.send(append(line, '\n'), false)
+}
+
+// send hands line to every watcher of notes, or of changes, that has room.
+func (s *pipeServer) send(line []byte, notes bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for ch := range s.watchers {
+	for ch, wants := range s.watchers {
+		if wants != notes {
+			continue
+		}
 		select {
 		case ch <- line:
 		default:

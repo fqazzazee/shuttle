@@ -15,6 +15,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/fsys/fsystest"
+	"github.com/fqazzazee/shuttle/internal/notice"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 )
 
@@ -31,6 +32,7 @@ type fixture struct {
 	local, mount string
 	pipe         string
 	d            *daemon.Daemon
+	notes        *Notes // the daemon's OnEvent
 	c            *Client
 	config       string
 }
@@ -45,7 +47,9 @@ func newFixture(t *testing.T, mode, extra string) *fixture {
 	if err := os.WriteFile(f.config, []byte(doc), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	d, err := daemon.New(&daemon.Options{Paths: daemon.Paths{Config: f.config, StateDir: filepath.Join(dir, "state")}, Store: noKeyring{}})
+	f.notes = NewNotes()
+	d, err := daemon.New(&daemon.Options{Paths: daemon.Paths{Config: f.config, StateDir: filepath.Join(dir, "state")}, Store: noKeyring{},
+		OnEvent: f.notes.Send})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +64,7 @@ func newFixture(t *testing.T, mode, extra string) *fixture {
 		<-runDone
 	})
 	<-d.Ready()
-	go func() { serveDone <- serve(ctx, d, f.pipe) }()
+	go func() { serveDone <- serve(ctx, d, f.notes, f.pipe) }()
 	f.d = d
 	for range 200 { // until the pipe is there
 		if f.c, err = connect(f.pipe); err == nil {
@@ -170,7 +174,7 @@ func TestPauseAndOverallStateOverThePipe(t *testing.T) {
 // One daemon per user: a second cannot serve the pipe the first serves.
 func TestSecondDaemonCannotTakeThePipe(t *testing.T) {
 	f := newFixture(t, "push", "")
-	if err := serve(ctx(t), f.d, f.pipe); !errors.Is(err, ErrNameTaken) {
+	if err := serve(ctx(t), f.d, nil, f.pipe); !errors.Is(err, ErrNameTaken) {
 		t.Errorf("a second serve = %v, want ErrNameTaken", err)
 	}
 	if _, err := f.c.Shuttles(ctx(t)); err != nil {
@@ -260,4 +264,31 @@ func TestChangesEndWithTheirContext(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Error("the stream did not end with its context")
 	}
+}
+
+// What is worth a notification reaches the watchers of notes, worded as the
+// desktop's and the app's are; the watchers of changes get none of it.
+func TestNotesOverThePipe(t *testing.T) {
+	f := newFixture(t, "push", "")
+	write(t, f.local, "a.txt", "a")
+	notes, err := f.c.Notes(ctx(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	changes, err := f.c.Changes(ctx(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.c.SyncNow(ctx(t), "s"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case n := <-notes:
+		if n.Kind != notice.Completed || n.Summary != "s: synced" || !strings.Contains(n.Body, "1") {
+			t.Errorf("note = %+v, want the run's completion", n)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("no note for the run")
+	}
+	f.waitFor(changes, "the run's result", ran)
 }
