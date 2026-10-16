@@ -5,12 +5,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
 )
@@ -58,10 +60,10 @@ func startDaemon(t *testing.T) (localA, mountA string) {
 	dir := t.TempDir()
 	isolate(t, dir)
 	localA, mountA = t.TempDir(), t.TempDir()
-	cfg := "[shares.m]\ntype = \"path\"\npath = \"" + mountA + "\"\n" +
-		"[shares.n]\ntype = \"path\"\npath = \"" + t.TempDir() + "\"\n" +
-		"[shuttles.a]\nmode = \"push\"\nlocal = \"" + localA + "\"\nremote = \"m:\"\n" +
-		"[shuttles.b]\nmode = \"push\"\nlocal = \"" + t.TempDir() + "\"\nremote = \"n:\"\n"
+	cfg := fmt.Sprintf("[shares.m]\ntype = \"path\"\npath = %q\n"+
+		"[shares.n]\ntype = \"path\"\npath = %q\n"+
+		"[shuttles.a]\nmode = \"push\"\nlocal = %q\nremote = \"m:\"\n"+
+		"[shuttles.b]\nmode = \"push\"\nlocal = %q\nremote = \"n:\"\n", mountA, t.TempDir(), localA, t.TempDir())
 	if err := os.MkdirAll(filepath.Join(dir, "shuttle"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +164,7 @@ func TestCLIErrors(t *testing.T) {
 func TestCLIWithoutADaemon(t *testing.T) {
 	privateSessionBus(t)
 	code, _, stderr := cli(t, "status")
-	if code != 1 || !strings.Contains(stderr, "not running") || !strings.Contains(stderr, "systemctl --user start shuttle") {
+	if code != 1 || !strings.Contains(stderr, bus.ErrNotRunning.Error()) {
 		t.Errorf("status without a daemon = %d, %q", code, stderr)
 	}
 }
@@ -188,7 +190,7 @@ func TestEnableDisableWithoutADaemon(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	doc := "[shares.m]\ntype = \"path\"\npath = \"/mnt\"\n[shuttles.a]\nmode = \"push\"\nlocal = \"/l\"\nremote = \"m:\"\n"
+	doc := fmt.Sprintf("[shares.m]\ntype = \"path\"\npath = %q\n[shuttles.a]\nmode = \"push\"\nlocal = %q\nremote = \"m:\"\n", t.TempDir(), t.TempDir())
 	if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
 		t.Fatal(err)
 	}

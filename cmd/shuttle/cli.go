@@ -19,7 +19,6 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/secrets"
-	"github.com/fqazzazee/shuttle/internal/secrets/secretservice"
 	"github.com/fqazzazee/shuttle/internal/shares"
 	"github.com/fqazzazee/shuttle/internal/tui"
 )
@@ -50,7 +49,7 @@ func runClient(ctx context.Context, cmd string, args []string, stdout, stderr io
 		return setEnabledOffline(name, cmd == "enable", stdout, stderr)
 	}
 	if err != nil {
-		fmt.Fprintf(stderr, "shuttle %s: connecting to the session bus: %v\n", cmd, err)
+		fmt.Fprintf(stderr, "shuttle %s: connecting to the daemon: %v\n", cmd, err)
 		return 1
 	}
 	defer c.Close()
@@ -193,7 +192,7 @@ func details(st *daemon.Status, now time.Time) string {
 	return strings.Join(parts, "; ")
 }
 
-// runTUI runs the TUI against the daemon on the session bus, on the named
+// runTUI runs the TUI against the daemon, on the named
 // tab ("" for the first).
 func runTUI(ctx context.Context, tab string, stderr io.Writer) int {
 	first, ok := tui.Tab(cmp.Or(tab, "shuttles"))
@@ -203,7 +202,7 @@ func runTUI(ctx context.Context, tab string, stderr io.Writer) int {
 	}
 	c, err := bus.Connect()
 	if err != nil {
-		fmt.Fprintf(stderr, "shuttle: connecting to the session bus: %v\n", err)
+		fmt.Fprintf(stderr, "shuttle: connecting to the daemon: %v\n", err)
 		return 1
 	}
 	defer c.Close()
@@ -217,7 +216,7 @@ func runTUI(ctx context.Context, tab string, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "shuttle: %v\n", err)
 		return 1
 	}
-	o := tui.Options{Config: paths.Config, Home: home, Store: secretservice.New(), Test: shares.Test, Tab: first,
+	o := tui.Options{Config: paths.Config, Home: home, Store: newStore(), Test: shares.Test, Tab: first,
 		Browse: func(ctx context.Context, share *config.Share, store secrets.Store) (fsys.FS, error) {
 			return shares.OpenShare(ctx, share, ".", store)
 		}}
