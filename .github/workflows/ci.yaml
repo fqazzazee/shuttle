@@ -363,6 +363,30 @@ jobs:
           SHUTTLE_TEST_SMB_ADDR: 127.0.0.1:445
           SHUTTLE_TEST_SMB_DIR: C:\smbtest
         run: go test -race -count=1 ./internal/fsys/... ./internal/engine/...
+      # Starting at sign-in, for real on a runner thrown away after the job:
+      # the task Task Scheduler is given runs the console-less build, which
+      # serves the pipe with no window and logs to a file.
+      - name: autostart
+        run: |
+          $bin = "$env:RUNNER_TEMP\bin"
+          go build -o "$bin\shuttle.exe" ./cmd/shuttle
+          go build -ldflags=-H=windowsgui -o "$bin\shuttlew.exe" ./cmd/shuttle
+          & "$bin\shuttle.exe" autostart on
+          if ($LASTEXITCODE) { exit 1 }
+          if ((& "$bin\shuttle.exe" autostart status) -notmatch '^on') { exit 1 }
+          $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+          schtasks /Run /TN "shuttle-$sid"
+          $up = $false
+          foreach ($i in 1..60) {
+            & "$bin\shuttle.exe" status
+            if ($LASTEXITCODE -eq 0) { $up = $true; break }
+            Start-Sleep 1
+          }
+          Get-Content "$env:LOCALAPPDATA\shuttle\daemon.log" -ErrorAction SilentlyContinue
+          schtasks /End /TN "shuttle-$sid"
+          & "$bin\shuttle.exe" autostart off
+          if ((& "$bin\shuttle.exe" autostart status) -ne 'off') { exit 1 }
+          if (-not $up) { Write-Error "the task's daemon never answered"; exit 1 }
       # Passwords in Credential Manager: written for real only here, on a
       # runner thrown away after the job, never on a user's machine.
       - name: Credential Manager
