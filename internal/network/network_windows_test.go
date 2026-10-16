@@ -4,8 +4,11 @@ package network
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/windows"
 )
 
 func TestIsMetered(t *testing.T) {
@@ -41,7 +44,14 @@ func TestWatchAsksWindows(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("Watch said nothing at first")
 	}
-	if err := <-done; err != nil {
+	// Windows Server, as on CI's runner, may have no Network List Manager:
+	// then Watch says "not metered" first, and why it stopped.
+	if err := <-done; err != nil && !errors.Is(err, classNotRegistered) {
 		t.Fatalf("Watch = %v", err)
+	} else if err != nil {
+		t.Logf("no Network List Manager here: %v", err)
 	}
 }
+
+// classNotRegistered is REGDB_E_CLASSNOTREG.
+const classNotRegistered = windows.Errno(0x80040154)
