@@ -360,3 +360,23 @@ func TestReadCountMustMatchData(t *testing.T) {
 		t.Error("a READ that sent less than it said was taken")
 	}
 }
+
+// A local port already in use is told apart from other dial errors as the
+// OS reports it (Winsock's own errors on Windows), so dialReserved tries
+// another port instead of failing.
+func TestPortTaken(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	d := net.Dialer{LocalAddr: l.Addr()}
+	nc, err := d.Dial("tcp", l.Addr().String())
+	if err == nil {
+		nc.Close()
+		t.Skip("the OS let two sockets share the port")
+	}
+	if !portTaken(err) || mayNotBind(err) {
+		t.Errorf("dialing from a port in use: %v; portTaken %v, mayNotBind %v", err, portTaken(err), mayNotBind(err))
+	}
+}

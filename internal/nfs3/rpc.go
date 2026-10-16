@@ -13,7 +13,6 @@ import (
 	"net"
 	"os"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -110,9 +109,9 @@ func dialReserved(ctx context.Context, addr string) (net.Conn, error) {
 		switch {
 		case err == nil:
 			return nc, nil
-		case errors.Is(err, syscall.EACCES), errors.Is(err, syscall.EPERM):
+		case mayNotBind(err):
 			return nil, nil
-		case errors.Is(err, syscall.EADDRINUSE), errors.Is(err, syscall.EADDRNOTAVAIL):
+		case portTaken(err):
 			continue // taken, or in TIME_WAIT with this server: another one
 		default:
 			return nil, err
