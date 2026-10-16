@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -57,7 +58,9 @@ func TestAddAndRead(t *testing.T) {
 	if got, _ := Read(path, "s", 2); paths(got) != " b " {
 		t.Errorf("limit 2: %q, want the run and b", paths(got))
 	}
-	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+	// Windows has no mode bits to check: the log is the user's by the
+	// ACL of the folder it is in.
+	if info, _ := os.Stat(path); runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Errorf("mode = %v", info.Mode().Perm())
 	}
 	if got, err := Read(filepath.Join(t.TempDir(), "none"), "x", 0); err != nil || len(got) != 0 {
@@ -89,7 +92,7 @@ func TestTrimByAge(t *testing.T) {
 	add(t, l, t0, KindDone, "old", "x")
 	add(t, l, t0.Add(MaxAge-time.Hour), KindDone, "young", "x")
 	add(t, l, t0.Add(MaxAge), KindDone, "new", "x")
-	before, _ := os.Stat(path)
+	before := stat(path)
 	if err := l.Trim(t0.Add(MaxAge + time.Minute)); err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +108,7 @@ func TestTrimByAge(t *testing.T) {
 		t.Error("the file was not rewritten")
 	}
 	// Nothing to drop: the file stays as it is.
-	before, _ = os.Stat(path)
+	before = stat(path)
 	if err := l.Trim(t0.Add(MaxAge + time.Hour)); err != nil {
 		t.Fatal(err)
 	}
@@ -164,4 +167,13 @@ func TestMerge(t *testing.T) {
 	if got := paths(Merge(2, a, b)); got != "a3 b2 " {
 		t.Errorf("merged, limit 2: %q", got)
 	}
+}
+
+// stat is path's FileInfo with its identity read now: on Windows,
+// os.SameFile reads it only when first asked, by path, which after a
+// rewrite finds the new file.
+func stat(path string) os.FileInfo {
+	fi, _ := os.Stat(path)
+	os.SameFile(fi, fi)
+	return fi
 }

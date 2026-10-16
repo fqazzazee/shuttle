@@ -163,10 +163,12 @@ func (l *Log) trim(before time.Time) error {
 	if err := os.Chmod(tmp.Name(), 0o600); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp.Name(), l.path); err != nil {
-		return err
-	}
+	// Closed first: Windows does not replace a file that is open. Opened
+	// again either way, so a failed rename leaves the old log to add to.
 	l.f.Close()
+	if err := os.Rename(tmp.Name(), l.path); err != nil {
+		return errors.Join(err, l.open())
+	}
 	l.n = len(keep)
 	return l.open()
 }
