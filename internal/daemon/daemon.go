@@ -82,7 +82,8 @@ type Options struct {
 	PausedAll bool
 	// LocalNames, if set, gives the naming rules of the file system a
 	// shuttle's local folder is on, where Linux cannot tell: the Android app
-	// says which folders are in the phone's shared storage. nil: Linux's.
+	// says which folders are in the phone's shared storage. nil: this OS's
+	// (fsys.OSNames).
 	LocalNames func(dir string) fsys.Names
 	// KeyringTimeout bounds waiting for the keyring, including an unlock
 	// prompt the user has not answered. Zero means two minutes.

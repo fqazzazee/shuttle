@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -31,12 +32,15 @@ func TestLocalContract(t *testing.T) {
 		}
 		t.Cleanup(func() { l.Close() })
 		return l
-	}, fsystest.LocalDisk)
+	})
 }
 
 // TestLocalAndroidSharedStorageContract holds a folder that refuses what
 // the phone's shared storage refuses to the same contract.
 func TestLocalAndroidSharedStorageContract(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Android's rules on an NTFS folder: Windows' come on top")
+	}
 	fsystest.Run(t, func(t *testing.T) fsys.FS {
 		l, err := fsys.OpenLocalWith(t.TempDir(), fsys.AndroidSharedStorage)
 		if err != nil {
@@ -44,7 +48,7 @@ func TestLocalAndroidSharedStorageContract(t *testing.T) {
 		}
 		t.Cleanup(func() { l.Close() })
 		return l
-	}, fsystest.LocalDisk)
+	})
 }
 
 // smbOptions points at the Samba container from `make samba-up`.
