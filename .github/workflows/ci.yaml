@@ -345,6 +345,12 @@ jobs:
       # a folder on the runner the tests also set up and inspect directly.
       - name: start a Windows SMB share
         run: |
+          # The fixture's password has no capitals or digits: the runner's
+          # policy refuses it until complexity is off (the runner is thrown away).
+          secedit /export /cfg "$env:RUNNER_TEMP\sec.cfg" | Out-Null
+          (Get-Content "$env:RUNNER_TEMP\sec.cfg") -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' |
+            Set-Content "$env:RUNNER_TEMP\sec.cfg"
+          secedit /configure /db "$env:RUNNER_TEMP\sec.sdb" /cfg "$env:RUNNER_TEMP\sec.cfg" /areas SECURITYPOLICY | Out-Null
           $pw = ConvertTo-SecureString 'samba-throwaway-pw' -AsPlainText -Force
           New-LocalUser -Name shuttle -Password $pw -PasswordNeverExpires | Out-Null
           New-Item -ItemType Directory -Path C:\smbtest | Out-Null
