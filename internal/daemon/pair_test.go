@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/fqazzazee/shuttle/internal/config"
@@ -111,10 +112,16 @@ func TestPairOf(t *testing.T) {
 }
 
 func TestPairOfNFS(t *testing.T) {
+	me, mine := uint32(os.Getuid()), uint32(os.Getgid()) //nolint:gosec // test IDs
+	if runtime.GOOS == "windows" {
+		me, mine = 1000, 1000 // no Unix IDs of one's own: the share names them
+	}
 	base := func() (*config.Config, *config.Shuttle) {
-		cfg := &config.Config{Shares: map[string]config.Share{
-			"nas": {Name: "nas", Type: config.ShareNFS3, Host: "nas.example", Export: "/volume1/home"},
-		}}
+		nas := config.Share{Name: "nas", Type: config.ShareNFS3, Host: "nas.example", Export: "/volume1/home"}
+		if runtime.GOOS == "windows" {
+			nas.UID, nas.GID = &me, &mine
+		}
+		cfg := &config.Config{Shares: map[string]config.Share{"nas": nas}}
 		return cfg, &config.Shuttle{Name: "docs", Local: "/home/u/Documents", Share: "nas", Remote: "docs"}
 	}
 	share := func(f func(*config.Share)) func(*config.Config) {
@@ -124,7 +131,6 @@ func TestPairOfNFS(t *testing.T) {
 			c.Shares["nas"] = sh
 		}
 	}
-	me, mine := uint32(os.Getuid()), uint32(os.Getgid()) //nolint:gosec // test IDs
 	other, others := me+1, mine+1
 	cfg, s := base()
 	want := pairOf(cfg, s)

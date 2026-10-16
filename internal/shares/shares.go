@@ -14,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -189,22 +188,26 @@ func openSMB(ctx context.Context, share *config.Share, folder string, store secr
 
 // NFSUser is who shuttle says it is to share's server (AUTH_SYS): the IDs
 // the share sets, or else the user running shuttle, with its groups. The
-// server believes it as sent.
-func NFSUser(share *config.Share) (uid, gid uint32, groups []uint32) {
-	if share.UID == nil && share.GID == nil {
-		ids, _ := os.Getgroups() // without them, files shared through a group read as unreadable
-		for _, g := range ids {
-			groups = append(groups, uint32(g)) //nolint:gosec // from the kernel: 32-bit IDs
-		}
+// server believes it as sent. On Windows, whose users have no Unix IDs, a
+// share must set both: err says so.
+func NFSUser(share *config.Share) (uid, gid uint32, groups []uint32, err error) {
+	if share.UID != nil && share.GID != nil {
+		return *share.UID, *share.GID, nil, nil
 	}
-	uid, gid = uint32(os.Getuid()), uint32(os.Getgid()) //nolint:gosec // from the kernel: 32-bit IDs
+	uid, gid, groups, err = ownIDs()
+	if err != nil {
+		return 0, 0, nil, fmt.Errorf("share %s: %w", share.Name, err)
+	}
+	if share.UID != nil || share.GID != nil {
+		groups = nil // someone else: none of this user's groups
+	}
 	if share.UID != nil {
 		uid = *share.UID
 	}
 	if share.GID != nil {
 		gid = *share.GID
 	}
-	return uid, gid, groups
+	return uid, gid, groups, nil
 }
 
 func openNFS(ctx context.Context, share *config.Share, folder string) (fsys.FS, error) {
@@ -212,7 +215,10 @@ func openNFS(ctx context.Context, share *config.Share, folder string) (fsys.FS, 
 		Options: nfs3.Options{Host: share.Host, Port: share.Port, MountPort: share.MountPort, Export: share.Export},
 		Folder:  folder,
 	}
-	o.UID, o.GID, o.Groups = NFSUser(share)
+	var err error
+	if o.UID, o.GID, o.Groups, err = NFSUser(share); err != nil {
+		return nil, err
+	}
 	f, err := fsys.DialNFS(ctx, o)
 	if err != nil {
 		return nil, fmt.Errorf("share %s: %w", share.Name, err)
