@@ -11,6 +11,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/notice"
 )
 
 // The pipe carries one JSON value per line each way. A client sends
@@ -28,6 +29,7 @@ type request struct {
 	Choice string `json:"choice,omitempty"`
 	On     bool   `json:"on,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
+	Notes  bool   `json:"notes,omitempty"` // watch: notes, not changes
 }
 
 // reply answers a request, or, with ID 0, is an event.
@@ -43,7 +45,8 @@ type reply struct {
 	Up          int64           `json:"up,omitempty"`
 	Down        int64           `json:"down,omitempty"`
 
-	Changed *daemon.Status `json:"changed,omitempty"` // an event
+	Changed *daemon.Status `json:"changed,omitempty"` // an event: a status changed
+	Note    *notice.Note   `json:"note,omitempty"`    // an event: something worth a notification
 }
 
 // entry is an activity log entry on the pipe, its shuttle's name included: a

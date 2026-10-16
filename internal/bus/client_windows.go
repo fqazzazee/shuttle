@@ -20,6 +20,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/engine"
+	"github.com/fqazzazee/shuttle/internal/notice"
 )
 
 // ErrNotRunning means no daemon serves this user's pipe.
@@ -91,6 +92,9 @@ func (c *Client) Close() error {
 // do sends req and waits for its reply, or for ctx. A call cut short leaves
 // the connection out of step, so it is closed, and the next call dials again.
 func (c *Client) do(ctx context.Context, req *request) (*reply, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // before anything is sent: the hook below may come too late
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.conn == nil {
@@ -219,13 +223,35 @@ func (c *Client) Rates(ctx context.Context) (up, down int64, err error) {
 // Changes streams status changes until ctx is done, on a connection of its
 // own.
 func (c *Client) Changes(ctx context.Context) (<-chan daemon.Status, error) {
-	conn, err := dialPipe(ctx, c.name)
+	return stream(ctx, c.name, false, func(r *reply) (daemon.Status, bool) {
+		if r.Changed == nil {
+			return daemon.Status{}, false
+		}
+		return *r.Changed, true
+	})
+}
+
+// Notes streams what is worth a notification, as the daemon words it, until
+// ctx is done, on a connection of its own: what the tray shows as toasts.
+func (c *Client) Notes(ctx context.Context) (<-chan notice.Note, error) {
+	return stream(ctx, c.name, true, func(r *reply) (notice.Note, bool) {
+		if r.Note == nil {
+			return notice.Note{}, false
+		}
+		return *r.Note, true
+	})
+}
+
+// stream watches the daemon on pipe name, for notes or for changes, and
+// passes on what pick takes of each event, until ctx is done.
+func stream[T any](ctx context.Context, name string, notes bool, pick func(*reply) (T, bool)) (<-chan T, error) {
+	conn, err := dialPipe(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 	dec := json.NewDecoder(bufio.NewReader(conn))
 	var ack reply
-	if err := json.NewEncoder(conn).Encode(&request{ID: 1, Method: methodWatch}); err != nil {
+	if err := json.NewEncoder(conn).Encode(&request{ID: 1, Method: methodWatch, Notes: notes}); err != nil {
 		conn.Close()
 		return nil, err
 	}
@@ -234,7 +260,7 @@ func (c *Client) Changes(ctx context.Context) (<-chan daemon.Status, error) {
 		return nil, err
 	}
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
-	out := make(chan daemon.Status, watchBuffer)
+	out := make(chan T, watchBuffer)
 	go func() {
 		defer close(out)
 		defer stop()
@@ -244,11 +270,12 @@ func (c *Client) Changes(ctx context.Context) (<-chan daemon.Status, error) {
 			if err := dec.Decode(&r); err != nil {
 				return
 			}
-			if r.Changed == nil {
+			v, ok := pick(&r)
+			if !ok {
 				continue
 			}
 			select {
-			case out <- *r.Changed:
+			case out <- v:
 			case <-ctx.Done():
 				return
 			}

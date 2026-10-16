@@ -25,7 +25,7 @@ func newStore() secrets.Store { return credman.New() }
 
 // runDaemon runs every shuttle in the user's config, and serves this user's
 // pipe once their state is held, until ctx is done, following whether the
-// connection is metered. It shows no notifications on Windows yet.
+// connection is metered. Its notifications go to the pipe, for the tray.
 func runDaemon(ctx context.Context, stderr io.Writer) error {
 	paths, err := daemon.DefaultPaths()
 	if err != nil {
@@ -37,7 +37,9 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 	}
 	defer closeLog()
 	log := slog.New(slog.NewTextHandler(out, nil))
-	d, err := daemon.New(&daemon.Options{Paths: paths, Store: newStore(), Log: log})
+	// What is worth a notification goes to the pipe's watchers: the tray shows it.
+	notes := bus.NewNotes()
+	d, err := daemon.New(&daemon.Options{Paths: paths, Store: newStore(), Log: log, OnEvent: notes.Send})
 	if err != nil {
 		return err
 	}
@@ -65,7 +67,7 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 		return errors.Join(err, <-runErr)
 	}
 	serveErr := make(chan error, 1)
-	go func() { serveErr <- bus.Serve(ctx, d) }()
+	go func() { serveErr <- bus.Serve(ctx, d, notes) }()
 	log.Info("serving the pipe", "name", pipe)
 
 	// Whichever ends first ends the other: a daemon nobody can reach, or a
