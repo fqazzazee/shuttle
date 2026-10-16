@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/engine"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/fsys/fsystest"
 )
 
 // texts is a log as "kind path: text" lines, newest first.
@@ -63,7 +65,8 @@ done d: folder created on the share
 	if got := len(f.activity("s")); got != 4 {
 		t.Errorf("%d entries after a quiet run, want still 4", got)
 	}
-	if info, err := os.Stat(filepath.Join(f.paths.StateDir, "s.activity")); err != nil || info.Mode().Perm() != 0o600 {
+	// Windows has no mode bits to check: the log is the user's by its folder's ACL.
+	if info, err := os.Stat(filepath.Join(f.paths.StateDir, "s.activity")); err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Errorf("log file: %v, %v", info, err)
 	}
 }
@@ -73,18 +76,19 @@ func TestActivityOfProblems(t *testing.T) {
 	write(t, f.local, "clash.txt", "local")
 	write(t, f.mount, "clash.txt", "remote, longer")
 	write(t, f.local, "locked.txt", "l")
-	if err := os.Chmod(filepath.Join(f.local, "locked.txt"), 0); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chmod(filepath.Join(f.local, "locked.txt"), 0o600) })
+	fsystest.Unreadable(t, filepath.Join(f.local, "locked.txt"))
 	f.start()
 	f.syncNow()
+	denied := "permission denied" // as the OS words a refused read
+	if runtime.GOOS == "windows" {
+		denied = "Access is denied"
+	}
 	got := texts(f.activity("s"))
 	for _, want := range []string{
 		"run : 1 conflict, 1 error\n",
 		"conflict clash.txt: changed on both sides; waiting for you to choose\n",
 		"error locked.txt: could not copy to the share: ",
-		"permission denied",
+		denied,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("activity lacks %q:\n%s", want, got)
@@ -120,6 +124,9 @@ func TestActivityOfProblems(t *testing.T) {
 // run leaves those names out, the status lists them, and the log says so
 // once.
 func TestActivityOfRefusedNames(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the share here is a folder on NTFS, which cannot hold a:b.txt")
+	}
 	f := newFixture(t, "sync", "")
 	write(t, f.mount, "ok.txt", "ok")
 	write(t, f.mount, "a:b.txt", "colon")

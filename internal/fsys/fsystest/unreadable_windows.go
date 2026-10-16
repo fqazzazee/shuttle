@@ -8,9 +8,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Unreadable makes the folder dir unreadable to this user until the test
-// ends: an entry in its ACL denies them listing it. Mode bits do nothing on
-// Windows. As its owner, the user can still change the ACL back.
+// Unreadable makes the file or folder dir unreadable to this user until the
+// test ends: an entry in its ACL denies them reading the file, or listing the
+// folder (one right, FILE_READ_DATA and FILE_LIST_DIRECTORY). Mode bits do
+// nothing on Windows. As its owner, the user can still change the ACL back.
 func Unreadable(t *testing.T, dir string) {
 	t.Helper()
 	sd, err := windows.GetNamedSecurityInfo(dir, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
