@@ -115,7 +115,7 @@ func TestLocalSymlinkCannotEscapeRoot(t *testing.T) {
 func TestLocalStat(t *testing.T) {
 	l, dir := newLocal(t)
 	writeOS(t, osPath(dir, "d/f.txt"), "hello")
-	mtime := time.Unix(1_700_000_000, 123_456_789)
+	mtime := time.Unix(1_700_000_000, 123_456_700) // NTFS keeps 100 ns
 	if err := os.Chtimes(osPath(dir, "d/f.txt"), mtime, mtime); err != nil {
 		t.Fatal(err)
 	}
