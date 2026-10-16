@@ -56,6 +56,7 @@ type Action struct {
 	hash       []byte // content hash found by a compare, for an OpAdopt
 	skip       bool   // already reported; nothing to execute
 	alwaysHold bool   // a conflict no policy can settle (names differing only in case)
+	was        string // the record's path before matchCase moved it to Path's spelling
 }
 
 // sideStatus is one side of a path compared with its record.

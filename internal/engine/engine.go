@@ -161,7 +161,12 @@ func plan(o *Options, local, remote map[string]fsys.FileInfo, records map[string
 		return Plan(o.Settings.Mode, o.Settings.Deletions, local, remote, records)
 	}
 	m := matchCase(local, remote, records, fo)
-	actions := slices.Concat(m.held, Plan(o.Settings.Mode, o.Settings.Deletions, m.local, m.remote, m.records))
+	actions := slices.Concat(m.held, m.forget, Plan(o.Settings.Mode, o.Settings.Deletions, m.local, m.remote, m.records))
+	for i := range actions {
+		if was, ok := m.moved[actions[i].Path]; ok && actions[i].Op != OpConflict {
+			actions[i].was = was
+		}
+	}
 	slices.SortStableFunc(actions, executionOrder)
 	return actions
 }

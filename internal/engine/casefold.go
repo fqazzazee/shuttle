@@ -35,6 +35,11 @@ type caseMatched struct {
 	local, remote map[string]fsys.FileInfo
 	records       map[string]state.Record
 	held          []Action // names a side cannot hold apart
+	// moved maps a name to the other spelling its record was under; a
+	// change to it moves the record for good. forget drops records left
+	// under an old spelling beside one under the new.
+	moved  map[string]string
+	forget []Action
 }
 
 // matchCase lines up the two scans of a run where one side or both ignore
@@ -54,7 +59,7 @@ type caseMatched struct {
 //     as they are: that side can hold them apart. A share that ignores case
 //     and still lists two such names does not ignore case after all.
 func matchCase(local, remote map[string]fsys.FileInfo, records map[string]state.Record, fo folding) caseMatched {
-	out := caseMatched{local: maps.Clone(local), remote: maps.Clone(remote), records: maps.Clone(records)}
+	out := caseMatched{local: maps.Clone(local), remote: maps.Clone(remote), records: maps.Clone(records), moved: map[string]string{}}
 	localByKey, remoteByKey := byKey(local, fo.key), byKey(remote, fo.key)
 
 	// Hold every clash, and everything below a clashing folder.
@@ -138,6 +143,9 @@ func matchCase(local, remote map[string]fsys.FileInfo, records map[string]state.
 			if _, has := out.records[to]; !has {
 				rec.Path = to
 				out.records[to] = rec
+				out.moved[to] = from
+			} else {
+				out.forget = append(out.forget, Action{Op: OpForget, Path: from})
 			}
 			delete(out.records, from)
 		}
