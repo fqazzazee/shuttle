@@ -562,3 +562,23 @@ func TestStopFinishesTheCurrentAction(t *testing.T) {
 		t.Errorf("next run planned %d, copied %d; want the remaining 2 (a was recorded)", res.Planned, res.Copied)
 	}
 }
+
+// A file that cannot be read is an error of its own, not a failed scan: the
+// rest of the run goes on, and the file is copied once it can be read.
+func TestUnreadableFileIsItsOwnError(t *testing.T) {
+	h := newHarness(t, config.ModePush, config.DeletionsAdditive)
+	write(t, h.localDir, "locked.txt", "l", t0)
+	write(t, h.localDir, "ok.txt", "ok", t0)
+	fsystest.Unreadable(t, filepath.Join(h.localDir, "locked.txt"))
+
+	res, err := Run(context.Background(), &h.opts)
+	if err != nil {
+		t.Fatalf("the run failed: %v", err)
+	}
+	if len(res.Errors) != 1 || res.Errors[0].Path != "locked.txt" || res.Copied != 1 {
+		t.Errorf("errors %+v, copied %d; want locked.txt's error and ok.txt copied", res.Errors, res.Copied)
+	}
+	if got, _ := read(t, h.remoteDir, "ok.txt"); got != "ok" {
+		t.Errorf("ok.txt on the share = %q", got)
+	}
+}
