@@ -56,8 +56,7 @@ func startDaemon(t *testing.T) (localA, mountA string) {
 	t.Helper()
 	privateSessionBus(t)
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	t.Setenv("XDG_STATE_HOME", dir)
+	isolate(t, dir)
 	localA, mountA = t.TempDir(), t.TempDir()
 	cfg := "[shares.m]\ntype = \"path\"\npath = \"" + mountA + "\"\n" +
 		"[shares.n]\ntype = \"path\"\npath = \"" + t.TempDir() + "\"\n" +
@@ -184,7 +183,7 @@ func TestEnableDisable(t *testing.T) {
 func TestEnableDisableWithoutADaemon(t *testing.T) {
 	privateSessionBus(t)
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	isolate(t, dir)
 	path := filepath.Join(dir, "shuttle", "config.toml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)

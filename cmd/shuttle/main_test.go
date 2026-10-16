@@ -51,13 +51,22 @@ func TestRun(t *testing.T) {
 	}
 }
 
+// isolate points the config and the state at dir, on every OS, so that no
+// test reaches the user's own: XDG's folders on Linux, %APPDATA% and
+// %LOCALAPPDATA% on Windows.
+func isolate(t *testing.T, dir string) {
+	t.Helper()
+	for _, v := range []string{"XDG_CONFIG_HOME", "XDG_STATE_HOME", "APPDATA", "LOCALAPPDATA"} {
+		t.Setenv(v, dir)
+	}
+}
+
 // A config file that does not load stops the daemon with EX_CONFIG: the
 // unit does not restart on it. (No config file at all is no shuttles yet:
 // see internal/daemon's TestNoConfigYet.)
 func TestDaemonWithABrokenConfig(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	t.Setenv("XDG_STATE_HOME", dir)
+	isolate(t, dir)
 	path := filepath.Join(dir, "shuttle", "config.toml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
@@ -96,8 +105,7 @@ func TestDaemonRunsUntilStopped(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	t.Setenv("XDG_STATE_HOME", dir)
+	isolate(t, dir)
 	local := t.TempDir()
 	cfg := "[shares.m]\ntype = \"path\"\npath = \"" + t.TempDir() + "\"\n[shuttles.s]\nmode = \"push\"\nlocal = \"" + local + "\"\nremote = \"m:\"\n"
 	if err := os.MkdirAll(dir+"/shuttle", 0o755); err != nil {

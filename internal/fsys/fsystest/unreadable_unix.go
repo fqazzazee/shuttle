@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-// Unreadable makes the folder dir unreadable to this user until the test
-// ends: its mode 000, then back to what it was. Root reads it anyway, so the
+// Unreadable makes the file or folder dir unreadable to this user until the
+// test ends: its mode 000, then back to what it was. Root reads it anyway, so the
 // test is skipped as root.
 func Unreadable(t *testing.T, dir string) {
 	t.Helper()

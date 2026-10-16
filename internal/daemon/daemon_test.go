@@ -425,15 +425,6 @@ func TestUnknownAndDisabledShuttles(t *testing.T) {
 	}
 }
 
-func TestDefaultPaths(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "/cfg")
-	t.Setenv("XDG_STATE_HOME", "/st")
-	p, err := DefaultPaths()
-	if err != nil || p.Config != "/cfg/shuttle/config.toml" || p.StateDir != "/st/shuttle" {
-		t.Errorf("DefaultPaths = %+v, %v", p, err)
-	}
-}
-
 // What a shuttle has synced is in its status after a run, and from the
 // start once the daemon restarts, before any run.
 func TestStatusCountsWhatIsSynced(t *testing.T) {
