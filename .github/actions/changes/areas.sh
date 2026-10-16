@@ -21,10 +21,11 @@ else
 		extension/* | package.json | package-lock.json | eslint.config.js | test/extension/*) extension=true ;;
 		packaging/* | .goreleaser.yaml | test/packages/*) packaging=true ;;
 		android/*) android=true ;;
-		# Go the Android app cannot reach: the desktop's own packages, and
-		# the scripts of tests that run on Linux only.
+		# Go the Android app cannot reach: the desktop's own packages, the
+		# scripts of tests that run on Linux only, and code built for Windows
+		# alone (the _windows file suffix).
 		cmd/* | internal/bus/* | internal/notify/* | internal/network/* | internal/terminal/* | internal/tui/* | \
-			internal/secrets/secretservice/* | test/*) go=true ;;
+			internal/secrets/secretservice/* | test/* | *_windows.go | *_windows_test.go) go=true ;;
 		# The rest of the Go, the binding included, goes into the app's .aar.
 		*.go | go.mod | go.sum | .golangci.yaml | internal/* | mobile/*) go=true android=true ;;
 		# CI itself, the Makefile every job runs, and anything else: all.
