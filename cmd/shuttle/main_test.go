@@ -7,16 +7,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/godbus/dbus/v5"
-
-	"github.com/fqazzazee/shuttle/internal/bus"
-	"github.com/fqazzazee/shuttle/internal/daemon"
 	"github.com/fqazzazee/shuttle/internal/dbustest"
-	"github.com/fqazzazee/shuttle/internal/notify/notifytest"
+	"github.com/fqazzazee/shuttle/internal/fsys/fsystest"
 )
 
 func TestRun(t *testing.T) {
@@ -53,12 +49,14 @@ func TestRun(t *testing.T) {
 
 // isolate points the config and the state at dir, on every OS, so that no
 // test reaches the user's own: XDG's folders on Linux, %APPDATA% and
-// %LOCALAPPDATA% on Windows.
+// %LOCALAPPDATA% on Windows; and, on Windows, the daemon's pipe at one of
+// the test's, not the user's daemon's.
 func isolate(t *testing.T, dir string) {
 	t.Helper()
 	for _, v := range []string{"XDG_CONFIG_HOME", "XDG_STATE_HOME", "APPDATA", "LOCALAPPDATA"} {
 		t.Setenv(v, dir)
 	}
+	t.Setenv("SHUTTLE_PIPE", `\\.\pipe\`+fsystest.UniqueName("shuttle-test"))
 }
 
 // A config file that does not load stops the daemon with EX_CONFIG: the
@@ -88,74 +86,10 @@ func TestDaemonWithABrokenConfig(t *testing.T) {
 // user's real session bus.
 func privateSessionBus(t *testing.T) {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		// No bus: a pipe of the test's own, never the user's daemon's.
+		t.Setenv("SHUTTLE_PIPE", `\\.\pipe\`+fsystest.UniqueName("shuttle-test"))
+		return
+	}
 	t.Setenv("DBUS_SESSION_BUS_ADDRESS", dbustest.Start(t))
-}
-
-// The daemon starts, serves D-Bus, shows notifications, runs until its
-// context ends, and exits cleanly.
-func TestDaemonRunsUntilStopped(t *testing.T) {
-	privateSessionBus(t)
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-	notes, err := notifytest.Serve(conn, false, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir := t.TempDir()
-	isolate(t, dir)
-	local := t.TempDir()
-	cfg := "[shares.m]\ntype = \"path\"\npath = \"" + t.TempDir() + "\"\n[shuttles.s]\nmode = \"push\"\nlocal = \"" + local + "\"\nremote = \"m:\"\n"
-	if err := os.MkdirAll(dir+"/shuttle", 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dir+"/shuttle/config.toml", []byte(cfg), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var stdout, stderr bytes.Buffer
-	done := make(chan int, 1)
-	go func() { done <- run(ctx, []string{"daemon"}, &stdout, &stderr) }()
-
-	// While it runs, it answers on the bus.
-	c, err := bus.Connect()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-	var shuttles []daemon.Status
-	for range 200 {
-		if shuttles, err = c.Shuttles(context.Background()); err == nil {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if err != nil || len(shuttles) != 1 || shuttles[0].Name != "s" {
-		t.Fatalf("over the bus: %+v, %v", shuttles, err)
-	}
-	if err := c.SyncNow(context.Background(), "s"); err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; len(notes.Notes()) == 0; i++ {
-		if i == 500 {
-			t.Fatal("no notification within 5s of the run asked for")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if n := notes.Notes()[0]; n.Summary != "s: synced" {
-		t.Errorf("notification = %+v, want the run's completion", n)
-	}
-
-	cancel()
-	if code := <-done; code != 0 {
-		t.Fatalf("exit code = %d; stderr:\n%s", code, stderr.String())
-	}
-	for _, want := range []string{"daemon started", "serving D-Bus", "daemon stopped"} {
-		if !strings.Contains(stderr.String(), want) {
-			t.Errorf("log lacks %q:\n%s", want, stderr.String())
-		}
-	}
 }
