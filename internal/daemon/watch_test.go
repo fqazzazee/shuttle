@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
+
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
@@ -219,4 +221,34 @@ func TestWatchFailureFallsBackToPolling(t *testing.T) {
 	}
 	write(t, f.local, "a.txt", "a")
 	f.waitFor("s", "polling to push", func(Status) bool { return exists(f.mount, "a.txt") })
+}
+
+// A folder's own write event, as Windows reports one whenever something in
+// it changes, is no change: not even for a folder the shuttle ignores,
+// which the event alone does not say is a folder.
+func TestFolderWriteEventsAreNoChange(t *testing.T) {
+	root := t.TempDir()
+	s := config.Defaults()
+	s.Ignore = []string{"cache/"}
+	lw, err := newLocalWatcher(root, &s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lw.Close()
+	for _, dir := range []string{"cache", "docs"} {
+		if err := os.Mkdir(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if rel, ok, err := lw.event(fsnotify.Event{Name: filepath.Join(root, dir), Op: fsnotify.Write}); ok || err != nil {
+			t.Errorf("a write to folder %s = %q, %v, %v; want no change", dir, rel, ok, err)
+		}
+	}
+	// A file written to is a change, and so is a folder made.
+	write(t, root, "a.txt", "a")
+	if rel, ok, _ := lw.event(fsnotify.Event{Name: filepath.Join(root, "a.txt"), Op: fsnotify.Write}); !ok || rel != "a.txt" {
+		t.Errorf("a write to a.txt = %q, %v", rel, ok)
+	}
+	if rel, ok, _ := lw.event(fsnotify.Event{Name: filepath.Join(root, "docs"), Op: fsnotify.Create}); !ok || rel != "docs" {
+		t.Errorf("docs made = %q, %v", rel, ok)
+	}
 }
