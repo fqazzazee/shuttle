@@ -25,13 +25,17 @@ else
 		# Code built for Windows alone (the _windows file suffix): never in the
 		# Android app.
 		*_windows.go | *_windows_test.go) go=true windows=true ;;
-		# Go the Android app cannot reach: the desktop's own packages, and the
-		# scripts of tests that run on Linux only.
-		cmd/* | internal/bus/* | internal/notify/* | internal/network/* | internal/terminal/* | internal/tui/* | \
+		# The desktop's own packages whose suites also run on Windows.
+		cmd/* | internal/terminal/* | internal/secrets/credman/*) go=true windows=true ;;
+		# Go the Android app cannot reach, Linux's alone so far: the rest of the
+		# desktop's packages, and the scripts of tests that run on Linux only.
+		internal/bus/* | internal/notify/* | internal/network/* | internal/tui/* | \
 			internal/secrets/secretservice/* | test/*) go=true ;;
-		# The core, whose suites also run on Windows, and the modules it builds with.
+		# The core and the daemon, whose suites also run on Windows, and the
+		# modules they build with.
 		internal/config/* | internal/fsys/* | internal/engine/* | internal/state/* | internal/activity/* | \
-			internal/ignore/* | internal/nfs3/* | go.mod | go.sum) go=true android=true windows=true ;;
+			internal/ignore/* | internal/nfs3/* | internal/daemon/* | internal/shares/* | internal/secrets/* | \
+			go.mod | go.sum) go=true android=true windows=true ;;
 		# The rest of the Go, the binding included, goes into the app's .aar.
 		*.go | .golangci.yaml | internal/* | mobile/*) go=true android=true ;;
 		# CI itself, the Makefile every job runs, and anything else: all.
