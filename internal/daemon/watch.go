@@ -112,16 +112,20 @@ func (lw *localWatcher) event(ev fsnotify.Event) (rel string, ok bool, err error
 	if !ok {
 		return "", false, nil
 	}
-	isDir := false
-	if ev.Has(fsnotify.Create) {
-		if info, statErr := os.Lstat(ev.Name); statErr == nil && info.IsDir() {
-			isDir = true
-			if !lw.skip(rel, true) {
-				// Files created in it before the watch existed are covered by
-				// the run this event triggers, which scans everything.
-				err = lw.addTree(ev.Name)
-			}
+	info, statErr := os.Lstat(ev.Name)
+	isDir := statErr == nil && info.IsDir()
+	switch {
+	case isDir && ev.Has(fsnotify.Create):
+		if !lw.skip(rel, true) {
+			// Files created in it before the watch existed are covered by
+			// the run this event triggers, which scans everything.
+			err = lw.addTree(ev.Name)
 		}
+	case isDir && !ev.Has(fsnotify.Remove) && !ev.Has(fsnotify.Rename):
+		// A folder written to is its own time changing because something in
+		// it did, which has an event of its own. Windows reports these;
+		// inotify does not.
+		return "", false, nil
 	}
 	if lw.skip(rel, isDir) {
 		return "", false, err
