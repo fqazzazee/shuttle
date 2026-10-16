@@ -340,3 +340,37 @@ func TestFolds(t *testing.T) {
 		}
 	}
 }
+
+// A file being read can still be deleted, or moved away for a new one as
+// Office saves, and the reader reads the old content to the end. Windows
+// allows either only if the reader opened the file sharing delete, which
+// os.Root does.
+func TestLocalOpenLetsOthersReplace(t *testing.T) {
+	l, dir := newLocal(t)
+	p := osPath(dir, "a.txt")
+	for what, replace := range map[string]func() error{
+		"deleted": func() error { return os.Remove(p) },
+		"moved away": func() error {
+			if err := os.Rename(p, p+".bak"); err != nil {
+				return err
+			}
+			return os.WriteFile(p, []byte("new"), 0o600)
+		},
+	} {
+		writeOS(t, p, "old")
+		r, err := l.Open(context.Background(), "a.txt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := replace(); err != nil {
+			t.Errorf("%s while read: %v", what, err)
+		}
+		got, err := io.ReadAll(r)
+		r.Close()
+		if err != nil || string(got) != "old" {
+			t.Errorf("%s while read: the reader read %q, %v; want the old content", what, got, err)
+		}
+		os.Remove(p)
+		os.Remove(p + ".bak")
+	}
+}

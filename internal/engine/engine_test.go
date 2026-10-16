@@ -360,9 +360,18 @@ func (e *editedWhileRead) Open(ctx context.Context, name string) (io.ReadCloser,
 	}
 	if err == nil && name == e.path {
 		// Saved as editors do, as a new file renamed over the old one: the
-		// copy reads the old content to the end.
+		// copy reads the old content to the end. Windows replaces no file
+		// that is open, so there the old one is moved away first, as Office
+		// saves.
 		write(e.t, e.dir, e.path+".new", e.content, e.mtime)
-		if err := os.Rename(filepath.Join(e.dir, e.path+".new"), filepath.Join(e.dir, e.path)); err != nil {
+		old := filepath.Join(e.dir, e.path)
+		if runtime.GOOS == "windows" {
+			if err := os.Rename(old, old+".bak"); err != nil {
+				e.t.Fatal(err)
+			}
+			defer os.Remove(old + ".bak")
+		}
+		if err := os.Rename(old+".new", old); err != nil {
 			e.t.Fatal(err)
 		}
 		e.path = "" // once
@@ -374,11 +383,6 @@ func (e *editedWhileRead) Open(ctx context.Context, name string) (io.ReadCloser,
 // neither version for sure. The next run copies it again; it must not take
 // the copy it left behind for an edit of its own, as a conflict.
 func TestFileChangedWhileCopiedIsCopiedAgain(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		// Windows refuses the save while the copy has the file open: the
-		// rename over it fails with "Access is denied".
-		t.Skip("Windows refuses saving a file over one being copied")
-	}
 	for _, mode := range []config.Mode{config.ModeSync, config.ModePush} {
 		t.Run(string(mode), func(t *testing.T) {
 			h := newHarness(t, mode, config.DeletionsAdditive)
