@@ -439,3 +439,33 @@ func TestRenameOnThePhoneWithEdit(t *testing.T) {
 		t.Errorf("next run planned %d actions", res.Planned)
 	}
 }
+
+// A file renamed in case only and edited, where both sides ignore case, is
+// then recorded under its new spelling alone: the old spelling's record goes
+// in the same run, not one run later, nor never.
+func TestCaseRenameWithEditBothFold(t *testing.T) {
+	h := newPhoneHarness(t, config.ModeSync, config.DeletionsMirror)
+	remote := openPhoneFS(t, h.remoteDir)
+	t.Cleanup(func() { remote.Close() })
+	h.opts.Remote = remote
+	write(t, h.localDir, "notes.txt", "v1", t0)
+	h.run()
+	if err := os.Rename(filepath.Join(h.localDir, "notes.txt"), filepath.Join(h.localDir, "Notes.txt")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, h.localDir, "Notes.txt", "v2, renamed", t1)
+
+	if res := h.run(); res.Copied != 1 || len(res.Conflicts) != 0 {
+		t.Errorf("result = %+v, want one copy", res)
+	}
+	records, err := h.opts.State.All()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := slices.Sorted(maps.Keys(records)); !slices.Equal(got, []string{"Notes.txt"}) {
+		t.Errorf("records = %q, want Notes.txt alone", got)
+	}
+	if res := h.run(); res.Planned != 0 {
+		t.Errorf("next run planned %d actions", res.Planned)
+	}
+}

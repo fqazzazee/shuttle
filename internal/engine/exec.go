@@ -53,6 +53,11 @@ func (e *executor) run(actions []Action) error {
 			e.o.Tracker.update(func(p *Progress) { p.Path = a.Path })
 		}
 		err := e.do(a)
+		if err == nil && a.was != "" {
+			// The record now stands under the new spelling: the old one goes.
+			was := a.was
+			e.pending = append(e.pending, func(tx *state.Tx) error { return tx.Delete(was) })
+		}
 		if track {
 			e.o.Tracker.update(func(p *Progress) { p.Done, p.Path = p.Done+1, "" })
 		}
