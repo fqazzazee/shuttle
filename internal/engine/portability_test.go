@@ -30,6 +30,7 @@ func TestCoreHasNoDesktopDependencies(t *testing.T) {
 	}
 	forbidden := []string{
 		"github.com/fqazzazee/shuttle/internal/secrets/secretservice",
+		"github.com/fqazzazee/shuttle/internal/secrets/credman",
 		"github.com/fqazzazee/shuttle/internal/bus",
 		"github.com/fqazzazee/shuttle/internal/notify",
 		"github.com/fqazzazee/shuttle/internal/network",

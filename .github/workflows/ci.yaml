@@ -362,6 +362,12 @@ jobs:
           SHUTTLE_TEST_SMB_ADDR: 127.0.0.1:445
           SHUTTLE_TEST_SMB_DIR: C:\smbtest
         run: go test -race -count=1 ./internal/fsys/... ./internal/engine/...
+      # Passwords in Credential Manager: written for real only here, on a
+      # runner thrown away after the job, never on a user's machine.
+      - name: Credential Manager
+        env:
+          SHUTTLE_TEST_CREDMAN: '1'
+        run: go test -race -count=1 ./internal/secrets/...
 
   # The one check branch protection requires of CI: every job passed, or was
   # skipped as nothing it tests changed. A job added above goes in needs.
