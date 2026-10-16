@@ -340,6 +340,28 @@ jobs:
           go test -race
           ./internal/config/... ./internal/fsys/... ./internal/engine/... ./internal/state/...
           ./internal/activity/... ./internal/ignore/... ./internal/nfs3/...
+      # Windows' own SMB server, as the Samba container is on Linux: the share
+      # "test" for the user "shuttle" (fsystest.SambaUser and SambaPassword),
+      # a folder on the runner the tests also set up and inspect directly.
+      - name: start a Windows SMB share
+        run: |
+          # The fixture's password has no capitals or digits: the runner's
+          # policy refuses it until complexity is off (the runner is thrown away).
+          secedit /export /cfg "$env:RUNNER_TEMP\sec.cfg" | Out-Null
+          (Get-Content "$env:RUNNER_TEMP\sec.cfg") -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' |
+            Set-Content "$env:RUNNER_TEMP\sec.cfg"
+          secedit /configure /db "$env:RUNNER_TEMP\sec.sdb" /cfg "$env:RUNNER_TEMP\sec.cfg" /areas SECURITYPOLICY | Out-Null
+          $pw = ConvertTo-SecureString 'samba-throwaway-pw' -AsPlainText -Force
+          New-LocalUser -Name shuttle -Password $pw -PasswordNeverExpires | Out-Null
+          New-Item -ItemType Directory -Path C:\smbtest | Out-Null
+          icacls C:\smbtest /grant 'shuttle:(OI)(CI)F' | Out-Null
+          New-SmbShare -Name test -Path C:\smbtest -FullAccess shuttle | Out-Null
+          Get-SmbShare -Name test
+      - name: fsys and engine over Windows' SMB
+        env:
+          SHUTTLE_TEST_SMB_ADDR: 127.0.0.1:445
+          SHUTTLE_TEST_SMB_DIR: C:\smbtest
+        run: go test -race -count=1 ./internal/fsys/... ./internal/engine/...
 
   # The one check branch protection requires of CI: every job passed, or was
   # skipped as nothing it tests changed. A job added above goes in needs.

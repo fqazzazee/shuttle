@@ -192,6 +192,9 @@ func smbOnly(t *testing.T) {
 
 func TestCaseClashIsHeldOverSMB(t *testing.T) {
 	smbOnly(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("the local folder here is on NTFS, which cannot hold Readme.md beside README.md")
+	}
 	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
 	write(t, h.localDir, "Readme.md", "lower", t0)
 	write(t, h.localDir, "README.md", "UPPER", t1)
