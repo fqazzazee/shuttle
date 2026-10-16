@@ -8,8 +8,10 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -377,4 +379,54 @@ func TestLocalOpenLetsOthersReplace(t *testing.T) {
 		os.Remove(p)
 		os.Remove(p + ".bak")
 	}
+}
+
+// Paths longer than Windows' old limit of 260 characters work, for the
+// folder itself and for what is in it.
+func TestLocalLongPaths(t *testing.T) {
+	const forty = "a-folder-with-a-forty-character-name-xx/"
+	root := filepath.Join(t.TempDir(), filepath.FromSlash(strings.Repeat(forty, 4)))
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	l, err := OpenLocal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	ctx := context.Background()
+	deep := strings.Repeat(forty, 4) + "a-file-with-a-long-name.txt"
+	if err := l.MkdirAll(ctx, path.Dir(deep)); err != nil {
+		t.Fatal(err)
+	}
+	w, err := l.Create(ctx, deep+".tmp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(w, "deep"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Rename(ctx, deep+".tmp", deep); err != nil {
+		t.Fatal(err)
+	}
+	r, err := l.Open(ctx, deep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(r)
+	r.Close()
+	if err != nil || string(got) != "deep" {
+		t.Errorf("read %q, %v", got, err)
+	}
+	var found bool
+	if err := Walk(ctx, l, ".", func(fi FileInfo) error { found = found || fi.Name == deep; return nil }); err != nil || !found {
+		t.Errorf("walk: found %v, %v", found, err)
+	}
+	if err := l.Remove(ctx, deep); err != nil {
+		t.Error(err)
+	}
+	t.Logf("%d characters in all", len(root)+1+len(deep))
 }
