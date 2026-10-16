@@ -31,6 +31,7 @@ func TestDraftName(t *testing.T) {
 // A new shuttle's settings, set one at a time before it is saved, as a saved
 // one's are.
 func TestDraftSet(t *testing.T) {
+	unixPaths(t)
 	data := []byte(rowsConfig)
 	d := &Draft{Name: "photos", Profile: "live", Remote: "nas:/photos", Local: "/p", New: true}
 	if err := d.Set(data, "/home/user", "conflicts", "ask"); err != nil {
@@ -107,6 +108,7 @@ func TestDraftSet(t *testing.T) {
 // Without a profile, a new shuttle has no mode until it is set: what is set
 // meanwhile is not refused for it, and Check says so.
 func TestDraftWithoutMode(t *testing.T) {
+	unixPaths(t)
 	data := []byte(rowsConfig)
 	d := &Draft{Name: "photos", Remote: "nas:/photos", Local: "/p", New: true}
 	if err := d.Check(data, "/home/user"); err == nil || !strings.Contains(err.Error(), "mode") {
@@ -130,6 +132,7 @@ func TestDraftWithoutMode(t *testing.T) {
 // The folders are checked as soon as they are chosen, before the mode and
 // the rest are.
 func TestDraftCheckFolders(t *testing.T) {
+	unixPaths(t)
 	data := []byte(rowsConfig)
 	d := &Draft{Name: "photos", Remote: "nas:/photos", Local: "/p", New: true}
 	if err := d.CheckFolders(data, "/home/user"); err != nil {
@@ -155,6 +158,7 @@ func TestDraftCheckFolders(t *testing.T) {
 }
 
 func TestDraftSaveNew(t *testing.T) {
+	unixPaths(t)
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(rowsConfig), 0o600); err != nil {
 		t.Fatal(err)
@@ -189,6 +193,7 @@ func TestDraftSaveNew(t *testing.T) {
 // An edit writes only its own keys: comments, enabled and the rest of the
 // file stay as written; a setting reset is removed.
 func TestDraftSaveEdit(t *testing.T) {
+	unixPaths(t)
 	path := filepath.Join(t.TempDir(), "config.toml")
 	data := strings.Replace(rowsConfig, "profile = \"live\"\n", "profile = \"live\"\nenabled = false\n", 1)
 	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {

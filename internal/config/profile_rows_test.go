@@ -41,6 +41,7 @@ func TestProfileRows(t *testing.T) {
 // One setting of the profile changes, and nothing else in the file; its
 // shuttles follow it.
 func TestSetProfileRow(t *testing.T) {
+	unixPaths(t)
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(rowsConfig), 0o600); err != nil {
 		t.Fatal(err)

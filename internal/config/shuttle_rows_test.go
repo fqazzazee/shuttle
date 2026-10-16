@@ -64,6 +64,7 @@ func TestShuttleRows(t *testing.T) {
 // One setting changes, and nothing else in the file: comments, and a list
 // written over several lines, stay as they were.
 func TestSetShuttleRow(t *testing.T) {
+	unixPaths(t)
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(rowsConfig), 0o600); err != nil {
 		t.Fatal(err)
