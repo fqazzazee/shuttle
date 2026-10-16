@@ -19,7 +19,7 @@ outputs:
     description: '"true" when the Android app, its binding or the Go core it uses changes'
     value: ${{ steps.areas.outputs.android }}
   windows:
-    description: '"true" when the Go core, its modules or code built for Windows alone changes'
+    description: '"true" when Go whose suites run on Windows changes: the core, the daemon, the CLI, code built for Windows alone'
     value: ${{ steps.areas.outputs.windows }}
 runs:
   using: composite
