@@ -12,6 +12,7 @@ func setShare(sh *Share) func(*Doc) error {
 }
 
 func TestSetShare(t *testing.T) {
+	unixPaths(t)
 	// A new share goes after the other shares, type first.
 	got := edit(t, commented, setShare(&Share{Name: "usb", Type: SharePath, Path: "/mnt/usb"}))
 	want := strings.Replace(commented, "user = \"user\"\n", "user = \"user\"\n\n[shares.usb]\ntype = \"path\"\npath = \"/mnt/usb\"\n", 1)

@@ -302,6 +302,7 @@ func normalize(v any) any {
 }
 
 func TestSave(t *testing.T) {
+	unixPaths(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "shuttle", "config.toml")
 	good := []byte("[shares.m]\ntype = \"path\"\npath = \"/mnt\"\n")

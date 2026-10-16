@@ -63,6 +63,7 @@ func TestSetEnabled(t *testing.T) {
 }
 
 func TestSetEnabledSpellings(t *testing.T) {
+	unixPaths(t)
 	home := t.TempDir()
 	const share = "[shares.m]\ntype = \"path\"\npath = \"/mnt\"\n"
 	for _, tc := range []struct{ name, text, shuttle string }{

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -13,6 +14,17 @@ import (
 )
 
 const home = "/home/user"
+
+// unixPaths skips a test whose configs use Unix paths ("/data", the home
+// above), which are not absolute on Windows. Windows paths are tested in
+// config_windows_test.go; the rest of what these tests check is the same on
+// every OS.
+func unixPaths(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix paths: Windows paths are tested in config_windows_test.go")
+	}
+}
 
 const day = 24 * time.Hour
 
@@ -35,6 +47,7 @@ func mustShuttle(t *testing.T, cfg *Config, name string) Shuttle {
 }
 
 func TestExampleConfig(t *testing.T) {
+	unixPaths(t)
 	data, err := os.ReadFile("testdata/example.toml")
 	if err != nil {
 		t.Fatal(err)
@@ -147,6 +160,7 @@ share = "home"
 `
 
 func TestDefaults(t *testing.T) {
+	unixPaths(t)
 	cfg := parse(t, minimalShare+`
 [shuttles.s]
 mode = "push"
@@ -173,6 +187,7 @@ remote = "nas:"
 // What a shuttle does on a metered connection comes from its profile, unless
 // it says otherwise itself.
 func TestMetered(t *testing.T) {
+	unixPaths(t)
 	cfg := parse(t, minimalShare+`
 [profiles.roam]
 mode = "sync"
@@ -215,6 +230,7 @@ func settingsEqual(a, b *Settings) bool {
 }
 
 func TestShuttleOverridesProfile(t *testing.T) {
+	unixPaths(t)
 	cfg := parse(t, minimalShare+`
 [profiles.p]
 mode = "sync"
@@ -246,6 +262,7 @@ deletion_guard = 0
 }
 
 func TestHomeExpansion(t *testing.T) {
+	unixPaths(t)
 	cfg := parse(t, minimalShare+`
 [shuttles.a]
 mode = "pull"
@@ -276,6 +293,7 @@ remote = "m:/b/"
 }
 
 func TestInvalidConfigs(t *testing.T) {
+	unixPaths(t)
 	tests := []struct {
 		name, doc, want string
 	}{
@@ -493,6 +511,7 @@ remote = "m:/docs"`, "local and remote folders overlap"},
 }
 
 func TestSiblingFoldersDoNotOverlap(t *testing.T) {
+	unixPaths(t)
 	parse(t, minimalShare+`
 [shuttles.a]
 mode = "push"
@@ -584,6 +603,7 @@ remote = "nas:/b"
 }
 
 func TestLoad(t *testing.T) {
+	unixPaths(t)
 	if _, err := Load("testdata/example.toml"); err != nil {
 		t.Fatal(err)
 	}
@@ -595,6 +615,7 @@ func TestLoad(t *testing.T) {
 // The README's example config must load: documentation that cannot be
 // copied and used is worse than none.
 func TestReadmeExampleParses(t *testing.T) {
+	unixPaths(t)
 	readme, err := os.ReadFile("../../README.md")
 	if err != nil {
 		t.Fatal(err)

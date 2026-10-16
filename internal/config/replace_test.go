@@ -11,6 +11,7 @@ import (
 // A backup restored: the file is the backup's, whatever it held; one that
 // would not load leaves it as it was.
 func TestReplace(t *testing.T) {
+	unixPaths(t)
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := Replace(path, "/home/user", []byte(rowsConfig)); err != nil {
 		t.Fatalf("no file yet: %v", err)
