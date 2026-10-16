@@ -565,11 +565,19 @@ func (p *parser) checkOverlaps(cfg *Config) {
 	reported := map[[2]string]bool{}
 	for i, a := range sides {
 		for _, b := range sides[i+1:] {
-			sep := "/" // a share's paths
+			if a.key != b.key {
+				continue
+			}
+			// A share's paths are compared as written; local ones as this OS
+			// compares names (on Windows, C:\Data is c:\data).
+			ap, bp, sep := a.path, b.path, "/"
 			if a.key == "local:" {
 				sep = string(filepath.Separator)
+				if fold := fsys.OSNames.Fold; fold != nil {
+					ap, bp = fold(ap), fold(bp)
+				}
 			}
-			if a.key != b.key || !nested(a.path, b.path, sep) {
+			if !nested(ap, bp, sep) {
 				continue
 			}
 			pair := [2]string{a.shuttle, b.shuttle}

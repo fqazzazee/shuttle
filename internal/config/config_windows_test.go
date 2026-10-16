@@ -68,7 +68,8 @@ remote = "nas:documents"
 }
 
 // Two shuttles' local folders, one inside the other, overlap however the
-// paths are written; a sibling with a longer name does not.
+// paths are written, in any case, as NTFS compares them; a sibling with a
+// longer name does not, nor a folder whose name NTFS keeps apart.
 func TestWindowsPathsOverlap(t *testing.T) {
 	doc := func(a, b string) []byte {
 		return []byte(minimalShare + `
@@ -88,6 +89,9 @@ remote = "nas:b"
 		{`C:/data/`, `C:\data\photos`},
 		{`C:\`, `C:\data`},
 		{`\\pc.example\photos`, `\\pc.example\photos\2026`},
+		{`C:\Data`, `c:\data\photos`}, // NTFS folds case
+		{`C:\DATA\Photos`, `c:\data\photos`},
+		{`D:\Fotos`, `d:\fotos`},
 	} {
 		if _, err := Parse(doc(tt[0], tt[1]), winHome); err == nil || !strings.Contains(err.Error(), "folders overlap") {
 			t.Errorf("%s and %s: %v, want them refused as overlapping", tt[0], tt[1], err)
@@ -95,6 +99,9 @@ remote = "nas:b"
 	}
 	if _, err := Parse(doc(`C:\data\photos`, `C:\data\photos-old`), winHome); err != nil {
 		t.Errorf("siblings: %v", err)
+	}
+	if _, err := Parse(doc(`C:\straße`, `C:\STRASSE\x`), winHome); err != nil {
+		t.Errorf("names NTFS keeps apart: %v", err)
 	}
 }
 
