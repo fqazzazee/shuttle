@@ -9,11 +9,13 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"golang.org/x/sys/windows"
 
 	"github.com/fqazzazee/shuttle/internal/bus"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/network"
 	"github.com/fqazzazee/shuttle/internal/secrets"
 	"github.com/fqazzazee/shuttle/internal/secrets/credman"
 )
@@ -22,8 +24,8 @@ import (
 func newStore() secrets.Store { return credman.New() }
 
 // runDaemon runs every shuttle in the user's config, and serves this user's
-// pipe once their state is held, until ctx is done. Notifications and
-// metered connections are Linux's for now.
+// pipe once their state is held, until ctx is done, following whether the
+// connection is metered. It shows no notifications on Windows yet.
 func runDaemon(ctx context.Context, stderr io.Writer) error {
 	paths, err := daemon.DefaultPaths()
 	if err != nil {
@@ -39,8 +41,17 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	var watching sync.WaitGroup
+	defer watching.Wait() // after cancel
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Whether the connection is metered, from Windows' Network List Manager.
+	// Without it, it never is: shuttles run as they always would.
+	watching.Go(func() {
+		if err := network.Watch(ctx, d.SetMetered); err != nil {
+			log.Warn("not following metered connections", "error", err)
+		}
+	})
 	runErr := make(chan error, 1)
 	go func() { runErr <- d.Run(ctx) }()
 	select {
