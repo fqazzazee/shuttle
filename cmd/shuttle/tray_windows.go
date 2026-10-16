@@ -54,8 +54,9 @@ func runTray(ctx context.Context, stderr io.Writer) int {
 	dir := filepath.Dir(self)
 	log.Info("showing the icon")
 	tray.Run(ctx, tray.Actions{
-		Open:  func() { openTUI(filepath.Join(dir, "shuttle.exe"), log) },
+		Open:  func(tab string) { openTUI(filepath.Join(dir, "shuttle.exe"), tab, log) },
 		Start: func() error { return launchDaemon(filepath.Join(dir, windowless)) },
+		Dir:   filepath.Dir(paths.StateDir),
 	}, log)
 	log.Info("the icon is gone")
 	return 0
@@ -85,10 +86,10 @@ func oneTray() (release func(), err error) {
 	return func() { windows.CloseHandle(h) }, nil //nolint:errcheck // leaving
 }
 
-// openTUI opens shuttle's TUI in a new terminal window: Windows Terminal,
-// or a console of its own.
-func openTUI(console string, log *slog.Logger) {
-	argv, err := terminal.Command(nil, exec.LookPath, console, "open")
+// openTUI opens shuttle's TUI on tab ("" for the first) in a new terminal
+// window: Windows Terminal, or a console of its own.
+func openTUI(console, tab string, log *slog.Logger) {
+	argv, err := terminal.Command(nil, exec.LookPath, console, "open", tab)
 	if err == nil {
 		err = terminal.Start(argv, exec.LookPath)
 	}

@@ -17,11 +17,12 @@ import (
 // every is how often the icon asks the daemon how it is.
 const every = 2 * time.Second
 
-// Actions are what the menu does beyond asking the daemon: open the TUI,
-// start a daemon when none runs.
+// Actions are what the menu and the toasts do beyond asking the daemon: open
+// the TUI, start a daemon when none runs.
 type Actions struct {
-	Open  func()
+	Open  func(tab string) // "" for the first tab
 	Start func() error
+	Dir   string // where the tray keeps its files: the toasts' icon
 }
 
 // Run shows the icon until ctx is done or the user quits it. It must run
@@ -29,6 +30,11 @@ type Actions struct {
 func Run(ctx context.Context, a Actions, log *slog.Logger) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	if icon, err := setUpToasts(a, a.Dir); err != nil {
+		log.Warn("notifications will not show", "error", err)
+	} else {
+		go showNotes(ctx, icon, log)
+	}
 	systray.Run(func() { go loop(ctx, a, log) }, cancel)
 }
 
@@ -58,7 +64,7 @@ func loop(ctx context.Context, a Actions, log *slog.Logger) {
 	m.start = systray.AddMenuItem("Start the daemon", "Start syncing: the daemon is not running")
 	systray.AddSeparator()
 	m.quit = systray.AddMenuItem("Quit the icon", "The daemon goes on syncing")
-	systray.SetOnTapped(a.Open)
+	systray.SetOnTapped(func() { a.Open("") })
 
 	var c *bus.Client
 	defer func() {
@@ -124,7 +130,7 @@ func loop(ctx context.Context, a Actions, log *slog.Logger) {
 			return
 		case <-tick.C:
 		case <-m.open.ClickedCh:
-			a.Open()
+			a.Open("")
 		case <-m.start.ClickedCh:
 			if err := a.Start(); err != nil {
 				log.Error("starting the daemon", "error", err)
