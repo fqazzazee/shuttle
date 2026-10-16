@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
+	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/nfs3"
 	"github.com/fqazzazee/shuttle/internal/nfs3/nfs3test"
 )
@@ -200,18 +200,18 @@ func TestNFSv4OnlyServer(t *testing.T) {
 	}
 }
 
-// FSSTAT says how big the served folder's disk is, as statfs does here.
+// FSSTAT says how big the served folder's disk is, as the OS says here.
 func TestFSStat(t *testing.T) {
 	c, dir := dial(t)
 	got, err := c.FSStat(t.Context(), c.Root())
 	if err != nil {
 		t.Fatal(err)
 	}
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(dir, &st); err != nil {
+	sp, err := fsys.LocalSpace(dir)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if want := st.Blocks * uint64(st.Bsize); got.Total != want || got.Avail == 0 || got.Avail > got.Free ||
+	if want := uint64(sp.Total); got.Total != want || got.Avail == 0 || got.Avail > got.Free ||
 		got.Free > got.Total {
 		t.Errorf("FSStat = %+v, want a total of %d and some room", got, want)
 	}

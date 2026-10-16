@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"testing"
 	"time"
 
@@ -105,14 +104,7 @@ type statfsHandler struct {
 }
 
 func (h statfsHandler) FSStat(_ context.Context, _ billy.Filesystem, s *nfs.FSStat) error {
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(h.dir, &st); err != nil {
-		return err
-	}
-	bs := uint64(st.Bsize) //nolint:gosec // a block size is positive
-	s.TotalSize, s.FreeSize, s.AvailableSize = st.Blocks*bs, st.Bfree*bs, st.Bavail*bs
-	s.TotalFiles, s.FreeFiles, s.AvailableFiles = st.Files, st.Ffree, st.Ffree
-	return nil
+	return diskRoom(h.dir, s)
 }
 
 // changeFS lets the server set times and modes, which billy's osfs cannot:
