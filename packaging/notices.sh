@@ -26,8 +26,10 @@ modules() {
 		CGO_ENABLED=1 GOOS=android GOARCH=arm64 go list -deps -f "$format" \
 			./mobile golang.org/x/mobile/bind/seq golang.org/x/mobile/bind/java
 	else
-		for arch in amd64 arm64; do
-			CGO_ENABLED=0 GOOS=linux GOARCH=$arch go list -deps -f "$format" ./cmd/shuttle
+		for os in linux windows; do
+			for arch in amd64 arm64; do
+				CGO_ENABLED=0 GOOS=$os GOARCH=$arch go list -deps -f "$format" ./cmd/shuttle
+			done
 		done
 	fi | sort -u
 }
@@ -64,8 +66,8 @@ else
 	cat <<'EOF'
 Third-party notices for shuttle
 
-shuttle's binary includes the software below, each under the license that
-follows its name. shuttle itself is under the terms in LICENSE; its GNOME
+shuttle's programs, for Linux and Windows, include the software below,
+each under the license that follows its name. shuttle itself is under the terms in LICENSE; its GNOME
 Shell extension is under the GPL-2.0-or-later, in a license file of its own.
 EOF
 fi

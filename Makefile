@@ -70,8 +70,9 @@ smoke:
 	cd / && "$(DESTDIR)$(BINDIR)/$(BINARY)" help >/dev/null
 	grep -qx 'ExecStart=$(BINDIR)/$(BINARY) daemon' "$(DESTDIR)$(USERUNITDIR)/shuttle.service"
 
-# The packages: RPM, DEB and tarballs for amd64 and arm64 in dist/, as a tagged
-# release would make them, but with a snapshot version and nothing published.
+# The packages: RPM, DEB, tarballs and Windows zips, for amd64 and arm64, in
+# dist/, as a tagged release would make them, but with a snapshot version and
+# nothing published.
 packages:
 	$(GORELEASER) release --snapshot --clean
 

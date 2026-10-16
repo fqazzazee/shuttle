@@ -263,6 +263,32 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tmux dbus
       - run: make test-tui
 
+  # What a tag would release, built as a snapshot: the release config's
+  # mistakes show here, not on the day of a release. The Windows zips must
+  # hold both programs: shuttle.exe, and shuttlew.exe, which autostart runs.
+  packages:
+    name: packages
+    needs: changes
+    if: needs.changes.outputs.packaging == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # goreleaser names the snapshot from the history
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      - run: make packages
+      - name: the Windows zips hold both programs
+        run: |
+          for z in dist/*_windows_*.zip; do
+            unzip -l "$z" | tee /dev/stderr | grep -q ' shuttle\.exe$'
+            unzip -l "$z" | grep -q ' shuttlew\.exe$'
+          done
+          ls dist/*_windows_amd64.zip dist/*_windows_arm64.zip
+
   vuln:
     name: govulncheck
     needs: changes
@@ -399,7 +425,7 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln, android, windows]
+    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln, android, windows, packages]
     runs-on: ubuntu-latest
     steps:
       - name: every job passed or was not needed

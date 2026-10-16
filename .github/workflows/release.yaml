@@ -79,7 +79,9 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # create the release and upload assets
+      contents: write      # create the release and upload assets
+      id-token: write      # the attestations' signing identity
+      attestations: write  # store them with the repository
     steps:
       - uses: actions/checkout@v7
         with:
@@ -99,6 +101,17 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # That each file was built here, by this workflow, from the tagged commit:
+      # the Windows programs are not signed, so this is what vouches for them
+      # (DECISIONS 2026-10-16). `gh attestation verify` checks it.
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.rpm
+            dist/*.deb
+            build/apk/*.apk
 
 # Tag only after CI is green on the commit being tagged:
 #   git tag -s vX.Y.Z && git push origin vX.Y.Z

@@ -17,9 +17,38 @@ builds:
     goarch: [amd64, arm64]
     flags: [-trimpath]
     ldflags: ["-s -w -X main.version={{ .Version }}"]
+  # Windows: shuttle.exe for the terminal, and shuttlew.exe, the same program
+  # without a console, which runs the daemon and the tray at sign-in.
+  - id: shuttle-windows
+    main: ./cmd/shuttle
+    binary: shuttle
+    env: [CGO_ENABLED=0]
+    goos: [windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+  - id: shuttlew
+    main: ./cmd/shuttle
+    binary: shuttlew
+    env: [CGO_ENABLED=0]
+    goos: [windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -H=windowsgui -X main.version={{ .Version }}"]
 
 archives:
-  - formats: [tar.gz]
+  - id: linux
+    ids: [shuttle]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - src: build/package/THIRD_PARTY_NOTICES
+        strip_parent: true
+  - id: windows
+    ids: [shuttle-windows, shuttlew]
+    formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
@@ -35,6 +64,7 @@ checksum:
 
 nfpms:
   - package_name: shuttle
+    ids: [shuttle]
     homepage: https://github.com/fqazzazee/shuttle
     maintainer: Fadi Q <fadi.qazzazee@gmail.com>
     description: Push, pull and sync folders between SMB/NFS shares and local storage.
@@ -96,7 +126,13 @@ release:
     phone and open it. It installs over an earlier release, keeping its setup; see the
     [README](https://github.com/fqazzazee/shuttle#android).
 
-    `checksums.txt` has every file's SHA-256.
+    On Windows 10 or 11: download `shuttle_{{ .Version }}_windows_amd64.zip` (or `_arm64`),
+    unzip it into a folder of its own, and run `shuttle autostart on` there: the daemon and its
+    icon then start when you sign in. Windows warns once that the programs are not signed; see the
+    [README](https://github.com/fqazzazee/shuttle#windows).
+
+    `checksums.txt` has every file's SHA-256, and every file is attested as built by this
+    repository's release workflow: `gh attestation verify <file> --repo fqazzazee/shuttle`.
 
     shuttle is source-available under PolyForm Noncommercial 1.0.0 or PolyForm Internal Use
     1.0.0; its GNOME extension is GPL-2.0-or-later. See
