@@ -12,7 +12,6 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -93,22 +92,12 @@ func (l *Local) RefuseName(name string) error {
 	return nil
 }
 
-// Space is what statfs says of the folder's file system.
+// Space is what the OS says of the folder's file system (LocalSpace).
 func (l *Local) Space(ctx context.Context) (Space, error) {
 	if err := ctx.Err(); err != nil {
 		return Space{}, err
 	}
 	return LocalSpace(l.root.Name())
-}
-
-// LocalSpace is how much room the file system dir is on has: what a user
-// can write, without root's reserve, out of the whole.
-func LocalSpace(dir string) (Space, error) {
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(dir, &st); err != nil {
-		return Space{}, &fs.PathError{Op: "statfs", Path: dir, Err: err}
-	}
-	return Space{Free: clampInt64(st.Bavail, st.Bsize), Total: clampInt64(st.Blocks, st.Bsize)}, nil
 }
 
 // clampInt64 is blocks of size bytes, at most math.MaxInt64.

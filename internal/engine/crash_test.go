@@ -19,7 +19,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
@@ -74,7 +73,7 @@ func (f *faultFS) tick() error {
 		return nil
 	}
 	if f.kill {
-		syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
+		killSelf()
 		select {} // never returns
 	}
 	return errInjected
@@ -259,7 +258,7 @@ func TestCrashAtEveryPoint(t *testing.T) {
 			finished := err == nil
 			var exit *exec.ExitError
 			if !finished {
-				if !errors.As(err, &exit) || !exit.Sys().(syscall.WaitStatus).Signaled() {
+				if !errors.As(err, &exit) || !killed(exit) {
 					t.Fatalf("crash child at %d: %v\n%s", at, err, out)
 				}
 				crashes++
