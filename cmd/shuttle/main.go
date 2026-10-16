@@ -77,6 +77,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 		return runTUI(ctx, strings.Join(args[1:], ""), stderr)
+	case "autostart":
+		return runAutostart(args[1:], stdout, stderr)
 	case "status", "sync", "pause", "resume", "enable", "disable", "activity":
 		return runClient(ctx, args[0], args[1:], stdout, stderr)
 	default:
@@ -115,6 +117,8 @@ Commands:
   disable <name>    Turn a shuttle off (saved in the config file)
   activity [<name>] Show what a shuttle, or every shuttle, did lately
   daemon            Run the background service (normally started by systemd)
+  autostart on|off|status
+                    Start the daemon when you sign in (Windows), or say how
   version           Print the version
   help              Show this help
 `)
