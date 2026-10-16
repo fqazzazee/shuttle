@@ -136,6 +136,7 @@ func typeIn(t *testing.T, m *model, text string) {
 }
 
 func TestSharesList(t *testing.T) {
+	unixPaths(t)
 	m, _, _ := sharesTab(t, sharesConfig)
 	s := screen(m)
 	for _, want := range []string{
@@ -151,6 +152,7 @@ func TestSharesList(t *testing.T) {
 }
 
 func TestAddAShare(t *testing.T) {
+	unixPaths(t)
 	m, kr, ts := sharesTab(t, sharesConfig)
 	press(t, m, "n")
 	if s := screen(m); !strings.Contains(s, "New share") || !strings.Contains(s, "› Name") {
@@ -204,6 +206,7 @@ func TestAddAShare(t *testing.T) {
 // An NFS share's IDs: 0 is root and is written; empty is the user's own,
 // and is not.
 func TestAddAnNFSShare(t *testing.T) {
+	unixPaths(t)
 	m, kr, _ := sharesTab(t, sharesConfig)
 	press(t, m, "n")
 	typeIn(t, m, "store")
@@ -247,6 +250,7 @@ func TestAddAnNFSShare(t *testing.T) {
 }
 
 func TestEditAShare(t *testing.T) {
+	unixPaths(t)
 	m, kr, _ := sharesTab(t, sharesConfig)
 	kr.pw["smb://user@nas.example/home"] = "old-pw"
 	press(t, m, "e")
@@ -289,6 +293,7 @@ func TestEditAShare(t *testing.T) {
 }
 
 func TestFormRefuses(t *testing.T) {
+	unixPaths(t)
 	m, kr, _ := sharesTab(t, sharesConfig)
 	before := configFile(t, m)
 
@@ -360,6 +365,7 @@ func TestFormRefuses(t *testing.T) {
 }
 
 func TestTestAndDeleteShares(t *testing.T) {
+	unixPaths(t)
 	doc := sharesConfig + "\n[shares.bad]\ntype = \"path\"\npath = \"/gone\"\n"
 	m, _, ts := sharesTab(t, doc)
 	press(t, m, "t") // bad, the first
@@ -388,6 +394,7 @@ func TestTestAndDeleteShares(t *testing.T) {
 }
 
 func TestSharesWithoutAConfig(t *testing.T) {
+	unixPaths(t)
 	m, _, _ := sharesTab(t, "")
 	if s := screen(m); !strings.Contains(s, "No shares yet: n adds one.") || !strings.Contains(s, present.Bus[1]) {
 		t.Errorf("no config:\n%s", s)
@@ -414,6 +421,7 @@ func TestSharesWithoutAConfig(t *testing.T) {
 // share's from its last test or its shuttles' last run, whichever is later,
 // amber when less than a tenth is left. Under the table, this computer's.
 func TestSharesFreeSpace(t *testing.T) {
+	unixPaths(t)
 	m, _, _ := sharesTab(t, sharesConfig)
 	if s := screen(m); !strings.Contains(s, "USED BY               FREE") || !strings.Contains(s, "docs                  —") {
 		t.Fatalf("nothing known yet:\n%s", s)
@@ -471,6 +479,7 @@ func TestMeasureDisks(t *testing.T) {
 // In a narrow terminal, a long WHERE gives up its middle, and the columns
 // after it still show.
 func TestSharesNarrow(t *testing.T) {
+	unixPaths(t)
 	m, _, _ := sharesTab(t, sharesConfig+`
 [shares.deep]
 type = "path"

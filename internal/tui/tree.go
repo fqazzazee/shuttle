@@ -42,13 +42,14 @@ func (n *node) name() string { return path.Base(n.path) }
 // with what is in it, folders opening in place, and marks the files and
 // folders it syncs or leaves out.
 type tree struct {
-	id    int
-	where string // "on nas", "here"
-	list  func(ctx context.Context, dir string) ([]entry, error)
-	clean func(typed string) string // a typed path as the tree's
-	root  *node                     // the shuttle's folder
-	sel   int                       // in rows()
-	marks pick.Marks                // slash paths from the top
+	id     int
+	where  string // "on nas", "here"
+	list   func(ctx context.Context, dir string) ([]entry, error)
+	clean  func(typed string) string // a typed path as the tree's
+	native func(p string) string     // a tree path as the folder it is, for the user and the config
+	root   *node                     // the shuttle's folder
+	sel    int                       // in rows()
+	marks  pick.Marks                // slash paths from the top
 	// folders are marks the other side's tree showed as folders: not
 	// here, they would not be known to be.
 	folders map[string]bool
@@ -77,19 +78,11 @@ func remoteTree(where string, f fsys.FS, dir string) *tree {
 	})
 }
 
-// localTree shows this computer, from dir. A typed path may start with ~,
-// for home.
+// localTree shows this computer, from dir, a folder of its. A typed path may
+// start with ~, for home.
 func localTree(dir, home string) *tree {
-	t := newTree("here", dir, func(ctx context.Context, dir string) ([]entry, error) {
-		// Through the local backend, as a run sees it; opened for each
-		// listing, so there is nothing to close.
-		f, err := fsys.OpenLocal("/")
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		return listFS(ctx, f, dir)
-	})
+	t := newTree("here", localSlash(dir), listLocal)
+	t.native = localNative
 	t.clean = func(p string) string {
 		if rest, ok := strings.CutPrefix(p, "~"); ok {
 			p = filepath.Join(home, rest)
@@ -97,7 +90,7 @@ func localTree(dir, home string) *tree {
 		if !filepath.IsAbs(p) {
 			return p // the wizard refuses it, with an example
 		}
-		return filepath.Clean(p)
+		return localSlash(filepath.Clean(p))
 	}
 	return t
 }
@@ -118,12 +111,12 @@ func listFS(ctx context.Context, f fsys.FS, dir string) ([]entry, error) {
 func newTree(where, dir string, list func(context.Context, string) ([]entry, error)) *tree {
 	treeIDs++
 	dir = cleanSlash(dir)
-	return &tree{id: treeIDs, where: where, list: list, clean: cleanSlash,
+	return &tree{id: treeIDs, where: where, list: list, clean: cleanSlash, native: func(p string) string { return p },
 		root: &node{path: dir, dir: true, open: true}, input: newInput(dir)}
 }
 
-// dir is the shuttle's folder: the top of the tree.
-func (t *tree) dir() string { return t.root.path }
+// dir is the shuttle's folder: the top of the tree, as the folder it is.
+func (t *tree) dir() string { return t.native(t.root.path) }
 
 // load lists the folder n.
 func (t *tree) load(ctx context.Context, n *node) tea.Cmd {
@@ -292,7 +285,7 @@ func (t *tree) key(ctx context.Context, msg tea.KeyPressMsg) (cmd tea.Cmd, chose
 		return nil, true
 	case "t", "/":
 		t.typing = true
-		t.input.SetValue(t.root.path)
+		t.input.SetValue(t.dir())
 		t.input.CursorEnd()
 		return t.input.Focus(), false
 	}
@@ -365,7 +358,7 @@ func (t *tree) setSelection(include, exclude []string) {
 }
 
 func (t *tree) lines(room, width int) []string {
-	lines := []string{"Folder " + t.where + ": " + headStyle.Render(t.root.path)}
+	lines := []string{"Folder " + t.where + ": " + headStyle.Render(t.dir())}
 	choices := make([]string, len(pick.Names))
 	for i, name := range pick.Names {
 		choices[i] = faint.Render(name)

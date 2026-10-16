@@ -321,8 +321,8 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-  # The suites on Windows, against NTFS folders: the core, the daemon, the CLI.
-  # The TUI, notifications and D-Bus are Linux's for now.
+  # The suites on Windows, against NTFS folders: the core, the daemon, the CLI,
+  # the TUI. Notifications and metered connections are Linux's for now.
   # The race detector uses the runner's MinGW gcc.
   windows:
     name: windows
@@ -340,7 +340,7 @@ jobs:
           go test -race
           ./internal/config/... ./internal/fsys/... ./internal/engine/... ./internal/state/...
           ./internal/activity/... ./internal/ignore/... ./internal/nfs3/...
-          ./internal/daemon/... ./internal/shares/... ./internal/terminal/... ./internal/bus/... ./cmd/...
+          ./internal/daemon/... ./internal/shares/... ./internal/terminal/... ./internal/bus/... ./internal/tui/... ./cmd/...
       # Windows' own SMB server, as the Samba container is on Linux: the share
       # "test" for the user "shuttle" (fsystest.SambaUser and SambaPassword),
       # a folder on the runner the tests also set up and inspect directly.

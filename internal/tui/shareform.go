@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -44,8 +43,8 @@ var (
 			nameField, typeField,
 			{"host", "Host", "the server's name or address"},
 			{"export", "Export", "the exported path on the server, e.g. /volume1/home"},
-			{"uid", "User ID", fmt.Sprintf("optional: yours (%d) if empty; the server believes it as sent", os.Getuid())},
-			{"gid", "Group ID", fmt.Sprintf("optional: yours (%d) if empty", os.Getgid())},
+			{"uid", "User ID", uidHint()},
+			{"gid", "Group ID", gidHint()},
 			{"port", "Port", "optional: found through the server's portmapper, else 2049"},
 			{"mount_port", "Mount port", "optional: found through the server's portmapper"},
 		},

@@ -77,6 +77,7 @@ func clearRow(t *testing.T, m *model) {
 }
 
 func TestProfilesList(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 20)
 	s := screen(m)
 	for _, want := range []string{
@@ -92,6 +93,7 @@ func TestProfilesList(t *testing.T) {
 }
 
 func TestNewProfile(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 30)
 	press(t, m, "n")
 	s := screen(m)
@@ -122,6 +124,7 @@ func TestNewProfile(t *testing.T) {
 }
 
 func TestEditProfile(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 30)
 	press(t, m, "e")
 	if s := screen(m); !strings.Contains(s, "The profile live") || strings.Contains(s, "  Name") {
@@ -149,6 +152,7 @@ conflicts = "ask"`, 1)
 }
 
 func TestCopyProfile(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 30)
 	press(t, m, "c")
 	if s := screen(m); !strings.Contains(s, "New profile") || !strings.Contains(s, "live-copy") {
@@ -162,6 +166,7 @@ func TestCopyProfile(t *testing.T) {
 }
 
 func TestProfileFormRefuses(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 30)
 	before := configFile(t, m)
 	check := func(what, want string) {
@@ -206,6 +211,7 @@ func TestProfileFormRefuses(t *testing.T) {
 }
 
 func TestDeleteProfile(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 20)
 	press(t, m, "x")
 	if s := screen(m); !strings.Contains(s, "live is used by docs") || m.question != "" {
@@ -223,6 +229,7 @@ func TestDeleteProfile(t *testing.T) {
 
 // In a short terminal, the form scrolls to keep the row being edited in view.
 func TestProfileFormScrolls(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 12)
 	press(t, m, "e")
 	toRow(t, m, "notify.share")

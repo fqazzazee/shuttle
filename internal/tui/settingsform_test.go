@@ -75,6 +75,7 @@ func TestSettingsThatDoNotApply(t *testing.T) {
 
 // The cursor passes greyed rows by, and comes to them once they apply.
 func TestGreyedRowsAreSkipped(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 40)
 	press(t, m, "n")
 	typeIn(t, m, "nightly")
@@ -96,6 +97,7 @@ func TestGreyedRowsAreSkipped(t *testing.T) {
 
 // A value in a row that no longer applies is shown, marked, and not saved.
 func TestGreyedValuesAreNotSaved(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 40)
 	press(t, m, "e") // live: sync, realtime, trash kept 30d
 	toRow(t, m, "versioning.kind")
@@ -115,6 +117,7 @@ func TestGreyedValuesAreNotSaved(t *testing.T) {
 // What a profile does on a metered connection is a choice in its form, the
 // default pause; run is written to the config file as such.
 func TestMeteredSetting(t *testing.T) {
+	unixPaths(t)
 	m := profilesTab(t, profilesConfig, 40)
 	press(t, m, "e") // live
 	toRow(t, m, "metered")

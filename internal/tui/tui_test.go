@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -448,7 +449,7 @@ func TestDaemonDown(t *testing.T) {
 	f := newFake()
 	f.down = bus.ErrNotRunning
 	m := start(t, f, 120, 12)
-	if s := screen(m); !strings.Contains(s, "the shuttle daemon is not running (start it with: systemctl --user start shuttle)") {
+	if s := screen(m); !strings.Contains(s, bus.ErrNotRunning.Error()) {
 		t.Errorf("screen:\n%s", s)
 	}
 	press(t, m, "s") // nothing selected: no call
@@ -590,5 +591,16 @@ func TestFirstTab(t *testing.T) {
 	run(t, m, m.Init())
 	if m.tab != tabActivity || len(f.asked) != 1 || !strings.Contains(screen(m), "Every shuttle") {
 		t.Errorf("tab %d, asked %q:\n%s", m.tab, f.asked, screen(m))
+	}
+}
+
+// unixPaths skips a test whose configs or screens use Unix paths ("/mnt/usb",
+// "/home/u/Documents"), which are not absolute on Windows. Windows paths are
+// tested in tui_windows_test.go; the rest of what these tests check is the
+// same on every OS.
+func unixPaths(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix paths: Windows paths are tested in tui_windows_test.go")
 	}
 }
