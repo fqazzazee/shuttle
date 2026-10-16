@@ -135,10 +135,8 @@ func (l *Local) ReadDir(ctx context.Context, name string) ([]FileInfo, error) {
 	}
 	out := make([]FileInfo, 0, len(entries))
 	for _, e := range entries {
-		// Lstat through the root rather than DirEntry.Info, which resolves the
-		// entry by path string outside the root's protection.
 		child := path.Join(name, e.Name())
-		fi, err := l.root.Lstat(child)
+		fi, err := entryInfo(l.root, child, e)
 		if err != nil {
 			return nil, err
 		}

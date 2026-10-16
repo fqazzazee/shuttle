@@ -38,3 +38,26 @@ func TestWalkFailsOnUnreadableDir(t *testing.T) {
 		t.Errorf("error = %v, want fs.ErrPermission", err)
 	}
 }
+
+// A file this user may not read is still listed, with its size: reading it
+// fails, the scan does not.
+func TestWalkListsAnUnreadableFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "locked"), []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l, err := fsys.OpenLocal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	fsystest.Unreadable(t, filepath.Join(dir, "locked"))
+
+	var got []fsys.FileInfo
+	if err := fsys.Walk(context.Background(), l, ".", func(fi fsys.FileInfo) error { got = append(got, fi); return nil }); err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	if len(got) != 1 || got[0].Name != "locked" || got[0].Size != 6 {
+		t.Errorf("walked %+v, want locked, 6 bytes", got)
+	}
+}
