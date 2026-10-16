@@ -565,7 +565,11 @@ func (p *parser) checkOverlaps(cfg *Config) {
 	reported := map[[2]string]bool{}
 	for i, a := range sides {
 		for _, b := range sides[i+1:] {
-			if a.key != b.key || !nested(a.path, b.path) {
+			sep := "/" // a share's paths
+			if a.key == "local:" {
+				sep = string(filepath.Separator)
+			}
+			if a.key != b.key || !nested(a.path, b.path, sep) {
 				continue
 			}
 			pair := [2]string{a.shuttle, b.shuttle}
@@ -582,13 +586,15 @@ func (p *parser) checkOverlaps(cfg *Config) {
 	}
 }
 
-// nested reports whether a and b are the same path or one contains the other.
-func nested(a, b string) bool {
+// nested reports whether a and b are the same path or one contains the other,
+// with sep between their folders: the OS's for a local path ("\" on Windows),
+// "/" on a share.
+func nested(a, b, sep string) bool {
 	if a == b {
 		return true
 	}
 	under := func(child, parent string) bool {
-		return strings.HasPrefix(child, strings.TrimSuffix(parent, "/")+"/")
+		return strings.HasPrefix(child, strings.TrimSuffix(parent, sep)+sep)
 	}
 	return under(a, b) || under(b, a)
 }
