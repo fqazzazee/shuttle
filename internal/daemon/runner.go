@@ -330,7 +330,7 @@ func (r *runner) countSynced() {
 
 // open opens both sides of the shuttle. The caller closes them.
 func (r *runner) open(ctx context.Context) (local, remote fsys.FS, err error) {
-	var names fsys.Names
+	names := fsys.OSNames
 	if r.d.o.LocalNames != nil {
 		names = r.d.o.LocalNames(r.shuttle.Local)
 	}

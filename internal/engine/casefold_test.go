@@ -33,7 +33,7 @@ var (
 
 func TestFoldingOf(t *testing.T) {
 	dir := t.TempDir()
-	plain, err := fsys.OpenLocal(dir)
+	plain, err := fsys.OpenLocalWith(dir, fsys.Names{}) // Linux's rules, on any OS
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,11 +324,14 @@ func openPhoneFS(t *testing.T, dir string) phoneFS {
 }
 
 func TestPhoneFSContract(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Android's rules on an NTFS folder: Windows' come on top")
+	}
 	fsystest.Run(t, func(t *testing.T) fsys.FS {
 		p := openPhoneFS(t, t.TempDir())
 		t.Cleanup(func() { p.Close() })
 		return p
-	}, fsystest.LocalDisk)
+	})
 }
 
 // shareHoldsWhatNTFSCannot skips a test whose share, a local folder here,
@@ -414,6 +417,9 @@ func TestRenameOnTheShareKeepsThePhonesFile(t *testing.T) {
 }
 
 func TestRenameOnThePhoneWithEdit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the share here is a folder on NTFS, which folds case: it keeps no spelling of its own")
+	}
 	h := newPhoneHarness(t, config.ModeSync, config.DeletionsMirror)
 	write(t, h.localDir, "notes.txt", "v1", t0)
 	h.run()

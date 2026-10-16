@@ -52,9 +52,10 @@ func refuseFAT(elem string) error {
 	return nil
 }
 
-// OpenLocal opens dir as an FS. dir must exist and be a directory.
+// OpenLocal opens dir as an FS, with this OS's rules (OSNames). dir must
+// exist and be a directory.
 func OpenLocal(dir string) (*Local, error) {
-	return OpenLocalWith(dir, Names{})
+	return OpenLocalWith(dir, OSNames)
 }
 
 // OpenLocalWith opens dir as an FS on a file system with the rules n. Local

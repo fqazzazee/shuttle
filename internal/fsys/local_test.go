@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -300,14 +301,17 @@ func TestAndroidSharedStorageNames(t *testing.T) {
 	}
 }
 
-func TestLocalRefusesNothingByDefault(t *testing.T) {
+// A local folder has its OS's rules: Linux's keep case and refuse nothing,
+// Windows' fold case and refuse what NTFS cannot hold.
+func TestLocalHasItsOSsRules(t *testing.T) {
 	l, _ := newLocal(t)
-	if FoldsCase(l) {
-		t.Error("FoldsCase = true, want false")
+	windows := runtime.GOOS == "windows"
+	if FoldsCase(l) != windows {
+		t.Errorf("FoldsCase = %v on %s", FoldsCase(l), runtime.GOOS)
 	}
 	for _, name := range []string{"a:b", "a\x01b", `a\b`} {
-		if err := RefuseName(l, name); err != nil {
-			t.Errorf("RefuseName(%q) = %v, want nil", name, err)
+		if err := RefuseName(l, name); (err != nil) != windows {
+			t.Errorf("RefuseName(%q) = %v on %s", name, err, runtime.GOOS)
 		}
 	}
 }
