@@ -20,6 +20,7 @@ import (
 // The selected shuttle in full, under the table: its folders from the
 // config, the room on each side, when it runs, and DETAILS uncut.
 func TestShuttlePanel(t *testing.T) {
+	unixPaths(t)
 	o := testOptions(t)
 	doc := `[shares.nas]
 type = "smb"

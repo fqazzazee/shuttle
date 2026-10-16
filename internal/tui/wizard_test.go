@@ -64,6 +64,7 @@ remote = "nas:/docs"
 		return fsys.OpenLocal(sh.Path)
 	}
 	w.m = newModel(context.Background(), newFake(), o)
+	t.Cleanup(w.m.closeWizard) // the share it browses: Windows deletes no folder held open
 	w.m.every, w.m.now = 0, func() time.Time { return now }
 	send(t, w.m, tea.WindowSizeMsg{Width: 150, Height: 30})
 	run(t, w.m, w.m.Init())
@@ -228,7 +229,7 @@ func TestShuttleFolders(t *testing.T) {
 	// A folder here that is not there yet: created after asking.
 	press(t, m, "t")
 	newDir := filepath.Join(w.home, "Backups", "x")
-	for range 80 {
+	for range 300 { // the whole path, however long the temp folder's
 		key(t, m, tea.KeyBackspace)
 	}
 	typeIn(t, m, "~/Backups/x")
@@ -237,7 +238,9 @@ func TestShuttleFolders(t *testing.T) {
 	toRow(t, m, "mode")
 	key(t, m, tea.KeyRight) // push
 	ctrl(t, m, 's')
-	if !strings.Contains(framedText(m.questionBox()), "There is no folder "+newDir+" here. Create it?") {
+	// Compared without the spaces and line ends the box wraps the path at:
+	// a temp folder's path can be longer than the box is wide.
+	if q, want := squeeze(framedText(m.questionBox())), squeeze("There is no folder "+newDir+" here. Create it?"); !strings.Contains(q, want) {
 		t.Fatalf("no question:\n%s", screen(m))
 	}
 	press(t, m, "y")
@@ -489,3 +492,6 @@ func TestMarksOnBothSides(t *testing.T) {
 		t.Fatalf("went on with nothing marked:\n%s", s)
 	}
 }
+
+// squeeze is s without its white space.
+func squeeze(s string) string { return strings.Join(strings.Fields(s), "") }
