@@ -31,7 +31,7 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	out, closeLog, err := logTo(stderr, paths)
+	out, closeLog, err := logTo(stderr, paths, "daemon.log")
 	if err != nil {
 		return err
 	}
@@ -84,13 +84,14 @@ func runDaemon(ctx context.Context, stderr io.Writer) error {
 // the one before kept beside it.
 const maxLog = 10 << 20
 
-// logTo is where the daemon logs: stderr, or, with no console to write to
-// (shuttlew.exe, started at sign-in), daemon.log beside the state.
-func logTo(stderr io.Writer, paths daemon.Paths) (io.Writer, func(), error) {
+// logTo is where the daemon, or the tray, logs: stderr, or, with no console
+// to write to (shuttlew.exe, started at sign-in), the file name beside the
+// state.
+func logTo(stderr io.Writer, paths daemon.Paths, name string) (io.Writer, func(), error) {
 	if f, ok := stderr.(*os.File); !ok || writable(f) {
 		return stderr, func() {}, nil
 	}
-	path := filepath.Join(filepath.Dir(paths.StateDir), "daemon.log")
+	path := filepath.Join(filepath.Dir(paths.StateDir), name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, nil, err
 	}

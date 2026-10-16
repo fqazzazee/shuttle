@@ -18,7 +18,7 @@ import (
 // less daemon, as them, without raised rights, for as long as it runs, and
 // again after a failure.
 func TestTaskXML(t *testing.T) {
-	def, err := taskXML(`C:\Program Files\shuttle\shuttlew.exe`, `PC\user`)
+	def, err := taskXML(`C:\Program Files\shuttle\shuttlew.exe`, "daemon", "Runs the daemon.", `PC\user`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestAutostartArguments(t *testing.T) {
 func TestLogToWithoutAConsole(t *testing.T) {
 	dir := t.TempDir()
 	paths := daemon.Paths{StateDir: filepath.Join(dir, "shuttle", "state")}
-	out, closeLog, err := logTo(os.NewFile(0, "no console"), paths)
+	out, closeLog, err := logTo(os.NewFile(0, "no console"), paths, "daemon.log")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestLogToWithoutAConsole(t *testing.T) {
 		t.Errorf("daemon.log = %q, %v", b, err)
 	}
 	var buf bytes.Buffer
-	if out, _, _ := logTo(&buf, paths); out != &buf {
+	if out, _, _ := logTo(&buf, paths, "daemon.log"); out != &buf {
 		t.Error("a writer given is not the one written to")
 	}
 }

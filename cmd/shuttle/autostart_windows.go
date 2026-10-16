@@ -63,20 +63,38 @@ func taskName() (string, error) {
 	return "shuttle-" + user.User.Sid.String(), nil
 }
 
+// trayTask is the task of the user's icon, beside their daemon's.
+func trayTask(name string) string { return strings.Replace(name, "shuttle-", "shuttle-tray-", 1) }
+
 func autostartOn(name string, stdout io.Writer) error {
 	self, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	daemon := filepath.Join(filepath.Dir(self), windowless)
-	if _, err := os.Stat(daemon); err != nil {
+	exe := filepath.Join(filepath.Dir(self), windowless)
+	if _, err := os.Stat(exe); err != nil {
 		return fmt.Errorf("%s is not beside %s: it is what starts at sign-in, without a window", windowless, filepath.Base(self))
 	}
 	user, err := currentUser()
 	if err != nil {
 		return err
 	}
-	def, err := taskXML(daemon, user)
+	for _, task := range []struct{ name, arg, what string }{
+		{name, "daemon", "Runs shuttle's daemon, which syncs your shuttles, when you sign in."},
+		{trayTask(name), "tray", "Shows shuttle's icon in the notification area when you sign in."},
+	} {
+		if err := createTask(task.name, exe, task.arg, task.what, user); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(stdout, "on: the daemon and its icon start when you sign in (Task Scheduler: %s, %s)\n", name, trayTask(name))
+	return nil
+}
+
+// createTask makes, or makes again, the task name: exe with arg, at user's
+// sign-in.
+func createTask(name, exe, arg, what, user string) error {
+	def, err := taskXML(exe, arg, what, user)
 	if err != nil {
 		return err
 	}
@@ -92,31 +110,37 @@ func autostartOn(name string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := schtasks("/Create", "/TN", name, "/XML", f.Name(), "/F"); err != nil {
-		return err
-	}
-	fmt.Fprintf(stdout, "on: %s daemon starts when you sign in (Task Scheduler: %s)\n", daemon, name)
-	return nil
+	return schtasks("/Create", "/TN", name, "/XML", f.Name(), "/F")
 }
 
 func autostartOff(name string, stdout io.Writer) error {
-	if !taskExists(name) {
+	gone := 0
+	for _, task := range []string{name, trayTask(name)} {
+		if !taskExists(task) {
+			continue
+		}
+		if err := schtasks("/Delete", "/TN", task, "/F"); err != nil {
+			return err
+		}
+		gone++
+	}
+	if gone == 0 {
 		fmt.Fprintln(stdout, "off already")
 		return nil
 	}
-	if err := schtasks("/Delete", "/TN", name, "/F"); err != nil {
-		return err
-	}
-	fmt.Fprintln(stdout, "off: the daemon no longer starts when you sign in; a running one runs on")
+	fmt.Fprintln(stdout, "off: the daemon and its icon no longer start when you sign in; running ones run on")
 	return nil
 }
 
 func autostartStatus(name string, stdout io.Writer) {
-	if !taskExists(name) {
+	switch daemon, icon := taskExists(name), taskExists(trayTask(name)); {
+	case daemon && icon:
+		fmt.Fprintf(stdout, "on (Task Scheduler: %s, %s)\n", name, trayTask(name))
+	case daemon:
+		fmt.Fprintf(stdout, "on, without the icon (Task Scheduler: %s)\n", name)
+	default:
 		fmt.Fprintln(stdout, "off")
-		return
 	}
-	fmt.Fprintf(stdout, "on (Task Scheduler: %s)\n", name)
 }
 
 func taskExists(name string) bool {
@@ -190,16 +214,16 @@ type taskSettings struct {
 	} `xml:"RestartOnFailure"`
 }
 
-// taskXML is the task that runs daemon at user's sign-in, as Task
+// taskXML is the task that runs exe with arg at user's sign-in, as Task
 // Scheduler reads it: UTF-16 with its byte order mark. It runs as the user,
 // only while they are signed in, without raised rights; restarts a minute
 // after a failure, three times; and runs for as long as it does (Task
 // Scheduler stops a task after three days, unless told otherwise), on
 // battery too.
-func taskXML(daemon, user string) ([]byte, error) {
+func taskXML(exe, arg, what, user string) ([]byte, error) {
 	var t task
 	t.Version, t.Xmlns = "1.2", "http://schemas.microsoft.com/windows/2004/02/mit/task"
-	t.Info.Description = "Runs shuttle's daemon, which syncs your shuttles, when you sign in."
+	t.Info.Description = what
 	t.Triggers.Logon.Enabled, t.Triggers.Logon.UserID = true, user
 	p := &t.Principals.Principal
 	p.ID, p.UserID, p.LogonType, p.RunLevel = "Author", user, "InteractiveToken", "LeastPrivilege"
@@ -207,7 +231,7 @@ func taskXML(daemon, user string) ([]byte, error) {
 	t.Settings.ExecutionTimeLimit = "PT0S"
 	t.Settings.RestartOnFailure.Interval, t.Settings.RestartOnFailure.Count = "PT1M", 3
 	t.Actions.Context = "Author"
-	t.Actions.Exec.Command, t.Actions.Exec.Arguments = daemon, "daemon"
+	t.Actions.Exec.Command, t.Actions.Exec.Arguments = exe, arg
 	body, err := xml.MarshalIndent(&t, "", "  ")
 	if err != nil {
 		return nil, err
