@@ -31,7 +31,7 @@ func TestLocalContract(t *testing.T) {
 		}
 		t.Cleanup(func() { l.Close() })
 		return l
-	})
+	}, fsystest.LocalDisk)
 }
 
 // TestLocalAndroidSharedStorageContract holds a folder that refuses what
@@ -44,7 +44,7 @@ func TestLocalAndroidSharedStorageContract(t *testing.T) {
 		}
 		t.Cleanup(func() { l.Close() })
 		return l
-	})
+	}, fsystest.LocalDisk)
 }
 
 // smbOptions points at the Samba container from `make samba-up`.

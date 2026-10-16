@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -324,7 +325,18 @@ func TestPhoneFSContract(t *testing.T) {
 		p := openPhoneFS(t, t.TempDir())
 		t.Cleanup(func() { p.Close() })
 		return p
-	})
+	}, fsystest.LocalDisk)
+}
+
+// shareHoldsWhatNTFSCannot skips a test whose share, a local folder here,
+// holds names NTFS cannot (a:b.txt; Readme.md beside README.md): on Windows
+// the share cannot be made. In use, such a share is a Linux server's, over
+// SMB or NFS.
+func shareHoldsWhatNTFSCannot(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the share here is a folder on NTFS, which cannot hold its names")
+	}
 }
 
 // newPhoneHarness is a harness whose local side is the phone's shared
@@ -349,6 +361,7 @@ func newPhoneHarness(t *testing.T, mode config.Mode, deletions config.DeletionMo
 }
 
 func TestCaseClashOnTheShareIsHeldOnThePhone(t *testing.T) {
+	shareHoldsWhatNTFSCannot(t)
 	h := newPhoneHarness(t, config.ModeSync, config.DeletionsMirror)
 	write(t, h.remoteDir, "Readme.md", "lower", t0)
 	write(t, h.remoteDir, "README.md", "UPPER", t1)

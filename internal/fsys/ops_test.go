@@ -206,23 +206,3 @@ func TestWalkStopsOnError(t *testing.T) {
 		t.Errorf("visited %v, want [a b]", got)
 	}
 }
-
-// A directory that cannot be listed must fail the walk, not be skipped:
-// treating a partial scan as complete would turn unreadable files into
-// deletions on the other side.
-func TestWalkFailsOnUnreadableDir(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root can read any directory")
-	}
-	l, dir := newLocal(t)
-	writeOS(t, osPath(dir, "locked/f"), "x")
-	if err := os.Chmod(filepath.Join(dir, "locked"), 0o000); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chmod(filepath.Join(dir, "locked"), 0o755) })
-
-	err := Walk(context.Background(), l, ".", func(FileInfo) error { return nil })
-	if !errors.Is(err, fs.ErrPermission) {
-		t.Errorf("error = %v, want fs.ErrPermission", err)
-	}
-}

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/fsys/fsystest"
 	"github.com/fqazzazee/shuttle/internal/state"
 )
 
@@ -372,6 +374,11 @@ func (e *editedWhileRead) Open(ctx context.Context, name string) (io.ReadCloser,
 // neither version for sure. The next run copies it again; it must not take
 // the copy it left behind for an edit of its own, as a conflict.
 func TestFileChangedWhileCopiedIsCopiedAgain(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Windows refuses the save while the copy has the file open: the
+		// rename over it fails with "Access is denied".
+		t.Skip("Windows refuses saving a file over one being copied")
+	}
 	for _, mode := range []config.Mode{config.ModeSync, config.ModePush} {
 		t.Run(string(mode), func(t *testing.T) {
 			h := newHarness(t, mode, config.DeletionsAdditive)
@@ -459,18 +466,11 @@ func TestCloseTimestampsDoNotHideAConflict(t *testing.T) {
 // If part of the local tree cannot be read, the run must stop: carrying on
 // would read the unreadable files as deleted and delete them remotely.
 func TestUnreadableFolderStopsTheRun(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root can read any directory")
-	}
 	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
 	write(t, h.localDir, "private/notes.txt", "n", t0)
 	h.run()
 
-	locked := filepath.Join(h.localDir, "private")
-	if err := os.Chmod(locked, 0o000); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+	fsystest.Unreadable(t, filepath.Join(h.localDir, "private"))
 
 	res, err := Run(context.Background(), &h.opts)
 	if err == nil {

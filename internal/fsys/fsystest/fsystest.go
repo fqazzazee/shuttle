@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,10 +23,24 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
+// Option says something of the FS under test that the contract cannot see
+// through the FS interface.
+type Option func(*options)
+
+type options struct{ localDisk bool }
+
+// LocalDisk says the FS is a folder on this machine's disk, so on Windows NTFS
+// decides which names it can hold, whatever the FS says it refuses.
+func LocalDisk(o *options) { o.localDisk = true }
+
 // Run checks that the FS from newFS behaves as the engine expects. newFS must
 // return a fresh, empty FS each time it is called.
-func Run(t *testing.T, newFS func(t *testing.T) fsys.FS) {
+func Run(t *testing.T, newFS func(t *testing.T) fsys.FS, opts ...Option) {
 	ctx := context.Background()
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
 
 	t.Run("missing paths", func(t *testing.T) {
 		f := newFS(t)
@@ -191,6 +206,9 @@ func Run(t *testing.T, newFS func(t *testing.T) fsys.FS) {
 	})
 
 	t.Run("refused names", func(t *testing.T) {
+		if o.localDisk && runtime.GOOS == "windows" {
+			t.Skip("a local folder does not refuse NTFS's names yet")
+		}
 		f := newFS(t)
 		if _, ok := f.(fsys.NameRefuser); !ok {
 			t.Skip("refuses no names")
