@@ -67,6 +67,37 @@ remote = "nas:documents"
 	}
 }
 
+// Two shuttles' local folders, one inside the other, overlap however the
+// paths are written; a sibling with a longer name does not.
+func TestWindowsPathsOverlap(t *testing.T) {
+	doc := func(a, b string) []byte {
+		return []byte(minimalShare + `
+[shuttles.a]
+mode = "push"
+local = '` + a + `'
+remote = "nas:a"
+
+[shuttles.b]
+mode = "push"
+local = '` + b + `'
+remote = "nas:b"
+`)
+	}
+	for _, tt := range [][2]string{
+		{`C:\data`, `C:\data\photos`},
+		{`C:/data/`, `C:\data\photos`},
+		{`C:\`, `C:\data`},
+		{`\\pc.example\photos`, `\\pc.example\photos\2026`},
+	} {
+		if _, err := Parse(doc(tt[0], tt[1]), winHome); err == nil || !strings.Contains(err.Error(), "folders overlap") {
+			t.Errorf("%s and %s: %v, want them refused as overlapping", tt[0], tt[1], err)
+		}
+	}
+	if _, err := Parse(doc(`C:\data\photos`, `C:\data\photos-old`), winHome); err != nil {
+		t.Errorf("siblings: %v", err)
+	}
+}
+
 // What is absolute on Linux is not on Windows: a path needs its drive (or
 // a UNC server).
 func TestWindowsPathsNotAbsolute(t *testing.T) {
