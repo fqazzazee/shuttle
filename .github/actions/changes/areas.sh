@@ -26,10 +26,10 @@ else
 		# Android app.
 		*_windows.go | *_windows_test.go) go=true windows=true ;;
 		# The desktop's own packages whose suites also run on Windows.
-		cmd/* | internal/terminal/* | internal/tui/* | internal/secrets/credman/*) go=true windows=true ;;
+		cmd/* | internal/terminal/* | internal/tui/* | internal/secrets/credman/* | internal/network/*) go=true windows=true ;;
 		# Go the Android app cannot reach, Linux's alone so far: the rest of the
 		# desktop's packages, and the scripts of tests that run on Linux only.
-		internal/bus/* | internal/notify/* | internal/network/* | \
+		internal/bus/* | internal/notify/* | \
 			internal/secrets/secretservice/* | test/*) go=true ;;
 		# The core and the daemon, whose suites also run on Windows, and the
 		# modules they build with.
