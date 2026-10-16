@@ -32,6 +32,7 @@ jobs:
       extension: ${{ steps.areas.outputs.extension }}
       packaging: ${{ steps.areas.outputs.packaging }}
       android: ${{ steps.areas.outputs.android }}
+      windows: ${{ steps.areas.outputs.windows }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -320,12 +321,32 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  # The core's suites on Windows, against NTFS folders: what a Windows app
+  # would build on. The rest (the daemon, the CLI, the TUI) is Linux's for now.
+  # The race detector uses the runner's MinGW gcc.
+  windows:
+    name: windows
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache: true
+      - run: >-
+          go test -race
+          ./internal/config/... ./internal/fsys/... ./internal/engine/... ./internal/state/...
+          ./internal/activity/... ./internal/ignore/... ./internal/nfs3/...
+
   # The one check branch protection requires of CI: every job passed, or was
   # skipped as nothing it tests changed. A job added above goes in needs.
   ci:
     name: ci
     if: always()
-    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln, android]
+    needs: [changes, lint, test, build, integration, nfs, extension, nfs-kernel, systemd, tui, vuln, android, windows]
     runs-on: ubuntu-latest
     steps:
       - name: every job passed or was not needed
