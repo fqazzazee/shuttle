@@ -340,7 +340,7 @@ jobs:
           go test -race
           ./internal/config/... ./internal/fsys/... ./internal/engine/... ./internal/state/...
           ./internal/activity/... ./internal/ignore/... ./internal/nfs3/...
-          ./internal/daemon/... ./internal/shares/... ./internal/terminal/... ./internal/bus/... ./internal/tui/... ./internal/network/... ./cmd/...
+          ./internal/daemon/... ./internal/shares/... ./internal/terminal/... ./internal/bus/... ./internal/tui/... ./internal/network/... ./internal/tray/... ./cmd/...
       # Windows' own SMB server, as the Samba container is on Linux: the share
       # "test" for the user "shuttle" (fsystest.SambaUser and SambaPassword),
       # a folder on the runner the tests also set up and inspect directly.
@@ -373,7 +373,7 @@ jobs:
           go build -ldflags=-H=windowsgui -o "$bin\shuttlew.exe" ./cmd/shuttle
           & "$bin\shuttle.exe" autostart on
           if ($LASTEXITCODE) { exit 1 }
-          if ((& "$bin\shuttle.exe" autostart status) -notmatch '^on') { exit 1 }
+          if ((& "$bin\shuttle.exe" autostart status) -notmatch '^on \(') { exit 1 }  # the daemon's and the icon's
           $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
           schtasks /Run /TN "shuttle-$sid"
           $up = $false
