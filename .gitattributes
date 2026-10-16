@@ -1,0 +1,6 @@
+# LF in every checkout, Windows' included: gofmt, the tests' golden text and
+# the shell scripts want it, whatever core.autocrlf says. Git leaves binary
+# files alone.
+* text=auto eol=lf
+# Windows' own scripts, kept as stored (CRLF).
+*.bat -text
