@@ -49,15 +49,15 @@ like Syncthing.
 
 ## Status
 
-Early, but usable: [v0.2.0](https://github.com/fqazzazee/shuttle/releases/tag/v0.2.0), the latest
-release, brings the Android app. The sync engine, SMB and NFSv3 shares, the keyring, the background service, the
+Early, but usable: [v0.3.0](https://github.com/fqazzazee/shuttle/releases/tag/v0.3.0), the latest
+release, brings Windows. The sync engine, SMB and NFSv3 shares, the keyring, the background service, the
 terminal interface and the GNOME Shell 50 extension work. SMB is tested against a real Samba
 server; NFS against the Linux kernel's server (NFSv3 directly, NFSv4 through a mount) and an
 in-process one. Packages are on [GitHub Releases](https://github.com/fqazzazee/shuttle/releases):
 the RPM and the DEB are install-tested on amd64; the arm64 ones are built, not yet tested.
 The Android app, a signed APK in the same releases, runs the same engine on the phone.
-The Windows programs, in a zip in the same releases, are new: tested in CI on Windows Server and
-by hand on Windows 11, not yet released; see [Windows](#windows).
+The Windows programs, in a zip in the same releases, have their tests run in CI on Windows Server
+and on Windows 11; see [Windows](#windows).
 
 ### Not planned as of right now but could be an addition in the future if requested
 
