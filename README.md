@@ -1,7 +1,8 @@
 # shuttle
 
 Push, pull and sync folders between SMB/NFS network shares and local storage, from a
-terminal UI, with a GNOME top-bar indicator and a Quick Settings toggle, and on Android phones.
+terminal UI, with a GNOME top-bar indicator and a Quick Settings toggle, on Windows with an icon
+in the notification area, and on Android phones.
 
 **[The project page](https://fqazzazee.github.io/shuttle/)** shows what shuttle is for and what it
 does, at a glance.
@@ -14,7 +15,8 @@ does, at a glance.
 [![D-Bus](https://img.shields.io/badge/IPC-D--Bus-2D6DB5)](https://github.com/godbus/dbus)
 [![Secret Service](https://img.shields.io/badge/passwords-Secret%20Service-4A86CF)](https://github.com/zalando/go-keyring)
 
-[![Linux](https://img.shields.io/badge/Linux-only-FCC624?logo=linux&logoColor=black)](#install)
+[![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-FCC624?logo=linux&logoColor=black)](#install)
+[![Windows 11](https://img.shields.io/badge/Windows-11-0078D4)](#windows)
 [![Fedora 44](https://img.shields.io/badge/Fedora-44-51A2DA?logo=fedora&logoColor=white)](https://fedoraproject.org)
 [![Debian stable](https://img.shields.io/badge/Debian-stable-A81D33?logo=debian&logoColor=white)](https://www.debian.org)
 [![GNOME Shell 50](https://img.shields.io/badge/GNOME%20Shell-50-4A86CF?logo=gnome&logoColor=white)](#gnome-extension)
@@ -54,6 +56,8 @@ server; NFS against the Linux kernel's server (NFSv3 directly, NFSv4 through a m
 in-process one. Packages are on [GitHub Releases](https://github.com/fqazzazee/shuttle/releases):
 the RPM and the DEB are install-tested on amd64; the arm64 ones are built, not yet tested.
 The Android app, a signed APK in the same releases, runs the same engine on the phone.
+The Windows programs, in a zip in the same releases, are new: tested in CI on Windows Server and
+by hand on Windows 11, not yet released; see [Windows](#windows).
 
 ### Not planned as of right now but could be an addition in the future if requested
 
@@ -128,6 +132,47 @@ asked; a real-time shuttle keeps a notification up while it runs); force-stoppin
 all syncing until it is opened again; and files on the share with names the phone cannot hold
 (with `: ? * " < > | \`) are listed as left out, not synced. Its About screen has the
 third-party notices.
+
+### Windows
+
+The same shuttles on Windows 11 (10 should work, but is untested), amd64 or arm64 (arm64 built,
+not yet tested). Each release has `shuttle_X.Y.Z_windows_amd64.zip` (and `_arm64`): unzip it into
+a folder of its own, for example `%LOCALAPPDATA%\Programs\shuttle`, and in that folder run
+
+```powershell
+.\shuttle.exe autostart on
+```
+
+From then on the daemon, which syncs, and its icon in the notification area start when you sign
+in; `shuttlew.exe daemon` and `shuttlew.exe tray` start them now. `shuttlew.exe` is the same program
+as `shuttle.exe`, built to open no window. Run `shuttle` (in Windows Terminal, for the look the
+screenshots have) for the terminal interface, where shares and shuttles are added as on Linux.
+`shuttle autostart off` stops them starting at sign-in.
+
+The programs are not signed with a certificate, so the first time Windows says "Windows protected
+your PC": **More info**, then **Run anyway**. To check a download first: its SHA-256 is in the
+release's `checksums.txt`, and `gh attestation verify shuttle_X.Y.Z_windows_amd64.zip --repo
+fqazzazee/shuttle` shows it was built by this repository's release workflow, from the release's
+commit.
+
+What differs from Linux:
+
+- The config is `%APPDATA%\shuttle\config.toml`; the state and the logs (`daemon.log`,
+  `tray.log`) are in `%LOCALAPPDATA%\shuttle`.
+- Share passwords are in Credential Manager (Windows Credentials, as `shuttle:smb://…`), kept on
+  this computer.
+- The icon in the notification area does what the GNOME extension does: the overall state, sync
+  now, pause and resume, and open shuttle; notifications are Windows' toasts, from the icon.
+- Folders compare names as NTFS does: names on the share that differ only in case are held as
+  conflicts until one is renamed, and names Windows cannot hold (with `: ? * " < > | \`, ending in a
+  dot or a space, or a device's such as `CON` or `NUL`) are listed as left out, never deleted on the
+  share.
+- An NFS share needs `uid` and `gid`: a Windows user has no Unix IDs to send.
+- A connection marked as metered in Settings pauses the shuttles set to pause on one, as on Linux.
+
+To remove shuttle: `shuttle autostart off`, quit the icon, and delete its folder, and
+`%APPDATA%\shuttle` and `%LOCALAPPDATA%\shuttle` with your settings. The icon registered
+shuttle's notifications with Windows under `HKEY_CURRENT_USER\Software\Classes\AppUserModelId\shuttle`.
 
 ## Configure
 
