@@ -397,11 +397,10 @@ jobs:
           $bin = "$env:RUNNER_TEMP\bin"
           go build -o "$bin\shuttle.exe" ./cmd/shuttle
           go build -ldflags=-H=windowsgui -o "$bin\shuttlew.exe" ./cmd/shuttle
-          & "$bin\shuttle.exe" autostart on
+          & "$bin\shuttle.exe" autostart on   # also starts both tasks now
           if ($LASTEXITCODE) { exit 1 }
           if ((& "$bin\shuttle.exe" autostart status) -notmatch '^on \(') { exit 1 }  # the daemon's and the icon's
           $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-          schtasks /Run /TN "shuttle-$sid"
           $up = $false
           foreach ($i in 1..60) {
             & "$bin\shuttle.exe" status
@@ -410,6 +409,7 @@ jobs:
           }
           Get-Content "$env:LOCALAPPDATA\shuttle\daemon.log" -ErrorAction SilentlyContinue
           schtasks /End /TN "shuttle-$sid"
+          schtasks /End /TN "shuttle-tray-$sid"
           & "$bin\shuttle.exe" autostart off
           if ((& "$bin\shuttle.exe" autostart status) -ne 'off') { exit 1 }
           if (-not $up) { Write-Error "the task's daemon never answered"; exit 1 }
