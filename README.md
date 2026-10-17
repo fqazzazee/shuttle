@@ -143,9 +143,10 @@ a folder of its own, for example `%LOCALAPPDATA%\Programs\shuttle`, and in that 
 .\shuttle.exe autostart on
 ```
 
-From then on the daemon, which syncs, and its icon in the notification area start when you sign
-in; `shuttlew.exe daemon` and `shuttlew.exe tray` start them now. `shuttlew.exe` is the same program
-as `shuttle.exe`, built to open no window. Run `shuttle` (in Windows Terminal, for the look the
+It starts the daemon, which syncs, and its icon in the notification area, now and each time you
+sign in. Windows 11 puts a new icon under the **^** beside the clock: to keep it on the taskbar,
+turn shuttle on in Settings > Personalization > Taskbar > Other system tray icons. Both run as
+`shuttlew.exe`, the same program as `shuttle.exe`, built to open no window. Run `shuttle` (in Windows Terminal, for the look the
 screenshots have) for the terminal interface, where shares and shuttles are added as on Linux.
 `shuttle autostart off` stops them starting at sign-in.
 

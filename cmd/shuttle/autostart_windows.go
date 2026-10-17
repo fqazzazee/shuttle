@@ -87,7 +87,14 @@ func autostartOn(name string, stdout io.Writer) error {
 			return err
 		}
 	}
-	fmt.Fprintf(stdout, "on: the daemon and its icon start when you sign in (Task Scheduler: %s, %s)\n", name, trayTask(name))
+	// And now, as systemctl --user enable --now does: waiting for the next
+	// sign-in shows nothing. A task already running ignores this (IgnoreNew).
+	for _, task := range []string{name, trayTask(name)} {
+		if err := schtasks("/Run", "/TN", task); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(stdout, "on: the daemon and its icon run now, and start when you sign in (Task Scheduler: %s, %s)\n", name, trayTask(name))
 	return nil
 }
 

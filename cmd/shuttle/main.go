@@ -121,7 +121,8 @@ Commands:
   daemon            Run the background service (normally started by systemd)
   tray              Show shuttle's icon in the notification area (Windows)
   autostart on|off|status
-                    Start the daemon when you sign in (Windows), or say how
+                    Start the daemon and its icon, now and when you sign
+                    in (Windows), or say how
   version           Print the version
   help              Show this help
 `)
