@@ -8,14 +8,14 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	fyne.io/systray v1.12.2
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3
-	github.com/Microsoft/go-winio v0.6.2
+	github.com/Microsoft/go-winio v0.6.4
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/cloudsoda/go-smb2 v0.0.0-20260918041005-0c5d69b69701
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-git/go-billy/v5 v5.9.2
-	github.com/godbus/dbus/v5 v5.2.2
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/willscott/go-nfs v0.0.4
 	github.com/zalando/go-keyring v0.2.8
