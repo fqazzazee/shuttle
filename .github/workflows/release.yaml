@@ -87,7 +87,7 @@ jobs:
         with:
           fetch-depth: 0   # goreleaser builds the changelog from history
       # goreleaser adds it to the release and to checksums.txt.
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: apk
           path: build/apk
