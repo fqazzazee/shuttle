@@ -5,6 +5,7 @@ package daemon
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -163,6 +164,114 @@ at = ["02:00"]`)
 	f.settled("s")
 	if !exists(f.mount, "a.txt") {
 		t.Error("the missed nightly run did not catch up")
+	}
+}
+
+// fakeClock is a wall clock a test moves by hand.
+type fakeClock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *fakeClock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *fakeClock) set(t time.Time) {
+	c.mu.Lock()
+	c.t = t
+	c.mu.Unlock()
+}
+
+// A nightly shuttle that has never run waits for its first slot, then runs
+// once, without running when the daemon starts.
+func TestAtScheduleFirstSlotRunsOnce(t *testing.T) {
+	fast(t)
+	f := newFixture(t, "push", `triggers = ["schedule"]
+at = ["02:00"]`)
+	write(t, f.local, "a.txt", "a")
+	clock := &fakeClock{t: time.Date(2026, 5, 1, 1, 0, 0, 0, time.Local)}
+	f.now = clock.now
+	f.start()
+	f.waitFor("s", "the schedule worked out", func(st Status) bool { return !st.NextRun.IsZero() })
+	if f.runCount() != 0 {
+		t.Fatal("ran at start, before its first slot")
+	}
+
+	clock.set(time.Date(2026, 5, 1, 2, 1, 0, 0, time.Local))
+	f.waitFor("s", "the first slot's run", func(st Status) bool { return !st.LastRun.IsZero() && st.State != StateRunning })
+	time.Sleep(5 * recheckEvery)
+	if got := f.runCount(); got != 1 {
+		t.Errorf("%d runs across the first slot, want 1", got)
+	}
+	if !exists(f.mount, "a.txt") {
+		t.Error("the first slot did not push")
+	}
+}
+
+// Android's worker starts the daemon after the slot it was planned for, so
+// the wait for the first slot has to outlive the daemon that began it.
+func TestAtScheduleBaselineSurvivesRestart(t *testing.T) {
+	fast(t)
+	f := newFixture(t, "push", `triggers = ["schedule"]
+at = ["02:00"]`)
+	write(t, f.local, "a.txt", "a")
+	clock := &fakeClock{t: time.Date(2026, 5, 1, 1, 0, 0, 0, time.Local)}
+	f.now = clock.now
+	f.start()
+	f.waitFor("s", "the schedule worked out", func(st Status) bool { return !st.NextRun.IsZero() })
+	f.stop()
+	if f.runCount() != 0 {
+		t.Fatal("ran before its first slot")
+	}
+
+	clock.set(time.Date(2026, 5, 1, 2, 3, 0, 0, time.Local))
+	f.start()
+	f.settled("s")
+	if !exists(f.mount, "a.txt") {
+		t.Error("a daemon started just after the first slot did not run it")
+	}
+}
+
+// What the Android app plans its next job from: a first slot that passed
+// and has not run is still due, even while the shuttle is held back.
+func TestNextRunsKeepsAMissedFirstSlotDue(t *testing.T) {
+	fast(t)
+	f := newFixture(t, "push", `triggers = ["schedule"]
+at = ["02:00"]`)
+	clock := &fakeClock{t: time.Date(2026, 5, 1, 1, 0, 0, 0, time.Local)}
+	f.now = clock.now
+	f.start()
+	f.waitFor("s", "the schedule worked out", func(st Status) bool { return !st.NextRun.IsZero() })
+	f.stop()
+
+	after := time.Date(2026, 5, 1, 2, 3, 0, 0, time.Local)
+	clock.set(after)
+	f.paused = []string{"s"}
+	f.start()
+	if got := f.d.NextRuns()["s"]; !got.Equal(after) {
+		t.Errorf("next run %v, want the missed slot due now, %v", got, after)
+	}
+}
+
+// A shuttle first seen after today's slot has no baseline before it: it
+// waits for tomorrow instead of running at start.
+func TestAtScheduleDoesNotRunAtFirstStart(t *testing.T) {
+	fast(t)
+	f := newFixture(t, "push", `triggers = ["schedule"]
+at = ["02:00"]`)
+	clock := &fakeClock{t: time.Date(2026, 5, 1, 9, 0, 0, 0, time.Local)}
+	f.now = clock.now
+	f.start()
+	st := f.waitFor("s", "the schedule worked out", func(st Status) bool { return !st.NextRun.IsZero() })
+	time.Sleep(5 * recheckEvery)
+	if f.runCount() != 0 {
+		t.Error("ran at its very first start")
+	}
+	if want := time.Date(2026, 5, 2, 2, 0, 0, 0, time.Local); !st.NextRun.Equal(want) {
+		t.Errorf("next run %v, want %v", st.NextRun, want)
 	}
 }
 

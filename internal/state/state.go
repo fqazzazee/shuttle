@@ -40,6 +40,7 @@ var (
 	keySchema       = []byte("schema")
 	keyLastComplete = []byte("last_complete")
 	keyPair         = []byte("pair")
+	keyScheduleFrom = []byte("schedule_from")
 )
 
 var (
@@ -230,6 +231,28 @@ func (d *DB) SetLastComplete(t time.Time) error {
 	})
 }
 
+// ScheduleFrom returns when the shuttle began waiting for its first scheduled
+// time, recording now if it had not. It lives here because a daemon can be
+// shorter-lived than that wait: Android's is started after the time has come.
+func (d *DB) ScheduleFrom(now time.Time) (time.Time, error) {
+	var t time.Time
+	err := d.db.Update(func(tx *bolt.Tx) error {
+		meta := tx.Bucket(bucketMeta)
+		v := meta.Get(keyScheduleFrom)
+		if v == nil {
+			t = now
+			return meta.Put(keyScheduleFrom, []byte(strconv.FormatInt(now.UnixNano(), 10)))
+		}
+		n, err := strconv.ParseInt(string(v), 10, 64)
+		if err != nil {
+			return fmt.Errorf("unreadable schedule_from %q", v)
+		}
+		t = time.Unix(0, n)
+		return nil
+	})
+	return t, err
+}
+
 // Bind ties the database to the folder pair whose history it records, an
 // opaque string naming both sides. Bound to another pair before, it forgets
 // that history and reports reset: the next run is a first sync, which
@@ -249,6 +272,9 @@ func (d *DB) Bind(pair string) (reset bool, err error) {
 				return err
 			}
 			if err := meta.Delete(keyLastComplete); err != nil {
+				return err
+			}
+			if err := meta.Delete(keyScheduleFrom); err != nil {
 				return err
 			}
 		}

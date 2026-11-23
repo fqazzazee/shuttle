@@ -465,7 +465,7 @@ func (d *Daemon) NextRuns() map[string]time.Time {
 	now := d.o.Now()
 	out := map[string]time.Time{}
 	for _, r := range d.all() {
-		if next, ok := nextDue(&r.shuttle.Settings, r.lastEnded(), now); ok {
+		if next, ok := nextDue(&r.shuttle.Settings, r.scheduleFrom(r.lastEnded()), now); ok {
 			out[r.shuttle.Name] = next
 		}
 	}

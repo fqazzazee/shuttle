@@ -96,7 +96,7 @@ func (r *runner) setNextRun(t time.Time) {
 func (r *runner) schedule(quit <-chan struct{}) {
 	for {
 		now := r.d.o.Now()
-		next, ok := nextDue(&r.shuttle.Settings, r.lastAttempt(), now)
+		next, ok := nextDue(&r.shuttle.Settings, r.scheduleFrom(r.lastAttempt()), now)
 		if !ok {
 			return
 		}
