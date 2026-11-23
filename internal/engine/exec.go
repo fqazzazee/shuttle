@@ -175,7 +175,7 @@ func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.File
 		}
 	}
 	h := sha256.New()
-	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(e.limit(r, toRemote, planned), h), srcInfo.ModTime)
+	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(e.limit(upTo(r, p, srcInfo.Size), toRemote, planned), h), srcInfo.ModTime)
 	r.Close()
 	if err != nil {
 		if kept != "" {
@@ -301,32 +301,61 @@ func (e *executor) sameContent(a *Action) (bool, []byte, error) {
 			return true, nil, nil
 		}
 	}
-	lsum, err := e.hash(e.o.Local, a.Path)
+	lsum, err := e.hash(e.o.Local, a.Path, l.Size)
 	if err != nil {
 		return false, nil, err
 	}
-	rsum, err := e.hash(e.o.Remote, a.Path)
+	rsum, err := e.hash(e.o.Remote, a.Path, r.Size)
 	if err != nil {
 		return false, nil, err
 	}
 	return bytes.Equal(lsum, rsum), lsum, nil
 }
 
-func (e *executor) hash(f fsys.FS, p string) ([]byte, error) {
+func (e *executor) hash(f fsys.FS, p string, size int64) ([]byte, error) {
 	r, err := f.Open(e.ctx, p)
 	if err != nil {
 		return nil, err
 	}
 	defer r.Close()
 	h := sha256.New()
-	var src io.Reader = r
+	src := upTo(r, p, size)
 	if f == e.o.Remote {
-		src = e.limit(r, false, false) // reading the share counts as download
+		src = e.limit(src, false, false) // reading the share counts as download
 	}
 	if _, err := fsys.Copy(h, src); err != nil {
 		return nil, err
 	}
 	return h.Sum(nil), nil
+}
+
+// upTo reads r, the file p, and fails with ErrChanged rather than yield more
+// than the size scanned. The free-space check counted that size, and a server
+// decides for itself when a file ends.
+func upTo(r io.Reader, p string, size int64) io.Reader {
+	return &boundedReader{r: r, path: p, left: max(size, 0)}
+}
+
+type boundedReader struct {
+	r    io.Reader
+	path string
+	left int64
+}
+
+func (b *boundedReader) Read(p []byte) (int, error) {
+	// One byte past the size is how a file that grew is told from one that
+	// ended.
+	if int64(len(p))-1 > b.left {
+		p = p[:b.left+1]
+	}
+	n, err := b.r.Read(p)
+	if int64(n) > b.left {
+		n = int(b.left)
+		b.left = 0
+		return n, fmt.Errorf("%s grew while being read: %w", b.path, ErrChanged)
+	}
+	b.left -= int64(n)
+	return n, err
 }
 
 // unchanged re-stats p and checks it still looks as scanned (want nil means

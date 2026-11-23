@@ -294,6 +294,76 @@ func TestCompareReadsShareInLargeChunks(t *testing.T) {
 	}
 }
 
+// endlessFS is a share that says a file is small and then never stops
+// sending it. The cap only ends the test if the reader is not bounded.
+type endlessFS struct {
+	fsys.FS
+	path string
+	read *int64
+}
+
+func (f endlessFS) Open(ctx context.Context, name string) (io.ReadCloser, error) {
+	if name != f.path {
+		return f.FS.Open(ctx, name)
+	}
+	return endlessFile{f.read}, nil
+}
+
+type endlessFile struct{ read *int64 }
+
+func (f endlessFile) Read(p []byte) (int, error) {
+	if *f.read > 8<<20 {
+		return 0, errInjected
+	}
+	*f.read += int64(len(p))
+	return len(p), nil
+}
+
+func (endlessFile) Close() error { return nil }
+
+// A file may not take more room than the free-space check counted, nor keep
+// a comparison running for as long as the server cares to send.
+func TestSourceLongerThanScannedIsLeftForNextRun(t *testing.T) {
+	for name, localContent := range map[string]string{
+		"copy":    "",
+		"compare": "local 10 b",
+	} {
+		t.Run(name, func(t *testing.T) {
+			localDir, remoteDir := t.TempDir(), newRemoteDir(t)
+			write(t, remoteDir, "f.bin", "remote 10b", t1)
+			if localContent != "" {
+				write(t, localDir, "f.bin", localContent, t0)
+			}
+
+			var sent int64
+			res, err := runSync(localDir, remoteDir, filepath.Join(t.TempDir(), "state.db"), nil,
+				func(f fsys.FS) fsys.FS { return endlessFS{f, "f.bin", &sent} }, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(res.Skipped) != 1 || !strings.Contains(res.Skipped[0].Reason, ErrChanged.Error()) {
+				t.Errorf("skipped = %+v, errors = %+v, want f.bin left for the next run", res.Skipped, res.Errors)
+			}
+			if sent > 11 {
+				t.Errorf("read %d bytes of a 10-byte file, want at most 11", sent)
+			}
+			got, _ := read(t, localDir, "f.bin")
+			if got != localContent {
+				t.Errorf("local f.bin = %q, want %q", got, localContent)
+			}
+			entries, err := os.ReadDir(localDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, e := range entries {
+				if fsys.IsTemp(e.Name()) {
+					t.Errorf("temp file left behind: %s", e.Name())
+				}
+			}
+		})
+	}
+}
+
 func TestFirstSyncOfExistingCopies(t *testing.T) {
 	h := newHarness(t, config.ModeSync, config.DeletionsAdditive)
 	h.settings.Conflicts = config.ConflictAsk
