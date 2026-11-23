@@ -20,29 +20,34 @@ else
 		*.md | LICENSE | extension/LICENSE | docs/* | .github/ISSUE_TEMPLATE/* | .github/CODEOWNERS | \
 			.github/FUNDING.yml | .github/dependabot.yml | .editorconfig | .gitignore | .pre-commit-config.yaml) ;;
 		extension/* | package.json | package-lock.json | eslint.config.js | test/extension/*) extension=true ;;
+		# The APK's notices are built by these two as well.
+		packaging/notices.sh | packaging/android-notices.py) packaging=true android=true ;;
 		packaging/* | .goreleaser.yaml | test/packages/*) packaging=true ;;
 		android/*) android=true ;;
 		# Code built for Windows alone (the _windows file suffix): never in the
 		# Android app.
 		*_windows.go | *_windows_test.go) go=true windows=true ;;
-		# The desktop's own packages whose suites also run on Windows.
+		# The desktop's own packages whose suites also run on Windows, and
+		# secretservice, which the shares, TUI and CLI tests import there.
 		cmd/* | internal/terminal/* | internal/tui/* | internal/secrets/credman/* | internal/network/* | \
-			internal/tray/*) go=true windows=true ;;
+			internal/tray/* | internal/secrets/secretservice/*) go=true windows=true ;;
 		# Go the Android app cannot reach, Linux's alone so far: the rest of the
 		# desktop's packages, and the scripts of tests that run on Linux only.
-		internal/bus/* | internal/notify/* | \
-			internal/secrets/secretservice/* | test/*) go=true ;;
-		# The core and the daemon, whose suites also run on Windows, and the
-		# modules they build with.
+		internal/bus/* | internal/notify/* | test/*) go=true ;;
+		# The core and the daemon, whose suites also run on Windows, the packages
+		# those suites import, and the modules they build with.
 		internal/config/* | internal/fsys/* | internal/engine/* | internal/state/* | internal/activity/* | \
 			internal/ignore/* | internal/nfs3/* | internal/daemon/* | internal/shares/* | internal/secrets/* | \
+			internal/present/* | internal/pick/* | internal/notice/* | internal/dbustest/* | \
 			go.mod | go.sum) go=true android=true windows=true ;;
 		# The rest of the Go, the binding included, goes into the app's .aar.
 		*.go | .golangci.yaml | internal/* | mobile/*) go=true android=true ;;
 		# CI itself, the Makefile every job runs, and anything else: all.
 		*) all ;;
 		esac
-	done < <(git diff --name-only "$BASE" "$HEAD")
+	# --no-renames: a rename would list only its new path, and a file moved
+	# into docs/ would then count as documentation alone.
+	done < <(git diff --no-renames --name-only "$BASE" "$HEAD")
 fi
 
 {
