@@ -84,9 +84,10 @@ func (c *Client) SetEnabled(ctx context.Context, name string, on bool) error {
 	return clientErr(c.call(ctx, "SetEnabled", name, on).Err)
 }
 
-// AllowDeletions lets the next run pass the deletion guard.
-func (c *Client) AllowDeletions(ctx context.Context, name string) error {
-	return clientErr(c.call(ctx, "AllowDeletions", name).Err)
+// AllowDeletions lets the next run pass the deletion guard, for the count
+// deletions the user was shown.
+func (c *Client) AllowDeletions(ctx context.Context, name string, count int) error {
+	return clientErr(c.call(ctx, "AllowDeletions", name, u32(count)).Err)
 }
 
 // Activity returns the newest entries of a shuttle's activity log, or of

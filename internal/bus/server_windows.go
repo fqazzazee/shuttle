@@ -127,7 +127,7 @@ func (s *pipeServer) call(req *request) *reply {
 	case methodSetEnabled:
 		err = s.d.SetEnabled(req.Name, req.On)
 	case methodAllowDeletions:
-		err = s.d.AllowDeletions(req.Name)
+		err = s.d.AllowDeletions(req.Name, req.Limit)
 	case methodActivity:
 		var es []activity.Entry
 		es, err = s.d.Activity(req.Name, req.Limit)

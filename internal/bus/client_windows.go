@@ -165,9 +165,10 @@ func (c *Client) SetEnabled(ctx context.Context, name string, on bool) error {
 	return err
 }
 
-// AllowDeletions lets the next run pass the deletion guard.
-func (c *Client) AllowDeletions(ctx context.Context, name string) error {
-	_, err := c.do(ctx, &request{Method: methodAllowDeletions, Name: name})
+// AllowDeletions lets the next run pass the deletion guard, for the count
+// deletions the user was shown.
+func (c *Client) AllowDeletions(ctx context.Context, name string, count int) error {
+	_, err := c.do(ctx, &request{Method: methodAllowDeletions, Name: name, Limit: count})
 	return err
 }
 

@@ -129,7 +129,7 @@ func TestResolving(t *testing.T) {
 
 	// Held deletions: allowed after a yes.
 	press(t, m, "g", "a", "y")
-	if got := f.took(); len(got) != 3 || got[2] != "allow docs" {
+	if got := f.took(); len(got) != 3 || got[2] != "allow docs 12" {
 		t.Errorf("calls = %q", got)
 	}
 }

@@ -55,8 +55,9 @@ type runner struct {
 	own       map[string]bool // local paths this shuttle's run wrote; see startOwnWrites
 	ownUntil  time.Time
 
-	allowDeletions bool       // the next run may pass the deletion guard
-	runMu          sync.Mutex // held by a run, and by Resolve: they never overlap
+	held           []engine.Issue // the deletions the guard holds, as last reported
+	allowDeletions []engine.Issue // those of them the user confirmed, for the next run
+	runMu          sync.Mutex     // held by a run, and by Resolve: they never overlap
 	announced      announced
 
 	// refused are the names the last run left out, so that each is logged
@@ -285,6 +286,7 @@ func (r *runner) runOnce(requested bool) {
 		st.Copied, st.Deleted = res.Copied, res.Deleted
 		st.Conflicts, st.Errors, st.HeldDeletions = res.Conflicts, res.Errors, len(res.HeldDeletions)
 		st.Refused = res.Refused
+		r.held = res.HeldDeletions
 	}
 	state := st.State
 	done := *st
@@ -364,17 +366,19 @@ func (r *runner) sync(t *engine.Tracker) (*engine.Result, error) {
 	// Runs are not cancelled by shutdown: Stop ends them after the current
 	// file instead. Only waiting for the keyring and the share is bounded.
 	ctx := context.Background()
+	// Used up by the attempt, before anything can fail: a later run would
+	// apply it to whatever the two sides hold by then.
+	r.mu.Lock()
+	allow := r.allowDeletions
+	r.allowDeletions = nil
+	r.mu.Unlock()
+
 	local, remote, err := r.open(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer local.Close()
 	defer remote.Close()
-
-	r.mu.Lock()
-	allow := r.allowDeletions
-	r.allowDeletions = false
-	r.mu.Unlock()
 
 	r.startOwnWrites()
 	defer r.endOwnWrites()

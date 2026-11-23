@@ -279,12 +279,28 @@ func TestDeletionGuardHoldsMassDeletion(t *testing.T) {
 	}
 
 	// Still held on the next run, until the user confirms.
-	if res := h.run(); len(res.HeldDeletions) != 15 {
+	res = h.run()
+	if len(res.HeldDeletions) != 15 {
 		t.Errorf("next run held %d, want 15", len(res.HeldDeletions))
 	}
-	h.opts.AllowDeletions = true
+	h.opts.AllowDeletions = res.HeldDeletions
 	if res := h.run(); res.Deleted != 15 || len(res.HeldDeletions) != 0 {
 		t.Errorf("confirmed run: deleted %d, held %d", res.Deleted, len(res.HeldDeletions))
+	}
+}
+
+// A confirmation is for the deletions the user saw: one more and the whole
+// set is held again.
+func TestDeletionGuardHoldsWhatWasNotConfirmed(t *testing.T) {
+	h := syncedTree(t, 20)
+	for i := range 15 {
+		os.Remove(filepath.Join(h.localDir, "f"+strconv.Itoa(i)))
+	}
+	h.opts.AllowDeletions = h.run().HeldDeletions
+	os.Remove(filepath.Join(h.localDir, "f15"))
+	res := h.run()
+	if res.Deleted != 0 || len(res.HeldDeletions) != 16 {
+		t.Errorf("deleted %d, held %d; want none deleted, 16 held", res.Deleted, len(res.HeldDeletions))
 	}
 }
 

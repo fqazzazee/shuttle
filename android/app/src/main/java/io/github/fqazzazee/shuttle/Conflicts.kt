@@ -86,7 +86,7 @@ fun ConflictsScreen(
     held: List<HeldDeletions>,
     error: String?,
     resolve: (ConflictItem, Keep) -> Unit,
-    allow: (String) -> Unit,
+    allow: (HeldDeletions) -> Unit,
 ) {
     Column(
         Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -101,7 +101,7 @@ fun ConflictsScreen(
 }
 
 @Composable
-private fun HeldCard(h: HeldDeletions, allow: (String) -> Unit) {
+private fun HeldCard(h: HeldDeletions, allow: (HeldDeletions) -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
@@ -110,7 +110,7 @@ private fun HeldCard(h: HeldDeletions, allow: (String) -> Unit) {
             )
             Text(stringResource(R.string.held_deletions_why), style = MaterialTheme.typography.bodyMedium)
             androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { allow(h.shuttle) }) { Text(stringResource(R.string.held_deletions_allow)) }
+                TextButton(onClick = { allow(h) }) { Text(stringResource(R.string.held_deletions_allow)) }
             }
         }
     }

@@ -101,8 +101,8 @@ func (f *fake) Resolve(_ context.Context, name, path string, c engine.Choice) er
 	defer f.mu.Unlock()
 	return f.resolve
 }
-func (f *fake) AllowDeletions(_ context.Context, name string) error {
-	return f.record("allow %s", name)
+func (f *fake) AllowDeletions(_ context.Context, name string, count int) error {
+	return f.record("allow %s %d", name, count)
 }
 func (f *fake) Activity(_ context.Context, name string, limit int) ([]activity.Entry, error) {
 	f.mu.Lock()

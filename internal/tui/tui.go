@@ -32,7 +32,7 @@ type Client interface {
 	SetPaused(ctx context.Context, name string, paused bool) error
 	SetEnabled(ctx context.Context, name string, on bool) error
 	Resolve(ctx context.Context, name, path string, choice engine.Choice) error
-	AllowDeletions(ctx context.Context, name string) error
+	AllowDeletions(ctx context.Context, name string, count int) error
 	Activity(ctx context.Context, name string, limit int) ([]activity.Entry, error)
 	Changes(ctx context.Context) (<-chan daemon.Status, error)
 }

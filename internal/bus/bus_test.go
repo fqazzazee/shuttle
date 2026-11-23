@@ -261,7 +261,7 @@ func TestAllowDeletionsOverTheBus(t *testing.T) {
 	if st.State != daemon.StateHeld {
 		t.Errorf("state = %q, want held", st.State)
 	}
-	if err := f.c.AllowDeletions(ctx(t), "s"); err != nil {
+	if err := f.c.AllowDeletions(ctx(t), "s", 12); err != nil {
 		t.Fatal(err)
 	}
 	st = f.waitFor(changes, "the deletions done", func(st *daemon.Status) bool { return ran(st) && st.Deleted == 12 })

@@ -63,9 +63,9 @@ type Options struct {
 	// Cap limits transfers across every shuttle (the global bandwidth cap),
 	// on top of the shuttle's own limits. nil means no cap.
 	Cap *Cap
-	// AllowDeletions lets one run through the deletion guard, after the user
-	// has confirmed that the deletions it held are wanted.
-	AllowDeletions bool
+	// AllowDeletions are the held deletions the user confirmed. They let one
+	// run through the deletion guard only if it would hold nothing else.
+	AllowDeletions []Issue
 	// Stop, if set, is asked before each action whether to stop. The action in
 	// progress (a whole file copy, say) always finishes; the run then returns
 	// ErrStopped. Pausing and shutting down use this.
@@ -112,7 +112,8 @@ type Result struct {
 	// nothing but the conflicts was looked at.
 	Held bool
 	// HeldDeletions are deletions the deletion guard stopped: too large a
-	// share of one side's files at once. They run once AllowDeletions is set.
+	// share of one side's files at once. They run once AllowDeletions covers
+	// them.
 	HeldDeletions []Issue
 	Skipped       []Issue // changed during the run
 	Errors        []Issue
@@ -231,8 +232,8 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	}
 	actions := plan(o, local.entries, remote.entries, records)
 	res.Planned = len(actions)
-	if !o.AllowDeletions {
-		actions, res.HeldDeletions = guardDeletions(actions, local.entries, remote.entries, o.Settings.DeletionGuard)
+	if kept, held := guardDeletions(actions, local.entries, remote.entries, o.Settings.DeletionGuard); !covered(held, o.AllowDeletions) {
+		actions, res.HeldDeletions = kept, held
 	}
 
 	e := newExecutor(ctx, o, res)

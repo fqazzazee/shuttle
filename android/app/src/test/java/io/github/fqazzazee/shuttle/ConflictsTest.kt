@@ -64,11 +64,11 @@ class ConflictsTest {
     @Test
     fun heldDeletionsAndTheirAllow() {
         assertEquals(listOf(HeldDeletions("music", 15)), HeldDeletions.of(statuses))
-        val allowed = mutableListOf<String>()
+        val allowed = mutableListOf<HeldDeletions>()
         compose.setContent { ConflictsScreen(emptyList(), HeldDeletions.of(statuses), null, { _, _ -> }) { allowed += it } }
         compose.onNodeWithText("music: 15 deletions held back").assertExists()
         compose.onNodeWithText("No conflicts waiting for you.").assertDoesNotExist()
         compose.onNodeWithText("Allow them").performScrollTo().performClick()
-        assertEquals(listOf("music"), allowed)
+        assertEquals(listOf(HeldDeletions("music", 15)), allowed)
     }
 }

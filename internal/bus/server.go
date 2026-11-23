@@ -302,6 +302,6 @@ func (s *server) Activity(name string, limit uint32) ([]entry, *dbus.Error) {
 	return out, nil
 }
 
-func (s *server) AllowDeletions(name string) *dbus.Error {
-	return busErr(s.d.AllowDeletions(name))
+func (s *server) AllowDeletions(name string, count uint32) *dbus.Error {
+	return busErr(s.d.AllowDeletions(name, int(count)))
 }

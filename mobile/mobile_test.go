@@ -842,7 +842,7 @@ func TestAllowDeletions(t *testing.T) {
 	if !strings.Contains(out, `"HeldDeletions":15`) {
 		t.Fatalf("status = %s, want 15 deletions held", out)
 	}
-	if err := m.AllowDeletions("s"); err != nil {
+	if err := m.AllowDeletions("s", 15); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(10 * time.Second)

@@ -114,9 +114,10 @@ func (m *model) conflictsKey(k string) tea.Cmd {
 	}
 	name := it.shuttle
 	if it.conflict == nil {
-		m.ask(fmt.Sprintf("Let %s delete the %s its deletion guard held back?", name, present.Plural(it.deletions, "file")),
+		count := it.deletions // the number in the question, whatever the status says by the answer
+		m.ask(fmt.Sprintf("Let %s delete the %s its deletion guard held back?", name, present.Plural(count, "file")),
 			func() tea.Cmd {
-				return m.do("deletions allowed for one run of "+name, func(ctx context.Context) error { return m.c.AllowDeletions(ctx, name) })
+				return m.do("deletions allowed for one run of "+name, func(ctx context.Context) error { return m.c.AllowDeletions(ctx, name, count) })
 			})
 		return nil
 	}
