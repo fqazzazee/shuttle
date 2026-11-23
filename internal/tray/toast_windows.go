@@ -79,8 +79,11 @@ func showNotes(ctx context.Context, icon string, log *slog.Logger) {
 // toastOf is the toast for n: its summary over its body, and, where it
 // waits for the user, a button opening the TUI on its tab.
 func toastOf(n *notice.Note, icon string) toast.Notification {
-	t := toast.Notification{AppID: appID, Title: n.Summary, Body: n.Body, Icon: icon}
-	if n.Open != "" {
+	t := toast.Notification{AppID: appID, Title: toastText(n.Summary), Body: toastText(n.Body)}
+	if toastAttr(icon) {
+		t.Icon = icon
+	}
+	if n.Open != "" && toastAttr(n.Open) {
 		t.ActivationArguments = openPrefix + n.Open
 		t.Actions = []toast.Action{{Type: toast.Foreground, Content: "Open shuttle", Arguments: openPrefix + n.Open}}
 	}
