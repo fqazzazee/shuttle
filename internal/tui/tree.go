@@ -15,6 +15,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/fsys"
 	"github.com/fqazzazee/shuttle/internal/pick"
+	"github.com/fqazzazee/shuttle/internal/present"
 	"github.com/fqazzazee/shuttle/internal/shares"
 )
 
@@ -55,6 +56,7 @@ type tree struct {
 	folders map[string]bool
 	typing  bool
 	input   *textinput.Model
+	shown   string // the path as the input holds it, control characters gone
 	note    string
 }
 
@@ -221,7 +223,13 @@ func (t *tree) key(ctx context.Context, msg tea.KeyPressMsg) (cmd tea.Cmd, chose
 		switch k {
 		case "enter":
 			t.typing = false
-			t.setRoot(&node{path: t.clean(strings.TrimSpace(t.input.Value())), dir: true})
+			p := t.root.path
+			// The input drops control characters: unless the path was
+			// edited, the folder is still the one with the exact name.
+			if t.input.Value() != t.shown {
+				p = t.clean(strings.TrimSpace(t.input.Value()))
+			}
+			t.setRoot(&node{path: p, dir: true})
 			t.sel = 0
 			// Listed for when the user comes back to this step.
 			return t.load(ctx, t.root), true
@@ -286,6 +294,7 @@ func (t *tree) key(ctx context.Context, msg tea.KeyPressMsg) (cmd tea.Cmd, chose
 	case "t", "/":
 		t.typing = true
 		t.input.SetValue(t.dir())
+		t.shown = t.input.Value()
 		t.input.CursorEnd()
 		return t.input.Focus(), false
 	}
@@ -358,7 +367,7 @@ func (t *tree) setSelection(include, exclude []string) {
 }
 
 func (t *tree) lines(room, width int) []string {
-	lines := []string{"Folder " + t.where + ": " + headStyle.Render(t.dir())}
+	lines := []string{"Folder " + t.where + ": " + headStyle.Render(present.Plain(t.dir()))}
 	choices := make([]string, len(pick.Names))
 	for i, name := range pick.Names {
 		choices[i] = faint.Render(name)
@@ -376,7 +385,7 @@ func (t *tree) lines(room, width int) []string {
 	case t.typing:
 		return append(lines, "Path: "+t.input.View())
 	case r.err != nil:
-		return append(lines, badStyle.Render(firstLine(r.err.Error())), "", "t types the path instead.")
+		return append(lines, badStyle.Render(errorText(r.err)), "", "t types the path instead.")
 	case !r.loaded:
 		return append(lines, faint.Render("Looking inside…"))
 	case len(r.kids) == 0:
@@ -400,7 +409,7 @@ func (t *tree) lines(room, width int) []string {
 			indent := strings.Repeat("  ", depth+1) + "    "
 			switch {
 			case k.err != nil:
-				body = append(body, indent+badStyle.Render(firstLine(k.err.Error())))
+				body = append(body, indent+badStyle.Render(errorText(k.err)))
 			case k.loading && !k.loaded:
 				body = append(body, indent+faint.Render("looking inside…"))
 			case k.loaded && len(k.kids) == 0:
@@ -430,7 +439,7 @@ func (t *tree) row(n *node, depth int, sel bool) string {
 			arrow = "▾ "
 		}
 	}
-	name := n.name()
+	name := present.Plain(n.name())
 	if n.dir {
 		name += "/"
 	}
@@ -471,7 +480,7 @@ func (t *tree) marksLine(width int) string {
 	}
 	names := make([]string, len(inside))
 	for i, m := range inside {
-		names[i] = strings.TrimPrefix(strings.TrimPrefix(m, t.root.path), "/")
+		names[i] = present.Plain(strings.TrimPrefix(strings.TrimPrefix(m, t.root.path), "/"))
 		if t.folder(m) {
 			names[i] += "/"
 		}

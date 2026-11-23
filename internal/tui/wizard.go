@@ -359,7 +359,7 @@ func (m *model) saveWizard() tea.Cmd {
 		return nil
 	}
 	if _, err := os.Stat(local); errors.Is(err, os.ErrNotExist) {
-		m.ask("There is no folder "+local+" here. Create it?", func() tea.Cmd {
+		m.ask("There is no folder "+present.Plain(local)+" here. Create it?", func() tea.Cmd {
 			if err := os.MkdirAll(local, 0o755); err != nil { //nolint:gosec // a folder the user chose, theirs to read
 				w.result, w.failed = err.Error(), true
 				return nil
@@ -393,7 +393,7 @@ func (w *wizard) lines(m *model, room int) []string {
 		foot = []string{"", faint.Render(w.busy + " (the keyring may ask to be unlocked)")}
 	case w.result != "" && w.failed:
 		foot = []string{""}
-		for _, l := range strings.Split(w.result, "\n") {
+		for _, l := range strings.Split(present.PlainLines(w.result), "\n") {
 			foot = append(foot, badStyle.Render(l))
 		}
 	}
