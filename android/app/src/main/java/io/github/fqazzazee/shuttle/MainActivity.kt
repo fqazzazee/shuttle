@@ -267,7 +267,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         access = Access.of(this)
         val now = access
-        Core.async { Core.setAccess(now) }
+        Core.async { Core.setAccess(this, now) }
     }
 
     private val actions = ListActions(
@@ -275,12 +275,12 @@ class MainActivity : ComponentActivity() {
         syncNow = { SyncService.syncNow(this, it) },
         setPaused = { name, paused ->
             pauses.set(name, paused)
-            Core.async { Core.current?.setPaused(name, paused) }
+            Core.async { Core.setPaused(this, name, paused) }
         },
         setPausedAll = { paused ->
             pauses.setAll(paused)
             pausedAll = paused
-            Core.async { Core.current?.setPaused("", paused) }
+            Core.async { Core.setPaused(this, "", paused) }
         },
         enable = { setEnabled(it, true) },
     )
