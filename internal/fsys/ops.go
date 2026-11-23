@@ -25,8 +25,8 @@ func IsTemp(name string) bool {
 }
 
 // WriteFile writes r to name without ever exposing a partial file: it writes a
-// temp file in the same directory, sets its modification time, and renames it
-// over name. On failure the temp file is removed and name is left as it was.
+// temp file in the same directory, flushes it to disk, sets its modification
+// time, and renames it over name. On failure the temp file is removed and name is left as it was.
 // It returns the number of bytes written.
 func WriteFile(ctx context.Context, fsys FS, name string, r io.Reader, mtime time.Time) (n int64, err error) {
 	if err := checkPath("write", name); err != nil {
@@ -49,6 +49,13 @@ func WriteFile(ctx context.Context, fsys FS, name string, r io.Reader, mtime tim
 	}()
 
 	n, err = Copy(w, ctxReader{ctx, r})
+	// The engine commits a durable state record after this returns. Were the
+	// data still in the page cache, a power loss would leave a short file that
+	// the next run reads as an edit and copies over the good one. NFS has no
+	// Sync: its Close commits.
+	if s, ok := w.(interface{ Sync() error }); ok && err == nil {
+		err = s.Sync()
+	}
 	if cerr := w.Close(); err == nil {
 		err = cerr
 	}
