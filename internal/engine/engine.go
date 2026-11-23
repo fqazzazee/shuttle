@@ -116,7 +116,7 @@ type Result struct {
 	HeldDeletions []Issue
 	Skipped       []Issue // changed during the run
 	Errors        []Issue
-	Unsupported   []string // symlinks, devices and the like: never synced
+	Unsupported   []string // symlinks, devices and the like: held, never synced or deleted
 	// Refused are names one side cannot hold, such as "a:b" on the phone's
 	// shared storage: left out of the run, so never copied or deleted.
 	Refused []Issue
@@ -207,7 +207,11 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	return plan(o, local.entries, remote.entries, records), nil
+	if err := findHidden(ctx, o, &local, &remote, records, ignored); err != nil {
+		return nil, err
+	}
+	parents := leaveOutSpecial(o, &local, &remote, records)
+	return keepParents(o, plan(o, local.entries, remote.entries, records), parents), nil
 }
 
 // Run syncs one shuttle once. The error is for problems that stop the whole
@@ -223,13 +227,17 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	if err != nil {
 		return res, err
 	}
-	res.Unsupported = slices.Concat(local.unsupported, remote.unsupported)
 	res.Refused = leaveOutRefused(o, &local, &remote)
 	records, err := o.State.All()
 	if err != nil {
 		return res, err
 	}
-	actions := plan(o, local.entries, remote.entries, records)
+	if err := findHidden(ctx, o, &local, &remote, records, ignored); err != nil {
+		return res, err
+	}
+	res.Unsupported = slices.Concat(local.unsupported, remote.unsupported)
+	parents := leaveOutSpecial(o, &local, &remote, records)
+	actions := keepParents(o, plan(o, local.entries, remote.entries, records), parents)
 	res.Planned = len(actions)
 	if !o.AllowDeletions {
 		actions, res.HeldDeletions = guardDeletions(actions, local.entries, remote.entries, o.Settings.DeletionGuard)
