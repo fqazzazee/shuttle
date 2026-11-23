@@ -105,6 +105,10 @@ nfpms:
 
 # What each release's page says above its changelog.
 release:
+  # Public only once every file is attested: the release workflow's last step.
+  # A re-run after a failure replaces its draft rather than adding a second.
+  draft: true
+  replace_existing_draft: true
   extra_files:
     - glob: build/apk/*.apk
   header: |
