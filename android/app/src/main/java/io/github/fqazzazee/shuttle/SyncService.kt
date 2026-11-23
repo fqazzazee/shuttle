@@ -9,7 +9,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import java.util.concurrent.TimeUnit
 
 /**
  * Holds the daemon while a shuttle is real-time, with the permanent notification Android asks of
@@ -18,6 +17,8 @@ import java.util.concurrent.TimeUnit
  * run 6 hours in 24, and a watcher runs all day.
  */
 class SyncService : Service() {
+    @Volatile private var destroyed = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -39,16 +40,25 @@ class SyncService : Service() {
                 // A run the user asked for (DECISIONS 2026-10-14: manual runs run in the
                 // service for their duration): leaving the app does not cut it short.
                 sync != null -> {
-                    d.syncNow(sync)
-                    Thread {
-                        try {
-                            d.waitQuiet(TimeUnit.MINUTES.toMillis(60))
-                        } catch (e: Exception) {
+                    seeThrough(
+                        Core.manualRuns,
+                        sync = { d.syncNow(sync) },
+                        wait = {
+                            try {
+                                waitWhileBusy(d::waitQuiet, { anyRunning(d.statusesJSON()) }, { destroyed })
+                            } catch (e: Exception) {
+                                android.util.Log.w("shuttle", "sync now", e)
+                            }
+                        },
+                        failed = { e ->
                             android.util.Log.w("shuttle", "sync now", e)
-                        }
-                        Core.manualRuns.decrementAndGet()
-                        Core.async { if (!d.realTime() && Core.manualRuns.get() == 0) stopSelf() }
-                    }.start()
+                            Notices.show(
+                                this,
+                                Notice("sync-now:$sync", Channel.ERRORS.id, getString(R.string.sync_now_failed, sync), e.message.orEmpty()),
+                            )
+                        },
+                        ended = { Core.async { if (!d.realTime() && Core.manualRuns.get() == 0) stopSelf() } },
+                    )
                 }
                 // No real-time shuttle any more, and no run to see through: nothing to keep running.
                 !d.realTime() && Core.manualRuns.get() == 0 -> stopSelf()
@@ -58,6 +68,7 @@ class SyncService : Service() {
     }
 
     override fun onDestroy() {
+        destroyed = true
         Core.async { Core.release(HOLDER) }
         super.onDestroy()
     }

@@ -4,6 +4,7 @@
     <string name="app_name">shuttle</string>
     <string name="not_set_up">No shuttles yet.</string>
     <string name="start_failed">Syncing could not start: %1$s</string>
+    <string name="sync_now_failed">%1$s could not sync</string>
     <string name="service_channel">Syncing</string>
     <string name="channel_errors">Errors</string>
     <string name="channel_conflicts">Conflicts</string>
