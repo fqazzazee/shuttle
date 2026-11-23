@@ -35,6 +35,19 @@ func TestActivityErrorInColor(t *testing.T) {
 	}
 }
 
+// A file name from the share reaches the screen without its escapes.
+func TestActivityHoldsNoEscapes(t *testing.T) {
+	f := newFake()
+	f.entries = []activity.Entry{{Time: now, Shuttle: "docs", Kind: activity.KindRun,
+		Path: "a\x1bP+q\x1b\\.txt", Text: "could not copy \x1b[2J"}}
+	m := start(t, f, 120, 12)
+	press(t, m, "3")
+	s := strings.Join(m.activityLines(10), "\n")
+	if strings.Contains(s, "\x1bP") || strings.Contains(s, "\x1b[2J") || !strings.Contains(s, "P+q") {
+		t.Errorf("the escapes reached the view: %q", s)
+	}
+}
+
 func TestActivityTab(t *testing.T) {
 	f := logged(0)
 	m := start(t, f, 120, 12)

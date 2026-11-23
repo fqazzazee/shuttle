@@ -49,7 +49,7 @@ func ModeArrow(m config.Mode) string {
 func Attention(st *daemon.Status) string {
 	var parts []string
 	if st.Error != "" {
-		parts = append(parts, st.Error)
+		parts = append(parts, PlainLines(st.Error))
 	}
 	if held := HeldConflicts(st); held > 0 {
 		parts = append(parts, Plural(held, "conflict")+" waiting for you")
@@ -66,9 +66,30 @@ func Attention(st *daemon.Status) string {
 		parts = append(parts, "a run is waiting")
 	}
 	if st.Note != "" {
-		parts = append(parts, st.Note)
+		parts = append(parts, PlainLines(st.Note))
 	}
 	return strings.Join(parts, "; ")
+}
+
+// Plain is a name from a share, safe to print on one line. A name can hold
+// any control character, and a terminal would act on it: an escape sequence
+// can set the clipboard or rewrite the screen.
+func Plain(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || r >= 0x7f && r < 0xa0 {
+			return '�'
+		}
+		return r
+	}, s)
+}
+
+// PlainLines is text holding such names, its line breaks kept.
+func PlainLines(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = Plain(l)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // HeldConflicts counts the conflicts waiting for the user's choice.
@@ -106,7 +127,7 @@ func Progress(p *daemon.Progress) string {
 		s += ", ↓ " + Size(p.RateDown) + "/s"
 	}
 	if p.Path != "" {
-		s += ": " + p.Path
+		s += ": " + Plain(p.Path)
 	}
 	return s
 }

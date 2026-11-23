@@ -3,6 +3,7 @@
 package tui
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -11,6 +12,64 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/pick"
 )
+
+// A name on a share can hold an escape sequence: the picker shows it clean,
+// and what it selects is still the file's exact name.
+func TestTreeHoldsNoEscapes(t *testing.T) {
+	const file, dir = "a\x1b]52;c;eA==\a.txt", "d\x1b[2Jir"
+	tr := fakeTree(t, map[string][]entry{
+		"/top":        {{name: dir, dir: true}, {name: file}},
+		"/top/" + dir: {{name: file}},
+	})
+	tr.marks.Mode = pick.Include
+	tr.toggle(tr.find("/top/" + file))
+	tr.toggle(tr.find("/top/" + dir))
+	tr.find("/top/" + dir).err = errors.New("cannot list " + dir)
+
+	// The picker's own styling is escape sequences too: look for the names'.
+	raw := func(s string) bool {
+		return strings.Contains(s, "\x1b]52") || strings.Contains(s, "\x1b[2J") || strings.Contains(s, "\a")
+	}
+	s := strings.Join(tr.lines(40, 200), "\n")
+	if raw(s) {
+		t.Errorf("the picker shows an escape sequence: %q", s)
+	}
+	if !strings.Contains(s, "a�]52;c;eA==�.txt") {
+		t.Errorf("the file is not shown cleaned: %q", s)
+	}
+	include, _ := tr.selection()
+	if want := []string{file, dir}; !slices.Equal(include, want) {
+		t.Errorf("selection = %q, want the raw names %q", include, want)
+	}
+
+	// The folder as the shuttle's folder, and the path typed over it.
+	tr.setRoot(tr.find("/top/" + dir))
+	if s := strings.Join(tr.lines(40, 200), "\n"); raw(s) {
+		t.Errorf("the folder's header shows an escape sequence: %q", s)
+	}
+	ctx := t.Context()
+	tr.key(ctx, tea.KeyPressMsg{Code: 't', Text: "t"})
+	if v := tr.input.Value(); strings.ContainsAny(v, "\x1b\a") {
+		t.Errorf("the path being typed = %q", v)
+	}
+	if _, chosen := tr.key(ctx, tea.KeyPressMsg{Code: tea.KeyEnter}); !chosen {
+		t.Fatal("enter did not choose the path")
+	}
+	if got, want := tr.dir(), "/top/"+dir; got != want {
+		t.Errorf("confirming the path unchanged chose %q, want %q", got, want)
+	}
+}
+
+// A folder the wizard could not create is named in its error.
+func TestWizardErrorHoldsNoEscapes(t *testing.T) {
+	w := newWizardSetup(t, nil)
+	m := w.m
+	press(t, m, "n")
+	m.wizard.result, m.wizard.failed = "mkdir /top/d\x1b[2Jir: permission denied", true
+	if s := screen(m); strings.Contains(s, "\x1b[2J") || !strings.Contains(s, "d�[2Jir") {
+		t.Errorf("the wizard's error = %q", s)
+	}
+}
 
 // fakeTree is a tree on /top whose folders are listed from dirs, each
 // folder listed as if opened.

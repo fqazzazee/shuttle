@@ -15,6 +15,7 @@ import (
 	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/present"
 )
 
 // The tabs, in order: keys 1 to 5 choose them.
@@ -458,7 +459,7 @@ func (m *model) shuttlesKey(k string) tea.Cmd {
 const messageFor = 5 * time.Second
 
 func (m *model) say(text string, failed bool) {
-	m.message, m.failed, m.messageAt = text, failed, m.now()
+	m.message, m.failed, m.messageAt = present.PlainLines(text), failed, m.now()
 }
 
 // configShuttle is the named shuttle as the config file has it.
@@ -487,5 +488,5 @@ func errorText(err error) string {
 	if errors.Is(err, daemon.ErrConfig) {
 		s = "the config file: " + s
 	}
-	return firstLine(s)
+	return firstLine(present.PlainLines(s))
 }

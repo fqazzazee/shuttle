@@ -11,6 +11,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/activity"
 	"github.com/fqazzazee/shuttle/internal/daemon"
+	"github.com/fqazzazee/shuttle/internal/present"
 )
 
 // activityShown is how many of the newest entries the Activity tab asks for.
@@ -114,9 +115,9 @@ func (m *model) activityLines(room int) []string {
 	}
 	for i := m.scroll; i < len(m.entries) && len(lines) < room; i++ {
 		e := &m.entries[i]
-		what := e.Text
+		what := present.PlainLines(e.Text)
 		if e.Path != "" {
-			what = e.Path + ": " + e.Text
+			what = present.Plain(e.Path) + ": " + what
 		}
 		if style, ok := kindStyles[e.Kind]; ok {
 			what = style.Render(what)

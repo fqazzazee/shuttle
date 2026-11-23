@@ -13,6 +13,43 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
+// A file name can hold anything but a slash, and a terminal acts on the
+// control characters in what it is given: they must not reach it.
+func TestPlain(t *testing.T) {
+	for _, tc := range []struct{ name, in, plain, lines string }{
+		{"plain", "docs/a b.txt", "docs/a b.txt", "docs/a b.txt"},
+		{"accents", "Résumé/日本語.txt", "Résumé/日本語.txt", "Résumé/日本語.txt"},
+		{"a clipboard write", "a\x1b]52;c;eA==\x1b\\b", "a�]52;c;eA==�\\b", "a�]52;c;eA==�\\b"},
+		{"a bell", "a\x07", "a�", "a�"},
+		{"delete", "a\x7fb", "a�b", "a�b"},
+		{"a C1 introducer", "a\u009b2Jb", "a�2Jb", "a�2Jb"},
+		{"a bad byte", "a\x9bb", "a�b", "a�b"},
+		{"a tab", "a\tb", "a�b", "a�b"},
+		{"a return", "a\rb", "a�b", "a�b"},
+		{"a line break", "a\nb", "a�b", "a\nb"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Plain(tc.in); got != tc.plain {
+				t.Errorf("Plain(%q) = %q, want %q", tc.in, got, tc.plain)
+			}
+			if got := PlainLines(tc.in); got != tc.lines {
+				t.Errorf("PlainLines(%q) = %q, want %q", tc.in, got, tc.lines)
+			}
+		})
+	}
+}
+
+// What the status says about a run carries names from the share.
+func TestStatusHoldsNoEscapes(t *testing.T) {
+	if got := Progress(&daemon.Progress{Phase: "copying", Path: "a\x1b]0;x\x07"}); strings.ContainsAny(got, "\x1b\x07") {
+		t.Errorf("Progress = %q", got)
+	}
+	st := daemon.Status{Error: "first \x1b[2J\nsecond", Note: "note\x1b[2J"}
+	if got := Attention(&st); strings.Contains(got, "\x1b") || !strings.Contains(got, "first �[2J\nsecond") {
+		t.Errorf("Attention = %q", got)
+	}
+}
+
 func TestAgo(t *testing.T) {
 	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
 	for d, want := range map[time.Duration]string{

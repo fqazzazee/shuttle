@@ -122,9 +122,9 @@ func printActivity(ctx context.Context, c *bus.Client, name string, w io.Writer)
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	for i := len(es) - 1; i >= 0; i-- {
 		e := &es[i]
-		what := e.Text
+		what := present.PlainLines(e.Text)
 		if e.Path != "" {
-			what = e.Path + ": " + e.Text
+			what = present.Plain(e.Path) + ": " + what
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\n", e.Time.Local().Format("2006-01-02 15:04:05"), e.Shuttle, what)
 	}
