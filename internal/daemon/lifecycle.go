@@ -36,7 +36,7 @@ func (r *runner) openState() error {
 		return err
 	}
 	if reset {
-		r.d.o.Log.Warn("the shuttle's folders changed: starting afresh, as a first sync (nothing is deleted; files that differ are conflicts)",
+		r.d.o.Log.Warn("the shuttle's folders changed: starting afresh, as a first run (a sync deletes nothing and files that differ are conflicts; a push or pull replaces files that differ and, with deletions = mirror, deletes what the source lacks)",
 			"shuttle", name)
 	}
 	// The schedule counts from the last complete run, so a slot missed
