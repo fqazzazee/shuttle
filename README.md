@@ -49,7 +49,7 @@ like Syncthing.
 
 ## Status
 
-Early, but usable: [v0.3.0](https://github.com/fqazzazee/shuttle/releases/tag/v0.3.0), the latest
+Early, but usable: [v0.4.0](https://github.com/fqazzazee/shuttle/releases/tag/v0.4.0), the latest
 release, brings Windows. The sync engine, SMB and NFSv3 shares, the keyring, the background service, the
 terminal interface and the GNOME Shell 50 extension work. SMB is tested against a real Samba
 server; NFS against the Linux kernel's server (NFSv3 directly, NFSv4 through a mount) and an
@@ -72,7 +72,7 @@ for amd64 (installed and tested on Fedora 44 and Debian stable) or arm64 (built,
 tested):
 
 ```bash
-v=0.3.0   # the release's version
+v=0.4.0   # the release's version
 # Fedora
 sudo dnf install https://github.com/fqazzazee/shuttle/releases/download/v$v/shuttle_${v}_linux_amd64.rpm
 # Debian, Ubuntu
