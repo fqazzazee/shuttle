@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -331,8 +332,11 @@ func TestSaveThroughSymlink(t *testing.T) {
 	if !bytes.Equal(got, after) {
 		t.Errorf("the link's target holds %q, want %q", got, after)
 	}
-	if info, err := os.Stat(target); err != nil || info.Mode().Perm() != 0o640 {
-		t.Errorf("target mode = %v, %v; want 0640 kept", info, err)
+	// Windows has no Unix modes: a writable file reads back as 0666.
+	if runtime.GOOS != "windows" {
+		if info, err := os.Stat(target); err != nil || info.Mode().Perm() != 0o640 {
+			t.Errorf("target mode = %v, %v; want 0640 kept", info, err)
+		}
 	}
 	for _, dir := range []string{linkDir, dotfiles} {
 		entries, err := os.ReadDir(dir)
