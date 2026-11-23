@@ -54,10 +54,17 @@ type tree struct {
 	// folders are marks the other side's tree showed as folders: not
 	// here, they would not be known to be.
 	folders map[string]bool
-	typing  bool
-	input   *textinput.Model
-	shown   string // the path as the input holds it, control characters gone
-	note    string
+	// carried are the marks that came from the share's tree. They mean a
+	// place in the shuttle's folder, not on this computer, so they move
+	// with the folder while it is being chosen.
+	carried map[string]bool
+	// alsoHere are carried marks that landed on a mark made on this tree.
+	// When they move on, that mark stays.
+	alsoHere map[string]bool
+	typing   bool
+	input    *textinput.Model
+	shown    string // the path as the input holds it, control characters gone
+	note     string
 }
 
 var treeIDs int
@@ -302,8 +309,40 @@ func (t *tree) key(ctx context.Context, msg tea.KeyPressMsg) (cmd tea.Cmd, chose
 }
 
 func (t *tree) setRoot(n *node) {
+	from := t.root.path
 	t.root = n
 	t.root.open = true
+	t.moveCarried(from, n.path)
+}
+
+// moveCarried moves the carried marks from the folder from to the folder to.
+func (t *tree) moveCarried(from, to string) {
+	if from == to || len(t.carried) == 0 {
+		return
+	}
+	moved, folders := make(map[string]bool, len(t.carried)), map[string]bool{}
+	for p := range t.carried {
+		q := path.Join(to, strings.TrimPrefix(p, from))
+		moved[q] = true
+		folders[q] = t.folder(p)
+		if t.alsoHere[p] {
+			delete(t.alsoHere, p)
+			continue
+		}
+		t.marks.Remove(p)
+		delete(t.folders, p)
+	}
+	// In two passes: one mark's new path can be another's old one.
+	for q := range moved {
+		if t.marks.Has(q) {
+			t.alsoHere[q] = true
+		}
+		t.marks.Add(q)
+		if folders[q] {
+			t.folders[q] = true
+		}
+	}
+	t.carried = moved
 }
 
 // up makes the folder above the shuttle's folder, with the folder it was
@@ -324,6 +363,7 @@ func (t *tree) synced(p string) (all, some bool) { return t.marks.Synced(p, t.ro
 
 // toggle marks n, or unmarks it (pick.Marks.Toggle).
 func (t *tree) toggle(n *node) {
+	before := t.inside()
 	t.marks.Toggle(n.path, t.root.path, func(dir string) []string {
 		var kids []string
 		for _, k := range t.find(dir).kids {
@@ -331,6 +371,26 @@ func (t *tree) toggle(n *node) {
 		}
 		return kids
 	})
+	after := t.inside()
+	// Unmarking part of a carried folder marks the rest of it instead,
+	// and the rest is as carried as the folder was.
+	for _, k := range after {
+		if slices.Contains(before, k) {
+			continue
+		}
+		for c := range t.carried {
+			if k != c && pick.Within(k, c) {
+				t.carried[k] = true
+				break
+			}
+		}
+	}
+	for c := range t.carried {
+		if !slices.Contains(after, c) {
+			delete(t.carried, c)
+			delete(t.alsoHere, c)
+		}
+	}
 }
 
 // selection is what the shuttle includes or excludes: the marks inside its
@@ -350,6 +410,18 @@ func (t *tree) adopt(from *tree) {
 		if from.folder(m) {
 			t.folders[p] = true
 		}
+	}
+}
+
+// carryMarks makes every mark inside the shuttle's folder a carried one.
+func (t *tree) carryMarks() {
+	t.carried, t.alsoHere = map[string]bool{}, map[string]bool{}
+	if t.folders == nil {
+		t.folders = map[string]bool{}
+	}
+	for _, m := range t.inside() {
+		t.carried[m] = true
+		t.folders[m] = t.folder(m)
 	}
 }
 

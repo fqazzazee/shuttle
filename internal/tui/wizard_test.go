@@ -493,5 +493,57 @@ func TestMarksOnBothSides(t *testing.T) {
 	}
 }
 
+// What is marked on the share is relative to the shuttle's folder, so it
+// stays marked however the folder here is chosen afterwards. Losing an
+// exclude puts what the user protected back in scope of a mirror.
+func TestMarksSurviveChoosingTheLocalFolder(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		choose func(t *testing.T, m *model)
+	}{
+		{"o", func(t *testing.T, m *model) {
+			press(t, m, "down", "o") // Papers
+			key(t, m, tea.KeyEnter)
+		}},
+		{"typed", func(t *testing.T, m *model) {
+			press(t, m, "t")
+			typeIn(t, m, string(filepath.Separator)+"Papers")
+			key(t, m, tea.KeyEnter)
+		}},
+		{"backspace", func(t *testing.T, m *model) {
+			press(t, m, "down", "o", "o") // Papers, then sub in it
+			key(t, m, tea.KeyBackspace)   // Papers again
+			key(t, m, tea.KeyEnter)
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			w := newWizardSetup(t, nil)
+			m := w.m
+			mkdirs(t, filepath.Join(w.share, "music", "private"), filepath.Join(w.home, "Papers", "sub"))
+			press(t, m, "n")
+			typeIn(t, m, "x")
+			key(t, m, tea.KeyEnter)
+			press(t, m, "down", "o") // music
+			press(t, m, "m", "m")    // all but what is marked
+			key(t, m, tea.KeySpace)  // private
+			key(t, m, tea.KeyEnter)
+			if s := screen(m); !strings.Contains(s, "Left out: private/") {
+				t.Fatalf("the share's marks, here:\n%s", s)
+			}
+			tt.choose(t, m)
+			press(t, m, "down") // the profile live, which has a mode
+			key(t, m, tea.KeyEnter)
+			ctrl(t, m, 's')
+			if m.wizard != nil {
+				t.Fatalf("still open: %s", m.wizard.result)
+			}
+			want := "local = \"~/Papers\"\nremote = \"nas:/music\"\nexclude = [\"private\"]\n"
+			if got := configFile(t, m); !strings.Contains(got, want) {
+				t.Errorf("config:\n%s\nwant it to hold:\n%s", got, want)
+			}
+		})
+	}
+}
+
 // squeeze is s without its white space.
 func squeeze(s string) string { return strings.Join(strings.Fields(s), "") }

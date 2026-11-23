@@ -41,6 +41,12 @@ func (m *Marks) Add(p string) {
 	m.set[p] = true
 }
 
+// Has reports whether p itself is marked.
+func (m *Marks) Has(p string) bool { return m.set[p] }
+
+// Remove unmarks p alone, whatever is marked around it.
+func (m *Marks) Remove(p string) { delete(m.set, p) }
+
 // Marked reports whether p or a folder it is in is marked, inside root.
 func (m *Marks) Marked(p, root string) bool {
 	for ; Within(p, root) && p != root; p = path.Dir(p) {
