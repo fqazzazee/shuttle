@@ -120,7 +120,7 @@ func (m *model) conflictsKey(k string) tea.Cmd {
 			})
 		return nil
 	}
-	path := it.conflict.Path
+	path := present.Plain(it.conflict.Path)
 	switch k {
 	case "l":
 		m.ask(fmt.Sprintf("Keep this computer's copy of %s and replace the share's?", path),
@@ -146,7 +146,7 @@ func (m *model) resolve(it *item, choice engine.Choice, done string) func() tea.
 	key, name, path := it.key(), it.shuttle, it.conflict.Path
 	return func() tea.Cmd {
 		m.resolving[key] = true
-		m.say("resolving "+path+"…", false)
+		m.say("resolving "+present.Plain(path)+"…", false)
 		return func() tea.Msg {
 			ctx, cancel := context.WithTimeout(m.ctx, resolveTimeout)
 			defer cancel()

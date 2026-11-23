@@ -310,7 +310,7 @@ func (m *model) conflictsTable(room int) []string {
 	for i := range items {
 		nameWidth = max(nameWidth, lipgloss.Width(items[i].shuttle))
 		if c := items[i].conflict; c != nil {
-			pathWidth = max(pathWidth, lipgloss.Width(c.Path))
+			pathWidth = max(pathWidth, lipgloss.Width(present.Plain(c.Path)))
 		}
 	}
 	nameWidth += 2
@@ -330,11 +330,11 @@ func (m *model) conflictsTable(room int) []string {
 		it := &items[i]
 		var line string
 		if c := it.conflict; c != nil {
-			why := c.Reason
+			why := present.Plain(c.Reason)
 			if m.resolving[it.key()] {
 				why = "resolving…"
 			}
-			line = row(it.shuttle, c.Path, copyText(c.Local, c.Remote, now), copyText(c.Remote, c.Local, now), why)
+			line = row(it.shuttle, present.Plain(c.Path), copyText(c.Local, c.Remote, now), copyText(c.Remote, c.Local, now), why)
 		} else {
 			line = row(it.shuttle, "", "", "",
 				present.Plural(it.deletions, "deletion")+" held back: too many at once for the deletion guard")

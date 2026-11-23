@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -228,6 +229,30 @@ func waitForStatus(t *testing.T, want string) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Errorf("status never showed %q:\n%s", want, out)
+}
+
+// A file name from the share cannot write to the terminal through shuttle
+// activity. Windows does not allow such a name.
+func TestActivityHoldsNoEscapes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no control characters in Windows file names")
+	}
+	local, _ := startDaemon(t)
+	name := "x\x1b]52;c;eA==\x07.txt"
+	if err := os.WriteFile(filepath.Join(local, name), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli(t, "sync", "a")
+	var out string
+	for range 300 {
+		if _, out, _ = cli(t, "activity", "a"); strings.Contains(out, "1 copied") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !strings.Contains(out, "]52;c;eA==") || strings.ContainsAny(out, "\x1b\x07") {
+		t.Errorf("shuttle activity = %q", out)
+	}
 }
 
 func TestActivity(t *testing.T) {

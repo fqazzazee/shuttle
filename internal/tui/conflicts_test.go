@@ -79,6 +79,32 @@ func TestConflictsTab(t *testing.T) {
 	}
 }
 
+// A conflict's name shows without its escapes, in the table, the question
+// and the message, and the daemon is still told the real one.
+func TestConflictHoldsNoEscapes(t *testing.T) {
+	const name = "a\x1b]52;c;eA==\x07.txt"
+	f := newFake()
+	f.shuttles = []daemon.Status{{Name: "photos", State: daemon.StateHeld, Conflicts: []engine.Issue{
+		{Path: name, Reason: "changed \x1b[2J", Outcome: "held", Local: file(5, older), Remote: file(15, newer)},
+	}}}
+	m := start(t, f, 160, 16)
+	press(t, m, "2")
+	if s := strings.Join(m.conflictsTable(10), "\n"); strings.Contains(s, "\x1b]52") || strings.Contains(s, "\x1b[2J") {
+		t.Errorf("the escapes reached the table: %q", s)
+	}
+	press(t, m, "l")
+	if strings.ContainsAny(m.question, "\x1b\x07") {
+		t.Errorf("the question = %q", m.question)
+	}
+	press(t, m, "y")
+	if strings.ContainsAny(m.message, "\x1b\x07") {
+		t.Errorf("the message = %q", m.message)
+	}
+	if got := f.took(); len(got) != 1 || got[0] != "resolve photos "+name+" keep-local" {
+		t.Errorf("calls = %q", got)
+	}
+}
+
 func TestResolving(t *testing.T) {
 	f := conflicted()
 	m := start(t, f, 160, 16)
