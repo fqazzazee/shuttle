@@ -453,7 +453,7 @@ class MainActivity : ComponentActivity() {
                     head = { WizardSaveHead(w.profile, wizardProblem) { saveDraft(false) } },
                     onBack = ::wizardBack,
                 )
-                if (askMoved) MovedDialog(w.name, { askMoved = false; saveDraft(true) }) { askMoved = false }
+                if (askMoved) MovedDialog(w.name, movedEffect(Setting.parseAll(rows)), { askMoved = false; saveDraft(true) }) { askMoved = false }
             }
         }
     }

@@ -355,8 +355,9 @@ func (m *model) saveWizard() tea.Cmd {
 		if !moved {
 			return save()
 		}
-		m.ask(name+" now syncs other folders: it starts afresh, like a first sync. Nothing is deleted; "+
-			"files that differ become conflicts. Save?", save)
+		f := w.settings
+		m.ask(name+" now syncs other folders: it starts afresh, like a first run. "+
+			movedEffect(f.effective("mode"), f.effective("deletions"))+" Save?", save)
 		return nil
 	}
 	if _, err := os.Stat(local); errors.Is(err, os.ErrNotExist) {
@@ -370,6 +371,30 @@ func (m *model) saveWizard() tea.Cmd {
 		return nil
 	}
 	return then()
+}
+
+// movedEffect is what a shuttle's first run in new folders does, by its mode:
+// only a two-way sync is sure to leave every file in place.
+func movedEffect(mode, deletions string) string {
+	const versions = " If versioning is on, the old copies are kept."
+	src, dst, srcs := "this computer", "the share", "this computer's"
+	switch mode {
+	case string(config.ModeSync):
+		return "Nothing is deleted; files that differ become conflicts."
+	case string(config.ModePull):
+		src, dst, srcs = "the share", "this computer", "the share's"
+	case string(config.ModePush):
+	default:
+		return "A two-way sync deletes nothing and keeps files that differ as conflicts. A push or pull " +
+			"replaces them on its destination and, with deletions = mirror, deletes what its source lacks, " +
+			"unless the deletion guard holds it." + versions
+	}
+	replaced := "Files that differ on " + dst + " are replaced with " + srcs + " copies"
+	if deletions == string(config.DeletionsMirror) {
+		return replaced + ", and whatever " + src + " lacks is deleted from " + dst +
+			", unless the deletion guard holds it." + versions
+	}
+	return replaced + ". Nothing is deleted." + versions
 }
 
 func (w *wizard) lines(m *model, room int) []string {

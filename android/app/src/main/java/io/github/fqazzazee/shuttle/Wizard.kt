@@ -364,12 +364,23 @@ fun WizardProfileStep(profiles: List<ProfileRow>, chosen: String, onChoose: (Str
     }
 }
 
+/** What a moved shuttle's first run does, by the mode and deletions its settings come to. */
+fun movedEffect(rows: List<Setting>): Int {
+    val mirror = rows.firstOrNull { it.key == "deletions" }?.shown == "mirror"
+    return when (rows.firstOrNull { it.key == "mode" }?.shown) {
+        "sync" -> R.string.wizard_moved_sync
+        "push" -> if (mirror) R.string.wizard_moved_push_mirror else R.string.wizard_moved_push
+        "pull" -> if (mirror) R.string.wizard_moved_pull_mirror else R.string.wizard_moved_pull
+        else -> R.string.wizard_moved_any
+    }
+}
+
 /** Asks before an edit that moves a shuttle is saved: it starts afresh, as on its first run. */
 @Composable
-fun MovedDialog(name: String, onSave: () -> Unit, onCancel: () -> Unit) {
+fun MovedDialog(name: String, effect: Int, onSave: () -> Unit, onCancel: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancel,
-        text = { Text(stringResource(R.string.wizard_moved, name)) },
+        text = { Text(stringResource(R.string.wizard_moved, name, stringResource(effect))) },
         confirmButton = { TextButton(onClick = onSave) { Text(stringResource(R.string.wizard_moved_save)) } },
         dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.add_cancel)) } },
     )

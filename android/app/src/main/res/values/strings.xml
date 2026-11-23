@@ -178,7 +178,13 @@
     <string name="profiles_none">No profiles yet. A profile is a set of settings that shuttles share.</string>
     <string name="wizard_add">Add a shuttle</string>
     <string name="wizard_edit">Edit %1$s</string>
-    <string name="wizard_moved">%1$s now syncs other folders: it starts afresh, as on its first sync. Nothing is deleted; files that differ on the two sides are kept as conflicts.</string>
+    <string name="wizard_moved">%1$s now syncs other folders: it starts afresh, as on its first run. %2$s</string>
+    <string name="wizard_moved_sync">Nothing is deleted; files that differ on the two sides are kept as conflicts.</string>
+    <string name="wizard_moved_push">Files that differ on the share are replaced with this phone\'s copies. Nothing is deleted. If versioning is on, the old copies are kept.</string>
+    <string name="wizard_moved_pull">Files that differ on this phone are replaced with the share\'s copies. Nothing is deleted. If versioning is on, the old copies are kept.</string>
+    <string name="wizard_moved_push_mirror">Files that differ on the share are replaced with this phone\'s copies, and whatever this phone lacks is deleted from the share, unless the deletion guard holds it. If versioning is on, the old copies are kept.</string>
+    <string name="wizard_moved_pull_mirror">Files that differ on this phone are replaced with the share\'s copies, and whatever the share lacks is deleted from this phone, unless the deletion guard holds it. If versioning is on, the old copies are kept.</string>
+    <string name="wizard_moved_any">A two-way sync deletes nothing and keeps files that differ as conflicts. A push or pull replaces them on its destination and, with deletions = mirror, deletes what its source lacks, unless the deletion guard holds it. If versioning is on, the old copies are kept.</string>
     <string name="wizard_moved_save">Save</string>
     <string name="wizard_share_title">Name and share</string>
     <string name="wizard_name">The shuttle\'s name</string>
