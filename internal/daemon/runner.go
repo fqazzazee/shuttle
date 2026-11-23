@@ -270,6 +270,9 @@ func (r *runner) runOnce(requested bool) {
 		st.State = StateIdle // shown as paused while paused; resumes as pending
 		r.pending = true
 		r.requested = r.requested || requested
+		// A resume since the engine stopped saw nothing pending to wake. The
+		// loop checks again, and waits if the shuttle is still paused.
+		r.wake()
 	case isOffline(err):
 		st.State, st.Error = StateOffline, err.Error()
 	case err != nil:
