@@ -4,6 +4,7 @@ package engine
 
 import (
 	"maps"
+	"path"
 	"slices"
 	"strings"
 
@@ -122,23 +123,20 @@ func matchCase(local, remote map[string]fsys.FileInfo, records map[string]state.
 		}
 	}
 
-	// Give the two spellings of one file one name, where that is unambiguous.
-	for k, rnames := range remoteByKey {
-		lnames := localByKey[k]
-		if len(rnames) != 1 || len(lnames) != 1 || rnames[0] == lnames[0] {
-			continue
-		}
-		from, to, m := rnames[0], lnames[0], out.remote
-		if !fo.remote {
-			from, to, m = lnames[0], rnames[0], out.local
-		}
-		info, ok := m[from]
+	// The side that ignores case is the one that can go by the other's
+	// spelling; with both, the share goes by the local one.
+	folded, foldedByKey := out.remote, remoteByKey
+	if !fo.remote {
+		folded, foldedByKey = out.local, localByKey
+	}
+	respell := func(from, to string) {
+		info, ok := folded[from]
 		if !ok {
-			continue // held above
+			return // held above
 		}
-		delete(m, from)
+		delete(folded, from)
 		info.Name = to
-		m[to] = info
+		folded[to] = info
 		if rec, ok := out.records[from]; ok {
 			if _, has := out.records[to]; !has {
 				rec.Path = to
@@ -149,6 +147,40 @@ func matchCase(local, remote map[string]fsys.FileInfo, records map[string]state.
 			}
 			delete(out.records, from)
 		}
+	}
+
+	// Give the two spellings of one file one name, where that is unambiguous.
+	spelled := map[string]string{} // by key, the name both sides now go by
+	for k, rnames := range remoteByKey {
+		lnames := localByKey[k]
+		if len(rnames) != 1 || len(lnames) != 1 {
+			continue
+		}
+		from, to := rnames[0], lnames[0]
+		if !fo.remote {
+			from, to = lnames[0], rnames[0]
+		}
+		spelled[k] = to
+		if from != to {
+			respell(from, to)
+		}
+	}
+
+	// A name on one side only follows its folder's spelling: copied under its
+	// own, it would make a second folder on a side that keeps case. Sorted, so
+	// a folder is settled before what is in it.
+	for _, p := range slices.Sorted(maps.Keys(folded)) {
+		dir := path.Dir(p)
+		parent, ok := spelled[fo.key(dir)]
+		if dir == "." || !ok || parent == dir || len(foldedByKey[fo.key(p)]) > 1 {
+			continue
+		}
+		to := parent + "/" + path.Base(p)
+		if _, taken := folded[to]; taken {
+			continue
+		}
+		respell(p, to)
+		spelled[fo.key(p)] = to
 	}
 	return out
 }
