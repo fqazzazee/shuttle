@@ -141,6 +141,50 @@ func TestMarksOutsideTheFolder(t *testing.T) {
 	}
 }
 
+// Unmarking part of a carried folder leaves the rest of it carried, and a
+// mark made on this tree stays on the file it was made on.
+func TestCarriedMarksMoveWithTheFolder(t *testing.T) {
+	tr := fakeTree(t, map[string][]entry{
+		"/top":   {{name: "a", dir: true}, {name: "mine.txt"}},
+		"/top/a": {{name: "b.txt"}, {name: "c.txt"}},
+	})
+	tr.marks.Mode = pick.Exclude
+	tr.marks.Add("/top/a")
+	tr.carryMarks()
+	tr.toggle(tr.find("/top/a/b.txt")) // c.txt marked instead
+	tr.toggle(tr.find("/top/mine.txt"))
+
+	tr.setRoot(&node{path: "/", dir: true})
+	if _, exclude := tr.selection(); !slices.Equal(exclude, []string{"a/c.txt", "top/mine.txt"}) {
+		t.Errorf("exclude = %q", exclude)
+	}
+	tr.setRoot(&node{path: "/top", dir: true})
+	if _, exclude := tr.selection(); !slices.Equal(exclude, []string{"a/c.txt", "mine.txt"}) {
+		t.Errorf("back on the folder: exclude = %q", exclude)
+	}
+}
+
+// A carried mark that passes over a mark made here does not take it along.
+func TestCarriedMarkLeavesAMarkMadeHere(t *testing.T) {
+	tr := fakeTree(t, map[string][]entry{
+		"/top":     {{name: "sub", dir: true}, {name: "x"}},
+		"/top/sub": {{name: "x"}},
+	})
+	tr.marks.Mode = pick.Exclude
+	tr.marks.Add("/top/x")
+	tr.carryMarks()
+	tr.toggle(tr.find("/top/sub/x")) // made here, where the carried x is about to land
+
+	tr.setRoot(&node{path: "/top/sub", dir: true})
+	if _, exclude := tr.selection(); !slices.Equal(exclude, []string{"x"}) {
+		t.Errorf("on sub: exclude = %q", exclude)
+	}
+	tr.setRoot(&node{path: "/top", dir: true})
+	if _, exclude := tr.selection(); !slices.Equal(exclude, []string{"sub/x", "x"}) {
+		t.Errorf("back on top: exclude = %q, want both marks", exclude)
+	}
+}
+
 // A typed path is listed, for when the user comes back to the step.
 func TestTypedPathIsListed(t *testing.T) {
 	w := newWizardSetup(t, nil)

@@ -266,6 +266,7 @@ func (m *model) next() tea.Cmd {
 			cmd = w.local.load(m.ctx, w.local.root)
 		}
 		w.local.adopt(w.remote)
+		w.local.carryMarks()
 		return cmd
 	case stepLocal:
 		if w.local.marks.Mode == pick.Include && len(w.local.inside()) == 0 {
