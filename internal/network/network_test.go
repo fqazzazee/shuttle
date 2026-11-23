@@ -115,6 +115,35 @@ func TestWatchWithoutNetworkManager(t *testing.T) {
 	next(t, got, false, "NetworkManager gone")
 }
 
+// Any client on the system bus can send a signal, also straight to shuttle,
+// where no match rule filters it: what it claims of Metered does not count.
+func TestWatchIgnoresForgedMetered(t *testing.T) {
+	bus := dbustest.Bus(t)
+	startNM(t, bus(), 2) // no
+	conn := bus()
+	got := watch(t, conn)
+	next(t, got, false, "at start, not metered")
+
+	forger := bus()
+	body := []any{nmIface, map[string]dbus.Variant{"Metered": dbus.MakeVariant(uint32(1))}, []string{}}
+	if err := forger.Emit(nmPath, "org.freedesktop.DBus.Properties.PropertiesChanged", body...); err != nil {
+		t.Fatal(err)
+	}
+	quiet(t, got, "a forged broadcast")
+
+	direct := &dbus.Message{Type: dbus.TypeSignal, Body: body, Headers: map[dbus.HeaderField]dbus.Variant{
+		dbus.FieldPath:        dbus.MakeVariant(nmPath),
+		dbus.FieldInterface:   dbus.MakeVariant("org.freedesktop.DBus.Properties"),
+		dbus.FieldMember:      dbus.MakeVariant("PropertiesChanged"),
+		dbus.FieldDestination: dbus.MakeVariant(conn.Names()[0]),
+		dbus.FieldSignature:   dbus.MakeVariant(dbus.SignatureOf(body...)),
+	}}
+	if call := forger.Send(direct, nil); call.Err != nil {
+		t.Fatal(call.Err)
+	}
+	quiet(t, got, "a forged signal sent straight to shuttle")
+}
+
 func TestIsMetered(t *testing.T) {
 	for v, want := range map[uint32]bool{0: false, 1: true, 2: false, 3: true, 4: false} {
 		if isMetered(v) != want {

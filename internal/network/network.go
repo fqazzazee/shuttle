@@ -35,6 +35,7 @@ func isMetered(v uint32) bool { return v == meteredYes || v == meteredGuessYes }
 // Without NetworkManager the connection is not metered, until it starts.
 func Watch(ctx context.Context, conn *dbus.Conn, onChange func(metered bool)) error {
 	matches := []dbus.MatchOption{
+		dbus.WithMatchSender(nmName),
 		dbus.WithMatchObjectPath(nmPath),
 		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
 		dbus.WithMatchMember("PropertiesChanged"),
@@ -87,10 +88,12 @@ func read(conn *dbus.Conn) bool {
 	return ok && isMetered(u)
 }
 
-// fromSignal is what a signal says of the connection, asking again where it
-// only says something changed: NetworkManager came or went, or invalidated
-// Metered. ok is false for a signal about NetworkManager's other properties,
-// which change far more often.
+// fromSignal is whether the connection is metered after a signal that says
+// Metered may have changed: NetworkManager came or went, or changed or
+// invalidated it. It always asks NetworkManager, as any client on the system
+// bus can send such a signal, also straight to shuttle, past the match rule.
+// ok is false for a signal about NetworkManager's other properties, which
+// change far more often.
 func fromSignal(sig *dbus.Signal, conn *dbus.Conn) (metered, ok bool) {
 	if sig.Name == "org.freedesktop.DBus.NameOwnerChanged" {
 		return read(conn), true
@@ -99,9 +102,8 @@ func fromSignal(sig *dbus.Signal, conn *dbus.Conn) (metered, ok bool) {
 		return false, false
 	}
 	if changed, isMap := sig.Body[1].(map[string]dbus.Variant); isMap {
-		if v, has := changed["Metered"]; has {
-			u, isU := v.Value().(uint32)
-			return isU && isMetered(u), true
+		if _, has := changed["Metered"]; has {
+			return read(conn), true
 		}
 	}
 	if invalidated, isList := sig.Body[2].([]string); isList && slices.Contains(invalidated, "Metered") {
