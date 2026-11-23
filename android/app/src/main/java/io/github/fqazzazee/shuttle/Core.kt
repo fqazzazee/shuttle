@@ -130,13 +130,13 @@ object Core {
                     Notices.show(app, Notice.parse(noteJSON))
                 }
 
-                // The config changed: drop the shuttles it removed, and see again whether the
+                // The config changed: drop the shuttles it removed, their pauses too, and see again whether the
                 // service is needed and what work to plan.
                 override fun onReload(reloadedJSON: String) {
-                    val removed = JSONObject(reloadedJSON).optJSONArray("Removed")
-                    if (removed != null) {
-                        val names = (0 until removed.length()).map { removed.getString(it) }.toSet()
+                    val names = removedBy(reloadedJSON)
+                    if (names.isNotEmpty()) {
                         synchronized(this@Core) { statuses = statuses - names }
+                        pauses(app).forget(names)
                     }
                     async {
                         current?.let {
