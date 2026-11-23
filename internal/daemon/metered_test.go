@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -85,6 +86,43 @@ func TestSyncNowRunsOnAMeteredConnection(t *testing.T) {
 	st := f.settled("s")
 	if st.Copied != 2 || f.runCount() != 1 {
 		t.Errorf("status %+v after %d runs; want both files in the one run the user asked for", st, f.runCount())
+	}
+}
+
+// A listener asks the daemon for its state, as the bus server does. With a
+// reload waiting for the lock, SetMetered must not be holding it meanwhile:
+// the listener would queue behind the reload, and the reload behind it.
+func TestSetMeteredDoesNotHoldTheLockForListeners(t *testing.T) {
+	f := newFixture(t, "push", "")
+	f.start()
+	var once sync.Once
+	inside, writerWaiting := make(chan struct{}), make(chan struct{})
+	stop := f.d.Watch(func(*Status) {
+		once.Do(func() {
+			close(inside)
+			<-writerWaiting
+			f.d.State()
+		})
+	})
+	defer stop()
+	go func() {
+		<-inside
+		go func() {
+			f.d.runnersMu.Lock()
+			defer f.d.runnersMu.Unlock()
+		}()
+		time.Sleep(50 * time.Millisecond) // the writer is queued by now
+		close(writerWaiting)
+	}()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		f.d.SetMetered(true)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("SetMetered is deadlocked with a waiting reload")
 	}
 }
 

@@ -303,9 +303,7 @@ func (d *Daemon) SetMetered(metered bool) {
 		return
 	}
 	d.o.Log.Info("connection", "metered", metered)
-	d.runnersMu.RLock()
-	defer d.runnersMu.RUnlock()
-	for _, r := range d.runners {
+	for _, r := range d.all() {
 		r.pausedChanged()
 	}
 }
