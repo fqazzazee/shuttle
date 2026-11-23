@@ -28,7 +28,7 @@ jobs:
       contents: read
       actions: read   # the CI run of the tagged commit
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: github.event_name != 'workflow_dispatch'
         with:
           fetch-depth: 0   # main's history, to find the commit in it
