@@ -9,7 +9,10 @@ package io.github.fqazzazee.shuttle
  */
 class Holders<T : Any>(private val stop: (T) -> Unit) {
     private val holders = mutableSetOf<String>()
-    private var thing: T? = null
+
+    // Volatile so that current takes no lock: starting and stopping hold it for as long as they
+    // take, a stop for the rest of a file, and the main thread reads current.
+    @Volatile private var thing: T? = null
 
     /** Starts it if no one held it, and returns it. A holder that already holds it is counted once. */
     @Synchronized
@@ -23,11 +26,11 @@ class Holders<T : Any>(private val stop: (T) -> Unit) {
     @Synchronized
     fun release(holder: String) {
         if (!holders.remove(holder) || holders.isNotEmpty()) return
-        thing?.let(stop)
+        val stopping = thing
         thing = null
+        stopping?.let(stop)
     }
 
-    /** It, while someone holds it. */
-    @get:Synchronized
+    /** It, while someone holds it; null once it is stopping. Never waits. */
     val current: T? get() = thing
 }
