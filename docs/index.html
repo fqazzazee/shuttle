@@ -336,8 +336,8 @@
         page shows the APK's SHA-256, to compare with the release's <code>checksums.txt</code>. See the
         <a href="https://github.com/fqazzazee/shuttle#android">README</a>.</p>
       <p>On Windows 11 (amd64; arm64 built, not yet tested): unzip <a href="https://github.com/fqazzazee/shuttle/releases/download/v0.3.0/shuttle_0.3.0_windows_amd64.zip">shuttle_0.3.0_windows_amd64.zip</a>
-        into a folder of its own and run <code>shuttle autostart on</code> there: the service and an icon in the
-        notification area then start when you sign in, and <code>shuttle</code> opens the same terminal interface.
+        into a folder of its own and run <code>.\shuttle.exe autostart on</code> there: the service and an icon in the
+        notification area then start when you sign in, and <code>.\shuttle</code> opens the same terminal interface.
         The programs are not code-signed, so Windows warns once; each release's files carry GitHub's build
         attestations. See the <a href="https://github.com/fqazzazee/shuttle#windows">README</a>.</p>
       <p style="margin-top: 26px">shuttle is not:</p>
@@ -368,7 +368,7 @@
         </details>
         <details>
           <summary>Both folders already have files. What does the first sync do?</summary>
-          <p>It joins them: what is on one side only is copied to the other. Files that exist on both sides but differ become conflicts, settled by the shuttle's conflict setting. Nothing is overwritten silently.</p>
+          <p>That depends on the mode. A two-way <em>sync</em> joins them: what is on one side only is copied to the other, and files that differ become conflicts, settled by the shuttle's conflict setting. A <em>push</em> or <em>pull</em> makes the destination follow the source: files that differ are replaced, and with <code>deletions = "mirror"</code> whatever the source lacks is deleted there, unless the deletion guard holds it. By default push and pull only add, and versioning keeps what is replaced or deleted for 30 days.</p>
         </details>
         <details>
           <summary>What if a file changes on both sides?</summary>
@@ -400,7 +400,7 @@
         </details>
         <details>
           <summary>Does it run on macOS or Windows, or sync to the cloud?</summary>
-          <p>No: it runs on Linux and Android, and it syncs with SMB and NFS shares. For cloud storage (S3, Google Drive, OneDrive), use rclone.</p>
+          <p>It runs on Linux, Windows and Android, not macOS, and it syncs with SMB and NFS shares. For cloud storage (S3, Google Drive, OneDrive), use rclone.</p>
         </details>
         <details>
           <summary>Is it free?</summary>

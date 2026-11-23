@@ -72,7 +72,7 @@ for amd64 (installed and tested on Fedora 44 and Debian stable) or arm64 (built,
 tested):
 
 ```bash
-v=0.2.0   # the release's version
+v=0.3.0   # the release's version
 # Fedora
 sudo dnf install https://github.com/fqazzazee/shuttle/releases/download/v$v/shuttle_${v}_linux_amd64.rpm
 # Debian, Ubuntu
@@ -146,9 +146,9 @@ a folder of its own, for example `%LOCALAPPDATA%\Programs\shuttle`, and in that 
 It starts the daemon, which syncs, and its icon in the notification area, now and each time you
 sign in. Windows 11 puts a new icon under the **^** beside the clock: to keep it on the taskbar,
 turn shuttle on in Settings > Personalization > Taskbar > Other system tray icons. Both run as
-`shuttlew.exe`, the same program as `shuttle.exe`, built to open no window. Run `shuttle` (in Windows Terminal, for the look the
+`shuttlew.exe`, the same program as `shuttle.exe`, built to open no window. In that folder, run `.\shuttle` (in Windows Terminal, for the look the
 screenshots have) for the terminal interface, where shares and shuttles are added as on Linux.
-`shuttle autostart off` stops them starting at sign-in.
+`.\shuttle autostart off` stops them starting at sign-in.
 
 The programs are not signed with a certificate, so the first time Windows says "Windows protected
 your PC": **More info**, then **Run anyway**. To check a download first: its SHA-256 is in the
@@ -171,8 +171,10 @@ What differs from Linux:
 - An NFS share needs `uid` and `gid`: a Windows user has no Unix IDs to send.
 - A connection marked as metered in Settings pauses the shuttles set to pause on one, as on Linux.
 
-To remove shuttle: `shuttle autostart off`, quit the icon, and delete its folder, and
-`%APPDATA%\shuttle` and `%LOCALAPPDATA%\shuttle` with your settings. The icon registered
+To remove shuttle: in its folder run `.\shuttle autostart off`, then
+`Stop-Process -Name shuttlew` to end the daemon and its icon, which otherwise run on, and sync,
+until you sign out. Then leave the folder and delete it, and `%APPDATA%\shuttle` and
+`%LOCALAPPDATA%\shuttle` with your settings. The icon registered
 shuttle's notifications with Windows under `HKEY_CURRENT_USER\Software\Classes\AppUserModelId\shuttle`.
 
 ## Configure
@@ -258,11 +260,81 @@ The service follows the config file: save a change and it applies within a secon
 restart. Shuttles you didn't touch carry on; a changed one finishes the file it is copying,
 then continues with the new settings. If an edit has a mistake, the service keeps the previous
 settings, and says what is wrong in `shuttle status`, a notification and the journal. If you
-point a shuttle at other folders, it starts afresh, like a first sync: nothing is deleted, and
-files that differ become conflicts.
+point a shuttle at other folders, it starts afresh, like a first run. For a two-way shuttle
+nothing is deleted, and files that differ become conflicts. A push or pull makes the new
+destination follow its source: files that differ are replaced, and with `deletions = "mirror"`
+what the source lacks is deleted there. See
+[What a run can replace or delete](#what-a-run-can-replace-or-delete).
 
 A broken config at startup stops the service with a message in `journalctl --user -u shuttle`, rather
 than restarting it over and over.
+
+### Settings
+
+A profile or a shuttle can set any of these; a shuttle's value wins over its profile's, and
+what neither sets takes the default.
+
+| Key | Values | Default |
+| --- | --- | --- |
+| `mode` | `push`, `pull`, `sync` | none: it must be set |
+| `triggers` | `realtime`, `schedule`, `share-available`, `manual` | none: runs only when asked |
+| `interval`, `at` | for `schedule`: every `"6h"` (at least `1m`), at `["02:00"]` | none |
+| `poll_interval` | how often the share is checked for changes (at least `1s`) | `60s` |
+| `deletions` | push and pull: `additive`, `mirror` | `additive` |
+| `deletion_guard` | percent, `0` (off) to `100` | `50` |
+| `conflicts` | sync: `keep-both`, `newest-wins`, `ask` | `keep-both` |
+| `conflict_hold` | what waits on an `ask`: `file`, `shuttle` | `file` |
+| `versioning` | `kind` = `none`, `trash`, `simple`, `staggered` | `trash`, `keep = "30d"` |
+| `ignore` | `.gitignore`-style patterns | none |
+| `metered` | `pause`, `run` | `pause` |
+| `bandwidth` | `up`, `down`, as `"20MB/s"` | unlimited |
+| `notify` | `errors`, `conflicts`, `completed`, `share` | all on; `completed` off for real-time |
+
+- **`deletions`:** `additive` never deletes on the destination, so a file removed from the
+  source stays there. `mirror` deletes it. A two-way sync always carries deletions across.
+- **`deletion_guard`:** holds all of a run's deletions on a side when they would remove at
+  least 10 files and more than this percent of that side's files. Fewer than 10 deletions are
+  never held.
+- **`versioning`:** `trash` keeps everything for `keep`; `simple` keeps the last `count` of each
+  file (default 5); `staggered` thins versions out with age, up to `keep` (default `365d`, `0`
+  for no limit). All three take `size_cap`, such as `"10GB"`: past it, the oldest go first. A
+  shuttle that sets `versioning` replaces its profile's table entirely.
+- **`ignore`:** a shuttle's list replaces its profile's; `ignore_add` adds to it.
+
+Only a shuttle has `profile`, `local`, `remote`, `enabled` (default `true`), `ignore_add`, and
+`include` or `exclude`: exact paths inside its folder, to sync only those or all but those.
+Under `[global]` are `bandwidth` and `terminal`. A share has `type` (`smb`, `nfs3`, `path`),
+`host` and `port`; `share`, `user` and `domain` for SMB; `export`, `mount_port`, `uid` and `gid`
+for NFSv3; and `path` for a mounted folder.
+
+### What a run can replace or delete
+
+On its first run, or after it is pointed at other folders, a shuttle has no history to compare
+with:
+
+- A **sync** joins the two sides and deletes nothing. What is on one side only is copied to the
+  other, and files that differ are conflicts, settled by `conflicts`.
+- A **push** or **pull** makes the destination follow the source. Files that differ are replaced.
+  With `deletions = "mirror"`, whatever the source lacks is deleted from the destination, on the
+  first run too, unless the deletion guard holds it.
+
+With versioning on, a replaced or deleted file is moved to a hidden `.shuttle-versions` folder
+at the root of the side it was on, under its own path and the local time it was replaced:
+`.shuttle-versions/dir/report~20261011-153000.pdf`. That folder is never synced, and old versions
+are pruned as `versioning` says. With `kind = "none"`, a replaced or deleted file is gone.
+
+There is no restore command: copy the version back and remove the `~20261011-153000` from its
+name. For a push or pull, put it back **on the source**: the destination follows the source, so a
+copy restored only there is replaced again, or with `mirror` deleted again.
+
+`keep-both` saves the older copy of a conflict beside the newer one, on both sides, as
+`report.sync-conflict-20261011-153000-laptop.pdf`, ending in the name of the side it came from.
+These are ordinary files, and sync like any other.
+
+**In the next release, not in v0.3.0:** a synced path replaced by a symlink or other special
+file, and a file/folder clash in a push or pull, are held: both sides stay unchanged, the path is
+reported, and nothing under it is deleted or renamed. A one-way source is never written to. Up to
+v0.3.0 such a path can still be renamed or, with `mirror`, deleted.
 
 ### GNOME extension
 

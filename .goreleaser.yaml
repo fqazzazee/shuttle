@@ -130,8 +130,8 @@ release:
     phone and open it. It installs over an earlier release, keeping its setup; see the
     [README](https://github.com/fqazzazee/shuttle#android).
 
-    On Windows 10 or 11: download `shuttle_{{ .Version }}_windows_amd64.zip` (or `_arm64`),
-    unzip it into a folder of its own, and run `shuttle autostart on` there: the daemon and its
+    On Windows 11 (10 should work, but is untested): download `shuttle_{{ .Version }}_windows_amd64.zip` (or `_arm64`),
+    unzip it into a folder of its own, and run `.\shuttle.exe autostart on` there: the daemon and its
     icon then start when you sign in. Windows warns once that the programs are not signed; see the
     [README](https://github.com/fqazzazee/shuttle#windows).
 
