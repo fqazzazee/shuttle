@@ -28,7 +28,14 @@ func IsTemp(name string) bool {
 // temp file in the same directory, flushes it to disk, sets its modification
 // time, and renames it over name. On failure the temp file is removed and name is left as it was.
 // It returns the number of bytes written.
-func WriteFile(ctx context.Context, fsys FS, name string, r io.Reader, mtime time.Time) (n int64, err error) {
+func WriteFile(ctx context.Context, fsys FS, name string, r io.Reader, mtime time.Time) (int64, error) {
+	return WriteFileLike(ctx, fsys, name, name, r, mtime)
+}
+
+// WriteFileLike is WriteFile with the new file's permissions taken from the
+// file at like, where the FS has permissions (PermCreator). Versioning moves
+// the old file away before the write, so like is not always name.
+func WriteFileLike(ctx context.Context, fsys FS, name, like string, r io.Reader, mtime time.Time) (n int64, err error) {
 	if err := checkPath("write", name); err != nil {
 		return 0, err
 	}
@@ -36,7 +43,12 @@ func WriteFile(ctx context.Context, fsys FS, name string, r io.Reader, mtime tim
 	if err != nil {
 		return 0, err
 	}
-	w, err := fsys.Create(ctx, tmp)
+	var w io.WriteCloser
+	if c, ok := fsys.(PermCreator); ok {
+		w, err = c.CreateLike(ctx, tmp, like)
+	} else {
+		w, err = fsys.Create(ctx, tmp)
+	}
 	if err != nil {
 		return 0, err
 	}

@@ -175,8 +175,12 @@ func (e *executor) copyFile(p string, toRemote bool, srcInfo, dstInfo *fsys.File
 			return err
 		}
 	}
+	like := p
+	if kept != "" {
+		like = kept
+	}
 	h := sha256.New()
-	n, err := fsys.WriteFile(e.ctx, dst, p, io.TeeReader(e.limit(upTo(r, p, min(srcInfo.Size, math.MaxInt64-growthAllowance)+growthAllowance), toRemote, planned), h), srcInfo.ModTime)
+	n, err := fsys.WriteFileLike(e.ctx, dst, p, like, io.TeeReader(e.limit(upTo(r, p, min(srcInfo.Size, math.MaxInt64-growthAllowance)+growthAllowance), toRemote, planned), h), srcInfo.ModTime)
 	r.Close()
 	if err != nil {
 		if kept != "" {
