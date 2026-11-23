@@ -13,6 +13,25 @@ import (
 // versioning keeps what was deleted.
 const guardMinFiles = 10
 
+// covered reports whether the user confirmed every deletion in held. The
+// side counts: the same path deleted the other way is another deletion.
+func covered(held, confirmed []Issue) bool {
+	type deletion struct {
+		op   Op
+		path string
+	}
+	ok := make(map[deletion]bool, len(confirmed))
+	for i := range confirmed {
+		ok[deletion{confirmed[i].Op, confirmed[i].Path}] = true
+	}
+	for i := range held {
+		if !ok[deletion{held[i].Op, held[i].Path}] {
+			return false
+		}
+	}
+	return true
+}
+
 // guardDeletions holds back every deletion on a side when they would remove
 // more than percent of that side's files at once: the signature of an empty
 // mount, a wiped share or a wrong folder, rather than of someone tidying up.

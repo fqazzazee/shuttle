@@ -80,6 +80,9 @@ var (
 	ErrUnknownShuttle = errors.New("no shuttle by that name")
 	// ErrDisabled means the shuttle is disabled in the config.
 	ErrDisabled = errors.New("shuttle is disabled in the config")
+	// ErrHeldChanged means the deletions the guard holds are not the ones
+	// the user was asked about.
+	ErrHeldChanged = errors.New("the held deletions have changed: sync the shuttle and check them again")
 	// ErrConfig means the config file is missing or invalid: running again
 	// will not help until the user fixes it.
 	ErrConfig = errors.New("config")
@@ -397,14 +400,21 @@ func (d *Daemon) Resolve(ctx context.Context, name, path string, choice engine.C
 }
 
 // AllowDeletions lets the named shuttle's next run delete what the deletion
-// guard has been holding back, and starts that run.
-func (d *Daemon) AllowDeletions(name string) error {
+// guard has been holding back, and starts that run. count is how many
+// deletions the user was shown: if the guard holds another number, it
+// returns ErrHeldChanged. The run deletes only those held now; if it would
+// delete anything else, they are all held again.
+func (d *Daemon) AllowDeletions(name string, count int) error {
 	r, err := d.runner(name)
 	if err != nil {
 		return err
 	}
 	r.mu.Lock()
-	r.allowDeletions = true
+	if count <= 0 || count != len(r.held) {
+		r.mu.Unlock()
+		return fmt.Errorf("%q: %w", name, ErrHeldChanged)
+	}
+	r.allowDeletions = r.held
 	r.mu.Unlock()
 	d.o.Log.Info("deletions allowed for one run", "shuttle", name)
 	r.trigger()

@@ -359,11 +359,11 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Lets the shuttle's next run make the deletions the guard held back; it starts that run. */
-    private fun allowDeletions(shuttle: String) {
+    private fun allowDeletions(held: HeldDeletions) {
         resolveError = null
         Thread {
             try {
-                Core.current?.allowDeletions(shuttle)
+                Core.current?.allowDeletions(held.shuttle, held.count.toLong())
             } catch (e: Exception) {
                 resolveError = e.message
             }

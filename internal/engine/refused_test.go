@@ -54,7 +54,6 @@ func TestRefusedNamesAreLeftOut(t *testing.T) {
 func TestRefusedNamesAreNeverDeletedOnTheShare(t *testing.T) {
 	shareHoldsWhatNTFSCannot(t)
 	h := newPhoneHarness(t, config.ModePush, config.DeletionsMirror)
-	h.opts.AllowDeletions = true // nothing for the guard to catch: the run itself must not delete
 	write(t, h.localDir, "ok.txt", "ok", t0)
 	write(t, h.remoteDir, "a:b.txt", "colon", t0)
 	write(t, h.remoteDir, "dir?/x.txt", "x", t0)

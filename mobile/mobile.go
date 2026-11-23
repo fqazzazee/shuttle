@@ -724,8 +724,11 @@ func (m *Daemon) Resolve(name, path, choice string) error {
 }
 
 // AllowDeletions lets the named shuttle's next run delete what the deletion
-// guard has been holding back, and starts that run.
-func (m *Daemon) AllowDeletions(name string) error { return m.d.AllowDeletions(name) }
+// guard has been holding back, and starts that run. count is how many the
+// user was shown: if the guard holds another number, it returns an error.
+func (m *Daemon) AllowDeletions(name string, count int) error {
+	return m.d.AllowDeletions(name, count)
+}
 
 // resolveTimeout bounds Resolve: a run in progress finishes its file first.
 const resolveTimeout = 2 * time.Minute

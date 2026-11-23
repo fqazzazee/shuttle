@@ -137,13 +137,14 @@ func closeAll(rs []*runner) error {
 
 // inherit carries what the user and the last runs left on a shuttle over
 // to its replacement: pause, a run waiting, the last run's results, what
-// was already announced. A disabled shuttle keeps none of it.
+// was already announced. A disabled shuttle keeps none of it. A deletion
+// approval stays behind: it was given for the shuttle as it was.
 func (r *runner) inherit(old *runner) {
 	if !r.shuttle.Enabled {
 		return
 	}
 	old.mu.Lock()
-	st, paused, pending, requested, allow := old.st, old.paused, old.pending, old.requested, old.allowDeletions
+	st, paused, pending, requested := old.st, old.paused, old.pending, old.requested
 	attempted := old.attempted
 	old.mu.Unlock()
 
@@ -154,7 +155,7 @@ func (r *runner) inherit(old *runner) {
 	}
 	st.Name, st.Mode, st.Note = r.shuttle.Name, r.shuttle.Settings.Mode, ""
 	r.st = st
-	r.paused, r.pending, r.requested, r.allowDeletions = paused, pending, requested, allow
+	r.paused, r.pending, r.requested = paused, pending, requested
 	r.attempted = attempted
 	r.announced = old.announced // old has stopped: nothing else touches it
 }

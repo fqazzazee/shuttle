@@ -28,7 +28,7 @@ type request struct {
 	Path   string `json:"path,omitempty"`
 	Choice string `json:"choice,omitempty"`
 	On     bool   `json:"on,omitempty"`
-	Limit  int    `json:"limit,omitempty"`
+	Limit  int    `json:"limit,omitempty"` // activity: how many; allow-deletions: the count confirmed
 	Notes  bool   `json:"notes,omitempty"` // watch: notes, not changes
 }
 
