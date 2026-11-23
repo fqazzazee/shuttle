@@ -4,6 +4,8 @@ package engine
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,17 +15,124 @@ import (
 	"github.com/fqazzazee/shuttle/internal/fsys"
 )
 
-// replaceWithLink moves p out of dir and leaves a symlink to it in its place,
-// the way a folder gets moved to a bigger disk.
+// replaceWithLink leaves a symlink to another disk where p was, the way a
+// folder gets moved to a bigger one. The contents are removed, not moved: dir
+// may be on a share, and a rename to another device fails.
 func replaceWithLink(t *testing.T, dir, p string) {
 	t.Helper()
 	full := filepath.Join(dir, filepath.FromSlash(p))
-	moved := filepath.Join(t.TempDir(), filepath.Base(full))
-	if err := os.Rename(full, moved); err != nil {
+	if err := os.RemoveAll(full); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(moved, full); err != nil {
+	if err := os.Symlink(t.TempDir(), full); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// linkHidingFS lists no symlinks but still answers Stat for them, as Samba
+// does for a link leading out of the share.
+type linkHidingFS struct{ fsys.FS }
+
+func (f linkHidingFS) ReadDir(ctx context.Context, name string) ([]fsys.FileInfo, error) {
+	entries, err := f.FS.ReadDir(ctx, name)
+	return slices.DeleteFunc(entries, func(e fsys.FileInfo) bool { return e.Kind == fsys.KindOther }), err
+}
+
+// statFailingFS is a side whose Stat fails for anything but a clean answer.
+type statFailingFS struct{ fsys.FS }
+
+func (statFailingFS) Stat(_ context.Context, name string) (fsys.FileInfo, error) {
+	return fsys.FileInfo{}, &fs.PathError{Op: "stat", Path: name, Err: errors.New("connection reset")}
+}
+
+func TestLinkTheListingHidesIsHeld(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		mode config.Mode
+		p    string
+	}{
+		{"sync, folder", config.ModeSync, "Photos"},
+		{"sync, file", config.ModeSync, "Photos/a.jpg"},
+		{"sync, nested folder", config.ModeSync, "Photos/sub"},
+		{"push, destination", config.ModePush, "Photos"},
+		{"pull, source", config.ModePull, "Photos"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t, tc.mode, config.DeletionsMirror)
+			seed := h.localDir
+			if tc.mode == config.ModePull {
+				seed = h.remoteDir
+			}
+			write(t, seed, "Photos/a.jpg", "photo", t0)
+			write(t, seed, "Photos/sub/b.jpg", "other photo", t0)
+			write(t, seed, "other.txt", "other", t0)
+			h.run()
+			h.opts.Remote = linkHidingFS{h.opts.Remote}
+			want := listing(t, h.localDir)
+			replaceWithLink(t, h.remoteDir, tc.p)
+
+			actions, err := Preview(context.Background(), &h.opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(actions) != 0 {
+				t.Errorf("preview planned %+v, want nothing", actions)
+			}
+			for run := range 2 {
+				res := h.run()
+				if res.Deleted != 0 || res.Copied != 0 || res.Versioned != 0 {
+					t.Errorf("run %d: %+v, want nothing changed", run, res)
+				}
+				if want := []string{"remote: " + tc.p}; !slices.Equal(res.Unsupported, want) {
+					t.Errorf("run %d: unsupported = %v, want %v", run, res.Unsupported, want)
+				}
+				if got := listing(t, h.localDir); got != want {
+					t.Fatalf("run %d: local = %s\nwant    %s", run, got, want)
+				}
+			}
+		})
+	}
+}
+
+// Asking about a missing path must not turn a real deletion into a held one.
+func TestDeletionStillLandsWhenTheListingHidesLinks(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsMirror)
+	write(t, h.localDir, "Photos/a.jpg", "photo", t0)
+	write(t, h.localDir, "other.txt", "other", t0)
+	h.run()
+	h.opts.Remote = linkHidingFS{h.opts.Remote}
+	if err := os.RemoveAll(filepath.Join(h.remoteDir, "Photos")); err != nil {
+		t.Fatal(err)
+	}
+
+	if res := h.run(); res.Deleted != 2 || len(res.Unsupported) != 0 {
+		t.Errorf("deleted = %d, unsupported = %v, want 2 and none", res.Deleted, res.Unsupported)
+	}
+	if _, ok := read(t, h.localDir, "Photos/a.jpg"); ok {
+		t.Error("the deletion did not reach the other side")
+	}
+}
+
+// Not knowing whether a missing path is a link is a failed scan.
+func TestFailedCheckOfAMissingPathDeletesNothing(t *testing.T) {
+	h := newHarness(t, config.ModeSync, config.DeletionsMirror)
+	write(t, h.localDir, "Photos/a.jpg", "photo", t0)
+	h.run()
+	want := listing(t, h.localDir)
+	h.opts.Remote = statFailingFS{h.opts.Remote}
+	if err := os.RemoveAll(filepath.Join(h.remoteDir, "Photos")); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := Run(context.Background(), &h.opts)
+	if err == nil {
+		t.Error("Run succeeded without knowing what the missing path is")
+	}
+	if res.Deleted != 0 {
+		t.Errorf("deleted = %d, want 0", res.Deleted)
+	}
+	if got := listing(t, h.localDir); got != want {
+		t.Errorf("local = %s\nwant    %s", got, want)
 	}
 }
 

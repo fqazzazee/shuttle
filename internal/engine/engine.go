@@ -207,6 +207,9 @@ func Preview(ctx context.Context, o *Options) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := findHidden(ctx, o, &local, &remote, records, ignored); err != nil {
+		return nil, err
+	}
 	parents := leaveOutSpecial(o, &local, &remote, records)
 	return keepParents(o, plan(o, local.entries, remote.entries, records), parents), nil
 }
@@ -224,12 +227,15 @@ func Run(ctx context.Context, o *Options) (*Result, error) {
 	if err != nil {
 		return res, err
 	}
-	res.Unsupported = slices.Concat(local.unsupported, remote.unsupported)
 	res.Refused = leaveOutRefused(o, &local, &remote)
 	records, err := o.State.All()
 	if err != nil {
 		return res, err
 	}
+	if err := findHidden(ctx, o, &local, &remote, records, ignored); err != nil {
+		return res, err
+	}
+	res.Unsupported = slices.Concat(local.unsupported, remote.unsupported)
 	parents := leaveOutSpecial(o, &local, &remote, records)
 	actions := keepParents(o, plan(o, local.entries, remote.entries, records), parents)
 	res.Planned = len(actions)

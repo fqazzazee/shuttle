@@ -4,6 +4,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -64,6 +65,60 @@ func scan(ctx context.Context, f fsys.FS, side string, ignored *ignore.Matcher, 
 	})
 	slices.Sort(out.unsupported) // listings finish in any order
 	return out, err
+}
+
+// findHidden adds to both scans the recorded paths that are symlinks their
+// listing did not show. Samba leaves a link leading out of the share out of
+// a folder's listing but still answers for it by name, so without asking,
+// the link reads as a deletion.
+func findHidden(ctx context.Context, o *Options, local, remote *scanned, records map[string]state.Record, ignored *ignore.Matcher) error {
+	if err := findHiddenOn(ctx, o.Local, "local", local, records, ignored); err != nil {
+		return fmt.Errorf("scanning local folder: %w", err)
+	}
+	if err := findHiddenOn(ctx, o.Remote, "remote", remote, records, ignored); err != nil {
+		return fmt.Errorf("scanning remote folder: %w", err)
+	}
+	return nil
+}
+
+// findHiddenOn asks once per topmost missing path, so a deleted folder costs
+// one round trip however much it held. An answer other than "not there"
+// fails the scan: the path cannot be called deleted.
+func findHiddenOn(ctx context.Context, f fsys.FS, side string, s *scanned, records map[string]state.Record, ignored *ignore.Matcher) error {
+	asked := make(map[string]bool, len(s.special))
+	for _, p := range s.special {
+		asked[p] = true
+	}
+	for p := range records {
+		if _, ok := s.entries[p]; ok {
+			continue
+		}
+		top, under := p, true
+		for dir := path.Dir(p); dir != "."; dir = path.Dir(dir) {
+			if info, ok := s.entries[dir]; ok {
+				under = info.Kind == fsys.KindDir // a file now: nothing can be below it
+				break
+			}
+			top = dir
+		}
+		if !under || asked[top] || fsys.RefuseName(f, top) != nil {
+			continue
+		}
+		asked[top] = true
+		info, err := f.Stat(ctx, top)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if info.Kind == fsys.KindOther && !ignored.Match(top, false) {
+			s.unsupported = append(s.unsupported, side+": "+top)
+			s.special = append(s.special, top)
+		}
+	}
+	slices.Sort(s.unsupported)
+	return nil
 }
 
 // leaveOutSpecial holds every path that is a symlink or special file on
