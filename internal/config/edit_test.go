@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -299,6 +300,50 @@ func normalize(v any) any {
 		return out
 	}
 	return v
+}
+
+// A config symlinked from a dotfiles repo stays a link, and the save lands in
+// the file it points to.
+func TestSaveThroughSymlink(t *testing.T) {
+	linkDir, dotfiles := t.TempDir(), t.TempDir()
+	path, target := filepath.Join(linkDir, "config.toml"), filepath.Join(dotfiles, "shuttle.toml")
+	before := []byte("# before\n")
+	after := []byte("# after\n")
+	if err := os.WriteFile(target, before, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Skip("no symlinks here:", err)
+	}
+	if err := Save(path, before, after, linkDir); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Error("the save replaced the symlink with a regular file")
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, after) {
+		t.Errorf("the link's target holds %q, want %q", got, after)
+	}
+	// Windows has no Unix modes: a writable file reads back as 0666.
+	if runtime.GOOS != "windows" {
+		if info, err := os.Stat(target); err != nil || info.Mode().Perm() != 0o640 {
+			t.Errorf("target mode = %v, %v; want 0640 kept", info, err)
+		}
+	}
+	for _, dir := range []string{linkDir, dotfiles} {
+		entries, err := os.ReadDir(dir)
+		if err != nil || len(entries) != 1 {
+			t.Errorf("%s holds %v, %v; want no temp file left", dir, entries, err)
+		}
+	}
 }
 
 func TestSave(t *testing.T) {

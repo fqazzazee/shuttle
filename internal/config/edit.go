@@ -553,12 +553,18 @@ func Save(path string, before, after []byte, home string) error {
 	if _, err := Parse(after, home); err != nil {
 		return err
 	}
-	dir := filepath.Dir(path)
+	// A rename over a symlink replaces the link, and a config linked from a
+	// dotfiles repo would silently part from it: write to what it points to.
+	target := path
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		target = resolved
+	}
+	dir := filepath.Dir(target)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	mode := fs.FileMode(0o600)
-	if info, err := os.Stat(path); err == nil {
+	if info, err := os.Stat(target); err == nil {
 		mode = info.Mode().Perm()
 	}
 	f, err := os.CreateTemp(dir, ".config.toml.*")
@@ -582,7 +588,7 @@ func Save(path string, before, after []byte, home string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	return os.Rename(tmp, target)
 }
 
 // Replace puts data in place of the config file at path, whatever it held: a
