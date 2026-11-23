@@ -16,12 +16,49 @@ permissions:
   contents: read
 
 jobs:
+  # A release comes only from a commit on main whose CI passed (DECISIONS
+  # 2026-11-22), checked before the signing key is touched. Only the run for
+  # the push to main counts: a pull request's skips the jobs its changes cannot
+  # affect. The APK's dry run releases nothing, so it has nothing to check.
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read   # the CI run of the tagged commit
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          fetch-depth: 0   # main's history, to find the commit in it
+      - name: the tag is on main and its commit passed CI
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse --verify "$GITHUB_SHA^{commit}")
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$sha" refs/remotes/origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($sha) is not on main: no release"
+            exit 1
+          fi
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yaml/runs?head_sha=$sha&event=push&branch=main&status=success" |
+            jq --arg sha "$sha" '[.workflow_runs[] | select(.head_sha == $sha and .path == ".github/workflows/ci.yaml" and .event == "push" and .head_branch == "main" and .conclusion == "success")] | length')
+          # Anything but a count of at least one, an empty answer included, stops here.
+          [ "$passed" -ge 1 ] || {
+            echo "::error::no passed CI run for the push of $sha to main: wait for CI, then re-run this workflow"
+            exit 1
+          }
+
   # The Android app, signed with the release key (DECISIONS 2026-10-14). The key
   # is in the secrets only: ANDROID_SIGNING_KEY (the PKCS12 file, base64),
   # ANDROID_SIGNING_PASSWORD and ANDROID_SIGNING_ALIAS. Without them, there is
   # no release.
   apk:
     name: apk
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -75,7 +112,7 @@ jobs:
 
   release:
     name: release
-    needs: apk
+    needs: [gate, apk]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -111,7 +148,27 @@ jobs:
             dist/*.zip
             dist/*.rpm
             dist/*.deb
+            dist/checksums.txt
             build/apk/*.apk
+      # The globs above would miss a new kind of file: ask of what the draft
+      # actually holds, so that nothing unattested goes public.
+      - name: every file of the release is attested
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          names=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          test -n "$names" || { echo "::error::the draft of $GITHUB_REF_NAME has no files"; exit 1; }
+          while IFS= read -r name; do
+            file=dist/$name
+            [ -f "$file" ] || file=build/apk/$name
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" >/dev/null ||
+              { echo "::error::$name is not attested: the release stays a draft"; exit 1; }
+          done <<<"$names"
+      - name: publish the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
 
-# Tag only after CI is green on the commit being tagged:
+# Tag a commit on main once CI is green on it; the gate job refuses any other:
 #   git tag -s vX.Y.Z && git push origin vX.Y.Z
