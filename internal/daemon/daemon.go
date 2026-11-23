@@ -85,6 +85,9 @@ var (
 	ErrConfig = errors.New("config")
 	// ErrAlreadyRunning means another daemon holds the shuttles' state.
 	ErrAlreadyRunning = errors.New("another shuttle daemon is already running")
+	// ErrRestarting means a reload or shutdown has the shuttle's state
+	// closed for now: asking again shortly can work.
+	ErrRestarting = errors.New("the shuttle is restarting: try again")
 )
 
 // Daemon runs the shuttles of one config, and follows the config as it
@@ -370,18 +373,25 @@ func (d *Daemon) Resolve(ctx context.Context, name, path string, choice engine.C
 	if err := func() error {
 		r.runMu.Lock()
 		defer r.runMu.Unlock()
+		// A reload may have closed the state while this waited for the run.
+		if r.db == nil {
+			return fmt.Errorf("%q: %w", name, ErrRestarting)
+		}
 		local, remote, err := r.open(ctx)
 		if err != nil {
 			return err
 		}
 		defer local.Close()
 		defer remote.Close()
-		return engine.Resolve(ctx, r.options(local, remote), path, choice)
+		if err := engine.Resolve(ctx, r.options(local, remote), path, choice); err != nil {
+			return err
+		}
+		r.addActivity(activity.KindConflict, path, "resolved: "+resolvedText(choice, d.o.Here))
+		return nil
 	}(); err != nil {
 		return err
 	}
 	d.o.Log.Info("conflict resolved", "shuttle", name, "path", path, "choice", choice)
-	r.addActivity(activity.KindConflict, path, "resolved: "+resolvedText(choice, d.o.Here))
 	r.trigger()
 	return nil
 }

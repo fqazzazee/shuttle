@@ -49,6 +49,10 @@ func (r *runner) openState() error {
 			r.markAttempt(last)
 		}
 	}
+	// Under runMu, as closeAll: Resolve can reach a runner a reload has
+	// just made.
+	r.runMu.Lock()
+	defer r.runMu.Unlock()
 	r.db = db
 	r.countSynced()
 	r.openActivity()
@@ -105,12 +109,15 @@ func stopAll(rs []*runner) error {
 func closeAll(rs []*runner) error {
 	var errs []error
 	for _, r := range rs {
+		// A Resolve may be using them: it holds runMu, and no run is left.
+		r.runMu.Lock()
 		errs = append(errs, r.db.Close())
 		r.db = nil
 		if r.activity != nil {
 			errs = append(errs, r.activity.Close())
 			r.activity = nil
 		}
+		r.runMu.Unlock()
 	}
 	return errors.Join(errs...)
 }
