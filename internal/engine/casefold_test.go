@@ -127,6 +127,38 @@ func TestMatchCase(t *testing.T) {
 		{"phone and SMB: two names neither side holds apart",
 			phoneSMB, config.ModeSync, tree(f("a", 1, t0)), tree(f("A", 2, t0)), nil,
 			"compare a (else conflict)\n"},
+
+		{"a new file in a folder spelled differently goes into the local spelling",
+			smbShare, config.ModeSync, tree(d("Docs"), f("Docs/a", 1, t0)),
+			tree(d("docs"), f("docs/a", 1, t0), f("docs/new", 2, t0)), synced(d("Docs"), f("Docs/a", 1, t0)),
+			"copy-to-local Docs/new\n"},
+		{"so does a new folder, and what is in it",
+			smbShare, config.ModeSync, tree(d("Docs"), f("Docs/a", 1, t0)),
+			tree(d("docs"), f("docs/a", 1, t0), d("docs/sub"), f("docs/sub/new", 2, t0)), synced(d("Docs"), f("Docs/a", 1, t0)),
+			"mkdir-local Docs/sub\ncopy-to-local Docs/sub/new\n"},
+		{"the record of a file only the share still has moves with it",
+			smbShare, config.ModeSync, tree(d("Docs"), f("Docs/a", 1, t0)),
+			tree(d("docs"), f("docs/a", 1, t0), f("docs/b", 2, t0)),
+			synced(d("Docs"), f("Docs/a", 1, t0), f("docs/b", 2, t0)),
+			"delete-remote Docs/b\n"},
+		{"a file deleted locally pairs with its record under the local spelling",
+			smbShare, config.ModeSync, tree(d("Docs"), f("Docs/a", 1, t0)),
+			tree(d("docs"), f("docs/a", 1, t0), f("docs/b", 2, t0)),
+			synced(d("Docs"), f("Docs/a", 1, t0), f("Docs/b", 2, t0)),
+			"delete-remote Docs/b\n"},
+		{"but not if the share's copy changed since: the edit comes back",
+			smbShare, config.ModeSync, tree(d("Docs"), f("Docs/a", 1, t0)),
+			tree(d("docs"), f("docs/a", 1, t0), f("docs/b", 3, t1)),
+			synced(d("Docs"), f("Docs/a", 1, t0), f("Docs/b", 2, t0)),
+			"copy-to-local Docs/b\n"},
+		{"a share listing both spellings of the folder is left alone",
+			smbShare, config.ModeSync, tree(d("Docs"), f("Docs/a", 1, t0)),
+			tree(d("Docs"), f("Docs/a", 1, t0), d("docs"), f("docs/new", 2, t0)), synced(d("Docs"), f("Docs/a", 1, t0)),
+			"mkdir-local docs\ncopy-to-local docs/new\n"},
+		{"phone: a new file in a folder spelled differently goes into the share's spelling",
+			phoneNFS, config.ModeSync, tree(d("Docs"), f("Docs/a", 1, t0), f("Docs/new", 2, t0)),
+			tree(d("docs"), f("docs/a", 1, t0)), synced(d("docs"), f("docs/a", 1, t0)),
+			"copy-to-remote docs/new\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -413,6 +445,26 @@ func TestRenameOnTheShareKeepsThePhonesFile(t *testing.T) {
 	}
 	if res := h.run(); res.Planned != 0 {
 		t.Errorf("next run planned %d actions", res.Planned)
+	}
+}
+
+func TestNewFileInAFolderSpelledDifferentlyStaysInIt(t *testing.T) {
+	shareHoldsWhatNTFSCannot(t)
+	h := newPhoneHarness(t, config.ModeSync, config.DeletionsMirror)
+	write(t, h.remoteDir, "docs/a", "a", t0)
+	h.run()
+	if err := os.Rename(filepath.Join(h.localDir, "docs"), filepath.Join(h.localDir, "Docs")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, h.localDir, "Docs/new", "new", t0)
+
+	h.run()
+	if got := listing(t, h.remoteDir); got != "docs/ docs/a=a docs/new=new" {
+		t.Errorf("share = %s, want one folder", got)
+	}
+	res := h.run()
+	if len(res.Conflicts) != 0 || res.Planned != 0 {
+		t.Errorf("next run: %d planned, conflicts %+v", res.Planned, res.Conflicts)
 	}
 }
 
