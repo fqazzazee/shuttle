@@ -22,4 +22,9 @@ func TestToastOf(t *testing.T) {
 		held.ActivationArguments != "open:conflicts" {
 		t.Errorf("a note that waits for the user = %+v", held)
 	}
+	hostile := toastOf(&notice.Note{Summary: "$(a)", Body: "$(b)]]>", Open: `x"$(c)`}, `C:\$(d)\icon.png`)
+	if hostile.Title != "＄(a)" || hostile.Body != "＄(b)]] >" || hostile.Icon != "" ||
+		len(hostile.Actions) != 0 || hostile.ActivationArguments != "" {
+		t.Errorf("a note with hostile text = %+v", hostile)
+	}
 }
