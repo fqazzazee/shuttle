@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -87,6 +88,64 @@ func TestWriteFileReplacesExisting(t *testing.T) {
 	}
 }
 
+// Replacing a file must not change who can read it.
+func TestWriteFileKeepsPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no permission bits to keep")
+	}
+	for _, perm := range []os.FileMode{0o600, 0o640, 0o664, 0o400} {
+		t.Run(perm.String(), func(t *testing.T) {
+			l, dir := newLocal(t)
+			p := filepath.Join(dir, "f")
+			writeOS(t, p, "old")
+			if err := os.Chmod(p, perm); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := WriteFile(context.Background(), l, "f", strings.NewReader("new"), time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			fi, err := os.Stat(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fi.Mode().Perm() != perm {
+				t.Errorf("mode = %o, want %o", fi.Mode().Perm(), perm)
+			}
+			if b, _ := os.ReadFile(p); string(b) != "new" {
+				t.Errorf("content = %q", b)
+			}
+		})
+	}
+}
+
+// A symlink's own mode says nothing about who may read the file replacing it.
+func TestWriteFileOverSymlinkUsesDefaultMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	l, dir := newLocal(t)
+	if _, err := WriteFile(context.Background(), l, "plain", strings.NewReader("x"), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.Stat(filepath.Join(dir, "plain"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("plain", filepath.Join(dir, "f")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteFile(context.Background(), l, "f", strings.NewReader("new"), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(filepath.Join(dir, "f"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fi.Mode().IsRegular() || fi.Mode().Perm() != want.Mode().Perm() {
+		t.Errorf("mode = %v, want a regular file with %o", fi.Mode(), want.Mode().Perm())
+	}
+}
+
 // syncLog is a Local that records the order of the steps of a write.
 type syncLog struct {
 	*Local
@@ -111,6 +170,14 @@ func (f syncLogFile) Close() error {
 
 func (l *syncLog) Create(ctx context.Context, name string) (io.WriteCloser, error) {
 	w, err := l.Local.Create(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return syncLogFile{w, l}, nil
+}
+
+func (l *syncLog) CreateLike(ctx context.Context, name, like string) (io.WriteCloser, error) {
+	w, err := l.Local.CreateLike(ctx, name, like)
 	if err != nil {
 		return nil, err
 	}

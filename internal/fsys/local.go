@@ -4,12 +4,14 @@ package fsys
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"math"
 	"os"
 	"path"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -159,6 +161,46 @@ func (l *Local) Create(ctx context.Context, name string) (io.WriteCloser, error)
 		return nil, err
 	}
 	return l.root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
+}
+
+// CreateLike never opens the file wider than like: a private file's data is
+// not readable by others even while it is being written.
+func (l *Local) CreateLike(ctx context.Context, name, like string) (io.WriteCloser, error) {
+	if err := begin(ctx, "create", like); err != nil {
+		return nil, err
+	}
+	fi, err := l.root.Lstat(like)
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && !fi.Mode().IsRegular()) || runtime.GOOS == "windows" {
+		return l.Create(ctx, name)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := l.beginNew(ctx, "create", name); err != nil {
+		return nil, err
+	}
+	perm := fi.Mode().Perm()
+	// Owner-write so a read-only file can still be written on a mount that
+	// checks the mode on each write; Close puts the exact bits back.
+	f, err := l.root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm|0o200)
+	if err != nil {
+		return nil, err
+	}
+	return permFile{f, perm}, nil
+}
+
+// permFile is a new file that takes its final permissions on Close, which
+// also undoes the umask's narrowing of a mode like 0664.
+type permFile struct {
+	*os.File
+	perm fs.FileMode
+}
+
+func (f permFile) Close() error {
+	// Best effort: FAT and Android's shared storage refuse chmod, and the
+	// mode the file was opened with is already no wider than the old file's.
+	_ = f.Chmod(f.perm)
+	return f.File.Close()
 }
 
 func (l *Local) Rename(ctx context.Context, oldname, newname string) error {

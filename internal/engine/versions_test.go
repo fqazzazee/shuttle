@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -179,6 +180,42 @@ func TestVersioningNone(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(h.localDir, VersionsDir)); !errors.Is(err, os.ErrNotExist) {
 		t.Error("a versions folder was created with versioning off")
+	}
+}
+
+// With versioning the old file has moved away by the time the new one is
+// written, and its permissions still have to reach the new one.
+func TestPullKeepsAPrivateFilePrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no permission bits to keep")
+	}
+	for name, v := range map[string]config.Versioning{
+		"versioned":     {Kind: config.VersioningTrash, Keep: time.Hour},
+		"not versioned": {Kind: config.VersioningNone},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t, config.ModePull, config.DeletionsMirror)
+			h.settings.Versioning = v
+			write(t, h.remoteDir, "a.txt", "v1", t0)
+			h.run()
+			p := filepath.Join(h.localDir, "a.txt")
+			if err := os.Chmod(p, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			write(t, h.remoteDir, "a.txt", "v2", t1)
+
+			h.run()
+			if got, _ := read(t, h.localDir, "a.txt"); got != "v2" {
+				t.Fatalf("local a.txt = %q", got)
+			}
+			fi, err := os.Stat(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fi.Mode().Perm() != 0o600 {
+				t.Errorf("mode = %o, want 600", fi.Mode().Perm())
+			}
+		})
 	}
 }
 

@@ -74,6 +74,14 @@ type FS interface {
 	Close() error
 }
 
+// PermCreator is implemented by file systems whose files have permissions
+// that replacing a file must not change.
+type PermCreator interface {
+	// CreateLike is Create with the permissions of the regular file at like.
+	// If like is absent or not a regular file, it is plain Create.
+	CreateLike(ctx context.Context, name, like string) (io.WriteCloser, error)
+}
+
 // CaseInsensitive is implemented by file systems that may treat names
 // differing only in case as the same file. FoldKey says which: two names
 // with the same key are one file there.
