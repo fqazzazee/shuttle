@@ -52,6 +52,7 @@ type runner struct {
 	asked     bool            // the user asked for the run in progress: a metered connection does not stop it
 	attempted time.Time       // when a run was last triggered by the schedule, or completed before start
 	completed time.Time       // when a run last completed, as of start
+	firstSlot time.Time       // when an at-only shuttle that never completed began waiting for its first time
 	own       map[string]bool // local paths this shuttle's run wrote; see startOwnWrites
 	ownUntil  time.Time
 
@@ -96,6 +97,18 @@ func (r *runner) lastEnded() time.Time {
 		return r.st.LastRun
 	}
 	return r.completed
+}
+
+// scheduleFrom is what the schedule counts from, given the shuttle's last
+// run: with none, when it began waiting for its first time, so that time is
+// seen as passed and not skipped for the next one.
+func (r *runner) scheduleFrom(last time.Time) time.Time {
+	if !last.IsZero() {
+		return last
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.firstSlot
 }
 
 func (r *runner) markAttempt(t time.Time) {

@@ -45,6 +45,7 @@ type fixture struct {
 	deviceName   string           // Options.DeviceName
 	paused       []string         // Options.Paused
 	pausedAll    bool             // Options.PausedAll
+	now          func() time.Time // Options.Now
 }
 
 // newFixture writes a config with one shuttle, s, between local and the
@@ -86,7 +87,7 @@ func (f *fixture) start() {
 func (f *fixture) build() {
 	f.t.Helper()
 	d, err := New(&Options{Paths: f.paths, Store: noKeyring{f.t}, OnChange: f.onChange, OnEvent: f.onEvent,
-		DeviceName: f.deviceName, Paused: f.paused, PausedAll: f.pausedAll})
+		DeviceName: f.deviceName, Paused: f.paused, PausedAll: f.pausedAll, Now: f.now})
 	if err != nil {
 		f.t.Fatal(err)
 	}

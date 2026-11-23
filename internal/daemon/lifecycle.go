@@ -48,6 +48,19 @@ func (r *runner) openState() error {
 		if last.After(r.lastAttempt()) {
 			r.markAttempt(last)
 		}
+		// An interval runs at start when it never ran, so only at times
+		// need a baseline.
+		set := &r.shuttle.Settings
+		if last.IsZero() && set.Has(config.TriggerSchedule) && set.Interval == 0 && len(set.At) > 0 {
+			from, err := db.ScheduleFrom(r.d.o.Now())
+			if err != nil {
+				r.d.o.Log.Warn("reading when the schedule began", "shuttle", name, "err", err)
+				from = r.d.o.Now()
+			}
+			r.mu.Lock()
+			r.firstSlot = from
+			r.mu.Unlock()
+		}
 	}
 	r.db = db
 	r.countSynced()

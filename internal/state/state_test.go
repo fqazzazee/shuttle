@@ -316,6 +316,37 @@ func BenchmarkPutBatched1000(b *testing.B) {
 	b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(i), "ns/record")
 }
 
+func TestScheduleFrom(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := time.Unix(1000, 0)
+	if got, err := db.ScheduleFrom(first); err != nil || !got.Equal(first) {
+		t.Fatalf("first call = %v, %v; want %v", got, err, first)
+	}
+	db.Close()
+	if db, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if got, err := db.ScheduleFrom(first.Add(time.Hour)); err != nil || !got.Equal(first) {
+		t.Errorf("after reopening = %v, %v; want the first time, %v", got, err, first)
+	}
+	// Other folders are another history: their wait starts afresh.
+	if _, err := db.Bind("one"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Bind("two"); err != nil {
+		t.Fatal(err)
+	}
+	later := first.Add(2 * time.Hour)
+	if got, err := db.ScheduleFrom(later); err != nil || !got.Equal(later) {
+		t.Errorf("after a reset = %v, %v; want %v", got, err, later)
+	}
+}
+
 func TestBind(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.db")
 	db, err := Open(path)
