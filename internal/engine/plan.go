@@ -157,7 +157,10 @@ func decide(mode config.Mode, deletions config.DeletionMode, l, r *fsys.FileInfo
 	}
 
 	if l != nil && r != nil && l.Kind != r.Kind {
-		return Action{Op: OpConflict, Reason: "a file on one side and a folder on the other"}, true
+		// Push and pull hold it whatever the policy: settling it renames the
+		// file, and a one-way source is never written to.
+		return Action{Op: OpConflict, Reason: "a file on one side and a folder on the other",
+			alwaysHold: mode != config.ModeSync}, true
 	}
 
 	switch mode {

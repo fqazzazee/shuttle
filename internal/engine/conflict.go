@@ -15,6 +15,7 @@ import (
 
 	"github.com/fqazzazee/shuttle/internal/config"
 	"github.com/fqazzazee/shuttle/internal/fsys"
+	"github.com/fqazzazee/shuttle/internal/state"
 )
 
 // conflict applies the shuttle's conflict policy to a path that changed on
@@ -90,12 +91,23 @@ func (e *executor) keepBoth(a *Action) error {
 	if err != nil {
 		return err
 	}
+	clash := a.Local.Kind != a.Remote.Kind
+	if clash {
+		// With its records left, the folder would read as deleted on the side
+		// that held the file, and the next run would delete it. They go first:
+		// a crash after the rename must not leave them, and a path without
+		// records is only ever copied.
+		e.pending = append(e.pending, func(tx *state.Tx) error { return tx.DeleteTree(a.Path) })
+		if err := e.flush(); err != nil {
+			return err
+		}
+	}
 	if err := loserFS.Rename(e.ctx, a.Path, saved); err != nil {
 		return err
 	}
 	e.settled(a, "kept both: the "+label(loserName)+" copy is now "+saved)
 
-	if a.Local.Kind != a.Remote.Kind {
+	if clash {
 		return nil // the folder and the renamed file sync on the next run
 	}
 	// Give the loser side the winning file, and the winner side the saved one.
@@ -188,6 +200,10 @@ func Resolve(ctx context.Context, o *Options, p string, choice Choice) error {
 	r, err := o.Remote.Stat(ctx, p)
 	if err != nil {
 		return err
+	}
+	if o.Settings.Mode != config.ModeSync && l.Kind != r.Kind {
+		// Keeping both renames the file, which may be on the one-way source.
+		return fmt.Errorf("resolve %s: a file and a folder in a one-way shuttle: rename or remove one of them", p)
 	}
 	a := &Action{Op: OpConflict, Path: p, Local: &l, Remote: &r, Reason: "resolved by the user"}
 	switch choice {
