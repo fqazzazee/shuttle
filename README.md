@@ -331,10 +331,10 @@ copy restored only there is replaced again, or with `mirror` deleted again.
 `report.sync-conflict-20261011-153000-laptop.pdf`, ending in the name of the side it came from.
 These are ordinary files, and sync like any other.
 
-**In the next release, not in v0.3.0:** a synced path replaced by a symlink or other special
-file, and a file/folder clash in a push or pull, are held: both sides stay unchanged, the path is
-reported, and nothing under it is deleted or renamed. A one-way source is never written to. Up to
-v0.3.0 such a path can still be renamed or, with `mirror`, deleted.
+**From v0.4.0:** a synced path replaced by a symlink or other special file, and a file/folder
+clash in a push or pull, are held: both sides stay unchanged, the path is reported, and nothing
+under it is deleted or renamed. A one-way source is never written to. Up to v0.3.0 such a path
+can still be renamed or, with `mirror`, deleted.
 
 ### GNOME extension
 
