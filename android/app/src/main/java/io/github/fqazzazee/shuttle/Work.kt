@@ -32,6 +32,17 @@ const val JOB_PREFIX = "shuttle:"
 /** WorkManager's shortest period. */
 val SHARE_CHECK_EVERY: Duration = Duration.ofMinutes(15)
 
+/**
+ * Changes what the daemon may run, then plans again: a shuttle paused or waiting for a permission
+ * has no job, so one that comes back needs a plan before the app closes, or it has none.
+ */
+fun <D : Any> changeThenPlan(d: D?, change: (D) -> Unit, plan: (D) -> Unit) {
+    d?.let {
+        change(it)
+        plan(it)
+    }
+}
+
 fun parseWork(json: String): List<Work> {
     val all = JSONArray(json)
     return (0 until all.length()).map { i ->

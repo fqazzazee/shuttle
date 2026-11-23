@@ -65,4 +65,19 @@ class WorkTest {
             planWork(listOf(Work("s", at, true, true, false)), now).map { it.name },
         )
     }
+
+    @Test
+    fun aChangeToWhatRunsPlansAgain() {
+        val log = mutableListOf<String>()
+        changeThenPlan("daemon", { log += "resume $it" }) { log += "plan $it" }
+        // In this order: the plan reads what the change left.
+        assertEquals(listOf("resume daemon", "plan daemon"), log)
+    }
+
+    @Test
+    fun noDaemonNothingToPlan() {
+        val log = mutableListOf<String>()
+        changeThenPlan<String>(null, { log += "resume" }) { log += "plan" }
+        assertEquals(emptyList<String>(), log)
+    }
 }

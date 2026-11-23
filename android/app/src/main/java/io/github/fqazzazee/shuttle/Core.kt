@@ -90,10 +90,13 @@ object Core {
         }
     }
 
-    /** Tells the daemon what the phone has given, as the app found it on coming back. */
-    fun setAccess(access: Access) {
-        current?.setPermissions(access.files, access.localNetwork)
-    }
+    /** Tells the daemon what the phone has given, as the app found it on coming back. On Core's thread. */
+    fun setAccess(context: Context, access: Access) =
+        changeThenPlan(current, { it.setPermissions(access.files, access.localNetwork) }) { plan(context, it) }
+
+    /** Pauses or resumes a shuttle, or every shuttle when name is empty. On Core's thread. */
+    fun setPaused(context: Context, name: String, paused: Boolean) =
+        changeThenPlan(current, { it.setPaused(name, paused) }) { plan(context, it) }
 
     /**
      * Runs the foreground service while a shuttle is real-time, and only then: a shuttle that is
