@@ -160,7 +160,10 @@ func (c *Client) Changes(ctx context.Context) (<-chan daemon.Status, error) {
 			select {
 			case <-ctx.Done():
 				return
-			case sig := <-signals:
+			case sig, ok := <-signals:
+				if !ok || sig == nil { // the connection closed
+					return
+				}
 				if sig.Name != Interface+".ShuttleChanged" || len(sig.Body) != 2 {
 					continue
 				}

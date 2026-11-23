@@ -324,6 +324,26 @@ func TestClosedBusDoesNotStopTheDaemon(t *testing.T) {
 	}
 }
 
+// If the client's connection goes away, its stream of changes ends. It used
+// to panic on the closed signal channel, which took the TUI down with the
+// terminal still in raw mode.
+func TestChangesEndWhenTheBusCloses(t *testing.T) {
+	conn := dbustest.Bus(t)()
+	ch, err := NewClient(conn).Changes(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Error("a change from a closed connection")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the stream did not end")
+	}
+}
+
 // Config edits reach the bus: a broken one as ConfigError and a refused
 // ReloadConfig, a removed shuttle as ShuttleRemoved.
 func TestReloadOverTheBus(t *testing.T) {
