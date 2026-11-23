@@ -418,8 +418,11 @@ func isOffline(err error) bool {
 // pairOf names the two folders a shuttle syncs, for state.Bind: the local
 // folder, and the folder on the server the share reaches as its user,
 // whatever the share is called. Another user may see other files, so it is
-// a new pair: starting afresh deletes nothing, while files the new user
-// cannot see would read as deleted against the old history.
+// a new pair: files the new user cannot see would read as deleted against
+// the old history. Starting afresh, a sync deletes nothing and holds files
+// that differ as conflicts; a push or pull makes the destination match its
+// source, replacing files that differ and, with deletions = mirror, deleting
+// what the source lacks, subject to the deletion guard and versioning.
 func pairOf(cfg *config.Config, s *config.Shuttle) string {
 	sh := cfg.Shares[s.Share]
 	var server string

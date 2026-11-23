@@ -209,6 +209,57 @@ func TestEditShuttle(t *testing.T) {
 	}
 }
 
+// Moving a shuttle: the question says what its mode can do to the new folders.
+func TestMovedSaysWhatItCanDelete(t *testing.T) {
+	const guard = "unless the deletion guard holds it"
+	for _, tt := range []struct {
+		mode, deletions string
+		has, hasNot     []string
+	}{
+		{"sync", "additive", []string{"Nothing is deleted", "conflicts"}, []string{"replaced"}},
+		{"sync", "mirror", []string{"Nothing is deleted", "conflicts"}, []string{"replaced"}},
+		{"push", "additive", []string{"on the share are replaced", "Nothing is deleted", "versioning"}, []string{"conflicts", guard}},
+		{"pull", "additive", []string{"on this computer are replaced", "Nothing is deleted", "versioning"}, []string{"conflicts", guard}},
+		{"push", "mirror", []string{"on the share are replaced", "whatever this computer lacks is deleted from the share", guard, "versioning"}, []string{"Nothing is deleted"}},
+		{"pull", "mirror", []string{"on this computer are replaced", "whatever the share lacks is deleted from this computer", guard, "versioning"}, []string{"Nothing is deleted"}},
+	} {
+		got := movedEffect(tt.mode, tt.deletions)
+		for _, w := range tt.has {
+			if !strings.Contains(got, w) {
+				t.Errorf("%s, %s: %q lacks %q", tt.mode, tt.deletions, got, w)
+			}
+		}
+		for _, w := range tt.hasNot {
+			if strings.Contains(got, w) {
+				t.Errorf("%s, %s: %q says %q", tt.mode, tt.deletions, got, w)
+			}
+		}
+	}
+}
+
+// The question goes by what the shuttle will do as saved: here its own
+// settings, over a profile that syncs.
+func TestMovedMirrorPushAsksAboutDeletion(t *testing.T) {
+	w := newWizardSetup(t, nil)
+	m := w.m
+	press(t, m, "e")
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyLeft)
+	press(t, m, "down", "down")
+	press(t, m, "o")
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	key(t, m, tea.KeyEnter)
+	m.wizard.settings.values["mode"], m.wizard.settings.values["deletions"] = "push", "mirror"
+	ctrl(t, m, 's')
+	if !strings.Contains(m.question, "whatever this computer lacks is deleted from the share") {
+		t.Errorf("the question = %q", m.question)
+	}
+	if strings.Contains(m.question, "Nothing is deleted") {
+		t.Errorf("a mirror push promises nothing is deleted: %q", m.question)
+	}
+}
+
 func TestShuttleFolders(t *testing.T) {
 	w := newWizardSetup(t, errors.New("share nas: connecting: no route to host"))
 	m := w.m

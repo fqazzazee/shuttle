@@ -43,6 +43,32 @@ class WizardTest {
         assertEquals(listOf(FolderEntry("Music", true), FolderEntry("Photos", true), FolderEntry("a.txt", false)), FolderEntry.parseAll(json))
     }
 
+    private fun setting(key: String, value: String, inherited: String = "") =
+        Setting(key, key, "", emptyList(), false, value, inherited, "default", "")
+
+    @Test
+    fun theMoveQuestionGoesByWhatTheShuttleDoes() {
+        for ((mode, deletions, want) in listOf(
+            Triple("sync", "mirror", R.string.wizard_moved_sync),
+            Triple("push", "additive", R.string.wizard_moved_push),
+            Triple("pull", "additive", R.string.wizard_moved_pull),
+            Triple("push", "mirror", R.string.wizard_moved_push_mirror),
+            Triple("pull", "mirror", R.string.wizard_moved_pull_mirror),
+            Triple("", "", R.string.wizard_moved_any),
+        )) {
+            // As inherited too: from a profile, or the default.
+            assertEquals(want, movedEffect(listOf(setting("mode", mode), setting("deletions", deletions))))
+            assertEquals(want, movedEffect(listOf(setting("mode", "", mode), setting("deletions", "", deletions))))
+        }
+    }
+
+    @Test
+    fun aMirrorPushIsToldWhatIsDeleted() {
+        val rows = listOf(setting("mode", "push"), setting("deletions", "mirror"))
+        compose.setContent { MovedDialog("docs", movedEffect(rows), {}, {}) }
+        compose.onNodeWithText("whatever this phone lacks is deleted from the share", substring = true).assertExists()
+    }
+
     @Test
     fun aFolderPathGoesInAndUp() {
         val top = WizardState(share = "nas")
@@ -310,7 +336,7 @@ class WizardTest {
     fun aMoveIsAskedAbout() {
         var saved = 0
         var cancelled = 0
-        compose.setContent { MovedDialog("photos", { saved++ }) { cancelled++ } }
+        compose.setContent { MovedDialog("photos", R.string.wizard_moved_sync, { saved++ }) { cancelled++ } }
         compose.onNodeWithText("photos now syncs other folders", substring = true).assertExists()
         compose.onNodeWithText("Save").performClick()
         compose.onNodeWithText("Cancel").performClick()
