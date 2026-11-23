@@ -312,7 +312,7 @@ func (f endlessFS) Open(ctx context.Context, name string) (io.ReadCloser, error)
 type endlessFile struct{ read *int64 }
 
 func (f endlessFile) Read(p []byte) (int, error) {
-	if *f.read > 8<<20 {
+	if *f.read > 2*growthAllowance {
 		return 0, errInjected
 	}
 	*f.read += int64(len(p))
@@ -321,22 +321,93 @@ func (f endlessFile) Read(p []byte) (int, error) {
 
 func (endlessFile) Close() error { return nil }
 
-// A file may not take more room than the free-space check counted, nor keep
-// a comparison running for as long as the server cares to send.
+// growingFS appends to a file on the server's disk as it is opened, the way a
+// live log grows between the scan and the copy.
+type growingFS struct {
+	fsys.FS
+	path, full, extra string
+	grown             *bool
+}
+
+func (f growingFS) Open(ctx context.Context, name string) (io.ReadCloser, error) {
+	if name == f.path && !*f.grown {
+		*f.grown = true
+		a, err := os.OpenFile(f.full, os.O_APPEND|os.O_WRONLY, 0)
+		if err != nil {
+			return nil, err
+		}
+		defer a.Close()
+		if _, err := a.WriteString(f.extra); err != nil {
+			return nil, err
+		}
+	}
+	return f.FS.Open(ctx, name)
+}
+
+// A live log must keep syncing: what it holds when read lands, and the next
+// run brings the two sides level.
+func TestFileGrowingWithinTheAllowanceLands(t *testing.T) {
+	localDir, remoteDir := t.TempDir(), newRemoteDir(t)
+	statePath := filepath.Join(t.TempDir(), "state.db")
+	write(t, remoteDir, "app.log", "first line\n", t1)
+	const grown = "first line\nsecond line\n"
+
+	var done bool
+	res, err := runSync(localDir, remoteDir, statePath, nil, func(f fsys.FS) fsys.FS {
+		return growingFS{f, "app.log", filepath.Join(remoteDir, "app.log"), "second line\n", &done}
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Errors) != 0 || res.Copied != 1 {
+		t.Errorf("copied = %d, errors = %+v, want the file copied", res.Copied, res.Errors)
+	}
+	if got, _ := read(t, localDir, "app.log"); got != grown {
+		t.Errorf("local app.log = %q, want %q", got, grown)
+	}
+
+	res, err = runSync(localDir, remoteDir, statePath, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Errors) != 0 || len(res.Skipped) != 0 || len(res.Conflicts) != 0 {
+		t.Errorf("second run: %+v, want it settled", res)
+	}
+	if got, _ := read(t, localDir, "app.log"); got != grown {
+		t.Errorf("local app.log after the second run = %q, want %q", got, grown)
+	}
+}
+
+// A file may not take more room than the free-space check counted plus the
+// allowance, nor keep a comparison running for as long as the server cares to
+// send. Comparing has no use for growth, so it stops at the scanned size.
 func TestSourceLongerThanScannedIsLeftForNextRun(t *testing.T) {
-	for name, localContent := range map[string]string{
-		"copy":    "",
-		"compare": "local 10 b",
+	for _, tc := range []struct {
+		name         string
+		localContent string
+		synced       bool // the local copy is a recorded one, so it gets replaced
+		wantMax      int64
+	}{
+		{"copy", "", false, 10 + growthAllowance + 1},
+		{"copy over a synced file", "local 10 b", true, 10 + growthAllowance + 1},
+		{"compare", "local 10 b", false, 11},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			localDir, remoteDir := t.TempDir(), newRemoteDir(t)
-			write(t, remoteDir, "f.bin", "remote 10b", t1)
+			statePath := filepath.Join(t.TempDir(), "state.db")
+			localContent := tc.localContent
 			if localContent != "" {
 				write(t, localDir, "f.bin", localContent, t0)
 			}
+			if tc.synced {
+				if _, err := runSync(localDir, remoteDir, statePath, nil, nil, nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			write(t, remoteDir, "f.bin", "remote 10b", t1)
 
 			var sent int64
-			res, err := runSync(localDir, remoteDir, filepath.Join(t.TempDir(), "state.db"), nil,
+			res, err := runSync(localDir, remoteDir, statePath, nil,
 				func(f fsys.FS) fsys.FS { return endlessFS{f, "f.bin", &sent} }, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -344,8 +415,8 @@ func TestSourceLongerThanScannedIsLeftForNextRun(t *testing.T) {
 			if len(res.Skipped) != 1 || !strings.Contains(res.Skipped[0].Reason, ErrChanged.Error()) {
 				t.Errorf("skipped = %+v, errors = %+v, want f.bin left for the next run", res.Skipped, res.Errors)
 			}
-			if sent > 11 {
-				t.Errorf("read %d bytes of a 10-byte file, want at most 11", sent)
+			if sent > tc.wantMax {
+				t.Errorf("read %d bytes of a 10-byte file, want at most %d", sent, tc.wantMax)
 			}
 			got, _ := read(t, localDir, "f.bin")
 			if got != localContent {
