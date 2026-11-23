@@ -361,8 +361,8 @@ type Entry struct {
 	HasAttr bool
 }
 
-// maxEntries bounds one folder's listing.
-const maxEntries = 1 << 22
+// maxEntries bounds one folder's listing. A variable for the tests.
+var maxEntries = 1 << 22
 
 // ReadDir lists folder dir with READDIRPLUS, calling fn for each entry
 // other than "." and "..", in the server's order.
@@ -396,11 +396,13 @@ func (c *Client) ReadDir(ctx context.Context, dir FH, fn func(Entry) error) erro
 				break
 			}
 			n++
-			if e.Name == "." || e.Name == ".." {
-				continue
-			}
+			// Before the skip: a server can send "." forever, with a new
+			// cookie each time.
 			if total++; total > maxEntries {
 				return fmt.Errorf("nfs readdirplus: more than %d entries in one folder", maxEntries)
+			}
+			if e.Name == "." || e.Name == ".." {
+				continue
 			}
 			if err := fn(e); err != nil {
 				return err

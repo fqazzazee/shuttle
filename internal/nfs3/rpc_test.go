@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -269,6 +270,37 @@ func TestReadDirMustMoveOn(t *testing.T) {
 	err := c.ReadDir(t.Context(), FH{1}, func(Entry) error { n++; return nil })
 	if err == nil || n > 2 {
 		t.Errorf("err = %v after %d entries", err, n)
+	}
+}
+
+// "." and ".." are never handed to the caller, but a server sending nothing
+// else, with a new cookie each time, must still reach the limit.
+func TestReadDirCountsDotEntries(t *testing.T) {
+	defer func(n int) { maxEntries = n }(maxEntries)
+	maxEntries = 10
+
+	var cookie atomic.Uint64
+	nc, _ := fakeConn(t, func(fakeCall) []byte {
+		return accepted(func(e *encoder) {
+			e.u32(uint32(StatusOK))
+			e.bool(false) // dir attributes
+			e.fixed(make([]byte, 8))
+			e.bool(true) // an entry
+			e.u64(1)
+			e.string(".")
+			e.u64(cookie.Add(1))
+			e.bool(false) // attributes
+			e.bool(false) // handle
+			e.bool(false) // no more entries
+			e.bool(false) // not the end
+		})
+	})
+	c := &Client{nfs: nc, rsize: 4096, wsize: 4096}
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	err := c.ReadDir(ctx, FH{1}, func(Entry) error { return nil })
+	if err == nil || !strings.Contains(err.Error(), "more than 10 entries") {
+		t.Errorf("err = %v after %d pages, want the entry limit", err, cookie.Load())
 	}
 }
 
